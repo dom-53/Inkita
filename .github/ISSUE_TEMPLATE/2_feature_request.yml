@@ -1,0 +1,52 @@
+name: Feature request
+description: Suggest a feature or improvement for Inkita
+labels: [feature]
+body:
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Describe your suggested feature
+      description: What should be added or improved in Inkita?
+      placeholder: |
+        Example:
+          "Add offline caching for chapters..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why is this needed?
+      placeholder: |
+        Example:
+          "Kavita API requires multiple requests, this would improve performance..."
+
+  - type: textarea
+    id: ui-impact
+    attributes:
+      label: UI impact (if any)
+      placeholder: |
+        Example:
+          "New button in the reader menu..."
+
+  - type: textarea
+    id: other-details
+    attributes:
+      label: Other details
+      placeholder: |
+        Additional notes or mockups.
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Acknowledgements
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate.
+          required: true
+        - label: I have written a clear and descriptive title.
+          required: true
+        - label: I understand this request must be technically feasible with the Kavita API.
+          required: true
+        - label: I have provided enough detail to understand the feature.
+          required: true

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_failed_stat_load">Failed to load statistics.</string>
+    <string name="stats_reading_sum">Reading summary</string>
+    <string name="stats_activity_last_30d">Activity (last 30 days)</string>
+    <string name="stats_pages_per_yer">Pages per year</string>
+    <string name="stats_words_per_yer">Words per year</string>
+    <string name="stats_source_kavita_api_description">Data comes from Kavita’s /api/Stats endpoint. Can be expanded with additional charts (day of week, formats, publication types, etc.).</string>
+</resources>

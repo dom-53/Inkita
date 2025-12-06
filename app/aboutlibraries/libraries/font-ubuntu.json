@@ -1,0 +1,8 @@
+{
+  "uniqueId": "font-ubuntu",
+  "name": "Ubuntu",
+  "website": "https://fonts.google.com/specimen/Ubuntu",
+  "licenses": ["ofl-1.1"],
+  "developers": [{ "name": "Dalton Maag" }],
+  "description": "Bundled font files in assets/fonts/Ubuntu (regular/weights)."
+}

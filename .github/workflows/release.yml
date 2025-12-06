@@ -1,0 +1,181 @@
+name: Build & Release Inkita
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Prepare vars
+        id: vars
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION_NAME="${TAG#v}"
+          CHANNEL="stable"
+          if [[ "$TAG" == *"-alpha"* ]]; then CHANNEL="preview"; fi
+          if [[ "$TAG" == *"-beta"* ]]; then CHANNEL="preview"; fi
+          IS_PRERELEASE="false"
+          if [[ "$CHANNEL" != "stable" ]]; then IS_PRERELEASE="true"; fi
+          BUILD_TASK="assembleRelease"
+          APK_DIR="app/build/outputs/apk/release"
+          APK_SUFFIX="release.apk"
+          if [[ "$CHANNEL" != "stable" ]]; then
+            BUILD_TASK="assemblePreview"
+            APK_DIR="app/build/outputs/apk/preview"
+            APK_SUFFIX="preview.apk"
+          fi
+          VERSION_CODE=$(grep "versionCode" app/build.gradle.kts | head -n1 | grep -oE "[0-9]+")
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "build_task=$BUILD_TASK" >> $GITHUB_OUTPUT
+          echo "apk_dir=$APK_DIR" >> $GITHUB_OUTPUT
+          echo "apk_suffix=$APK_SUFFIX" >> $GITHUB_OUTPUT
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+
+      - name: Decode keystore
+        run: |
+          set -euo pipefail
+          echo "${SIGNING_KEY}" | base64 --decode > /tmp/inkita.keystore
+          echo "STORE_FILE=/tmp/inkita.keystore" >> $GITHUB_ENV
+          echo "STORE_PASSWORD=${STORE_PASSWORD}" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=${KEY_PASSWORD}" >> $GITHUB_ENV
+          echo "KEY_ALIAS=${KEY_ALIAS}" >> $GITHUB_ENV
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+
+      - name: Build APKs (abi splits + universal)
+        run: |
+          ./gradlew ${{ steps.vars.outputs.build_task }} \
+            -PversionNameOverride="${{ steps.vars.outputs.version_name }}" \
+            -PreleaseChannel="${{ steps.vars.outputs.channel }}"
+
+      - name: Collect APK artifact
+        id: apk
+        run: |
+          OUT_DIR="${{ steps.vars.outputs.apk_dir }}"
+          SUFFIX="${{ steps.vars.outputs.apk_suffix }}"
+          ls -la "$OUT_DIR"
+          FILE=$(find "$OUT_DIR" -name "*${SUFFIX}" -print -quit)
+          if [[ -z "$FILE" ]]; then
+            echo "::error::Missing APK"
+            exit 1
+          fi
+          DEST="inkita-universal-v${{ steps.vars.outputs.version_name }}.apk"
+          mv "$FILE" "$OUT_DIR/$DEST"
+          echo "apk=$OUT_DIR/$DEST" >> $GITHUB_OUTPUT
+
+      - name: Extract release notes from CHANGELOG
+        id: changelog
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.vars.outputs.tag }}"
+          CLEAN="${TAG#v}"
+
+          # Try to read section matching the tag (with or without leading v)
+          BODY=$(awk -v A="$TAG" -v B="$CLEAN" '
+            /^##[[:space:]]+/ {
+              if(found) exit
+              hdr=$0
+              if (match(hdr, "^##[[:space:]]+" A "$") || match(hdr, "^##[[:space:]]+" B "$")) {found=1; next}
+            }
+            found {print}
+          ' CHANGELOG.md)
+
+          # Fallback to Unreleased if tag section not found or empty
+          if [[ -z "$BODY" ]]; then
+            BODY=$(awk '
+              /^##[[:space:]]+Unreleased/ {flag=1; next}
+              /^##[[:space:]]+/ {if(flag) exit}
+              flag {print}
+            ' CHANGELOG.md)
+          fi
+
+          # Final fallback
+          if [[ -z "$BODY" ]]; then
+            BODY="Release ${TAG}"
+          fi
+          {
+            echo "body<<EOF"
+            echo "$BODY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ fromJson(steps.vars.outputs.is_prerelease) }}
+          body: ${{ steps.changelog.outputs.body }}
+          files: ${{ steps.apk.outputs.apk }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update gh-pages updates.json
+        if: success()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin gh-pages
+          git worktree add /tmp/gh-pages gh-pages
+          cd /tmp/gh-pages
+
+          # keep only docs/updates.json
+          find . -maxdepth 1 ! -name '.' ! -name '..' ! -name '.git' -exec rm -rf {} +
+          mkdir -p docs
+
+          APK_PATH="${GITHUB_WORKSPACE}/${APK_DIR}/inkita-universal-v${VERSION_NAME}.apk"
+          SHA=""
+          if [[ -f "$APK_PATH" ]]; then
+            SHA=$(sha256sum "$APK_PATH" | awk '{print $1}')
+          fi
+
+          cat > docs/updates.json <<EOF
+          {
+            "channel": "${CHANNEL}",
+            "version": "${VERSION_NAME}",
+            "versionCode": ${VERSION_CODE},
+            "url": "https://github.com/dom-53/Inkita/releases/download/${TAG}/inkita-universal-v${VERSION_NAME}.apk",
+            "sha256": "${SHA}"
+          }
+          EOF
+
+          git add docs/updates.json
+          git commit -m "chore: update updates.json for ${TAG}" || true
+          git push origin gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANNEL: ${{ steps.vars.outputs.channel }}
+          VERSION_NAME: ${{ steps.vars.outputs.version_name }}
+          TAG: ${{ steps.vars.outputs.tag }}
+          VERSION_CODE: ${{ steps.vars.outputs.version_code }}
+          APK_DIR: ${{ steps.vars.outputs.apk_dir }}

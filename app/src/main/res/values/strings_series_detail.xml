@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="series_detail_detail">Detail</string>
+    <string name="series_detail_share_series">Share series</string>
+    <string name="series_detail_chapter_not_available">Chapter is not available for reading.</string>
+    <string name="series_detail_start_over_question">Start over?</string>
+    <string name="series_detail_reset_and_start_again">This will reset your reading progress and start from the beginning.</string>
+    <string name="series_detail_reset_progress">Reset progress</string>
+    <string name="series_detail_no_related_items">No related items.</string>
+    <string name="series_detail_no_related">No related items.</string>
+    <string name="series_detail_mark_prev_q">Mark previous volumes as read?</string>
+    <string name="series_detail_mark_read_this_and_prev">Volume %1$s is being marked read. Do you want to mark previous unread volumes as read too?</string>
+    <string name="series_detail_mark_with_prev">Mark with previous</string>
+    <string name="series_detail_only_this_vol">This volume only</string>
+    <string name="series_detail_mark_this_and_later">Volume %1$s is being marked unread. Do you want to mark later read volumes as unread too?</string>
+    <string name="series_detail_mark_all">Mark all</string>
+    <string name="series_detail_mark_this_vol">Only this volume</string>
+    <string name="series_detail_prev_unread_mark_read_too_q">Previous volumes are unread. Mark them as read too, or only set this page?</string>
+    <string name="series_detail_mark_prev_and_continue">Mark previous and continue</string>
+    <string name="series_detail_only_this_page">Only this page</string>
+    <string name="series_detail_mark_later_vol_unr_q">Mark later volumes as unread?</string>
+    <string name="series_detail_mark_unred_vol_and_later_too_q">Later volumes are marked read. Mark them unread too, or only update this volume?</string>
+    <string name="series_detail_scroll_top">Scroll to top</string>
+    <string name="series_detail_no_colls_reload">No collections. Reload.</string>
+    <string name="series_detail_load_colls">Load collections</string>
+    <string name="series_detail_resume_page">Resume: page</string>
+    <string name="series_detail_ch_loading_err">Chapters cannot be loaded (missing book for this volume).</string>
+</resources>

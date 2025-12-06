@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="browse_filter_match_all">Match all</string>
+    <string name="browse_filter_match_any">Match any</string>
+    <string name="browse_filter_sort_name">Name</string>
+    <string name="browse_filter_sort_by">Sort by</string>
+    <string name="browse_filter_sort_created">Created</string>
+    <string name="browse_filter_sort_last_modified">Last modified</string>
+    <string name="browse_filter_sort_item_added">Item added</string>
+    <string name="browse_filter_sort_time_to_read">Time to read</string>
+    <string name="browse_filter_sort_release_year">Release year</string>
+    <string name="browse_filter_sort_last_read">Last read</string>
+    <string name="browse_filter_sort_avg_rating">Avg rating</string>
+    <string name="browse_filter_sort_random">Random</string>
+    <string name="browse_filter_status">Status</string>
+    <string name="browse_filter_release_year">Release year</string>
+    <string name="browse_filter_age_rating">Age rating</string>
+    <string name="browse_filter_special_list">Special list</string>
+    <string name="browse_filter_filter_no_others">The following filters cannot be combined with the others.</string>
+    <string name="browse_filter_smart_filters">Smart filters</string>
+</resources>

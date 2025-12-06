@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reader_title">Reader</string>
+    <string name="reader_no_previous_chapter">No previous chapter</string>
+    <string name="reader_no_next_chapter">This is the last volume</string>
+    <string name="reader_time_left">Time left</string>
+    <string name="reader_prev_chapter">Prev chapter</string>
+    <string name="reader_jump_to_start">Jump to start</string>
+    <string name="reader_prev_page">Prev page</string>
+    <string name="reader_reader_settings">Reader settings</string>
+    <string name="reader_next_page">Next Page</string>
+    <string name="reader_jump_to_end">Jump to end</string>
+    <string name="reader_next_chapter">Next Chapter</string>
+    <string name="reader_font_selection">Select font</string>
+    <string name="reader_text_settings">Text settings</string>
+    <string name="reader_font_size">Font size</string>
+    <string name="reader_line_height">Line height</string>
+    <string name="reader_padding">Padding</string>
+    <string name="reader_alignment">Alignment</string>
+    <string name="reader_font_family">Font family</string>
+    <string name="reader_theme_header">Reader theme</string>
+    <string name="reader_theme_day">Day</string>
+    <string name="reader_theme_night">Night</string>
+    <string name="reader_theme_night_high_contrast">Night (High Contrast)</string>
+    <string name="reader_theme_sepia">Sepia</string>
+    <string name="reader_theme_sepia_high_contrast">Sepia (High Contrast)</string>
+    <string name="reader_theme_gray">Gray</string>
+</resources>

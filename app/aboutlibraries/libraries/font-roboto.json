@@ -1,0 +1,8 @@
+{
+  "uniqueId": "font-roboto",
+  "name": "Roboto",
+  "website": "https://fonts.google.com/specimen/Roboto",
+  "licenses": ["ofl-1.1"],
+  "developers": [{ "name": "Google" }],
+  "description": "Bundled variable font in assets/fonts/Roboto."
+}

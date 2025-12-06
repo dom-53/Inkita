@@ -1,0 +1,268 @@
+@file:Suppress("MagicNumber")
+
+package net.dom53.inkita.data.local.db
+
+import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import net.dom53.inkita.data.local.db.dao.DownloadDao
+import net.dom53.inkita.data.local.db.dao.ReaderDao
+import net.dom53.inkita.data.local.db.dao.SeriesDao
+import net.dom53.inkita.data.local.db.entity.CachedBrowseRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedChapterEntity
+import net.dom53.inkita.data.local.db.entity.CachedPageEntity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailEntity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesEntity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedVolumeEntity
+import net.dom53.inkita.data.local.db.entity.DownloadTaskEntity
+import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
+
+@Database(
+    entities = [
+        CachedSeriesEntity::class,
+        CachedSeriesRefEntity::class,
+        CachedBrowseRefEntity::class,
+        CachedSeriesDetailEntity::class,
+        CachedVolumeEntity::class,
+        CachedPageEntity::class,
+        CachedChapterEntity::class,
+        DownloadTaskEntity::class,
+        DownloadedPageEntity::class,
+        net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity::class,
+    ],
+    version = 12,
+    exportSchema = false,
+)
+abstract class InkitaDatabase : RoomDatabase() {
+    abstract fun seriesDao(): SeriesDao
+
+    abstract fun readerDao(): ReaderDao
+
+    abstract fun downloadDao(): DownloadDao
+
+    companion object {
+        @Volatile
+        @Suppress("ktlint:standard:property-naming")
+        private var INSTANCE: InkitaDatabase? = null
+
+        private val MIGRATION_1_2 =
+            object : Migration(1, 2) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_series_refs(
+                            tabType TEXT NOT NULL,
+                            collectionId INTEGER NOT NULL DEFAULT ${CachedSeriesRefEntity.NO_COLLECTION},
+                            seriesId INTEGER NOT NULL,
+                            updatedAt INTEGER NOT NULL,
+                            PRIMARY KEY(tabType, collectionId, seriesId)
+                        )
+                        """.trimIndent(),
+                    )
+                }
+            }
+        private val MIGRATION_2_3 =
+            object : Migration(2, 3) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_browse_refs(
+                            queryKey TEXT NOT NULL,
+                            page INTEGER NOT NULL,
+                            seriesId INTEGER NOT NULL,
+                            updatedAt INTEGER NOT NULL,
+                            PRIMARY KEY(queryKey, page, seriesId)
+                        )
+                        """.trimIndent(),
+                    )
+                }
+            }
+        private val MIGRATION_3_4 =
+            object : Migration(3, 4) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_series_detail(
+                            seriesId INTEGER NOT NULL PRIMARY KEY,
+                            unreadCount INTEGER,
+                            totalCount INTEGER,
+                            readState TEXT,
+                            timeLeftMin REAL,
+                            timeLeftMax REAL,
+                            timeLeftAvg REAL,
+                            updatedAt INTEGER NOT NULL
+                        )
+                        """.trimIndent(),
+                    )
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_volumes(
+                            id INTEGER NOT NULL PRIMARY KEY,
+                            seriesId INTEGER NOT NULL,
+                            name TEXT,
+                            minNumber REAL,
+                            maxNumber REAL,
+                            pages INTEGER,
+                            pagesRead INTEGER,
+                            readState TEXT,
+                            minHoursToRead REAL,
+                            maxHoursToRead REAL,
+                            avgHoursToRead REAL,
+                            bookId INTEGER,
+                            updatedAt INTEGER NOT NULL
+                        )
+                        """.trimIndent(),
+                    )
+                }
+            }
+        private val MIGRATION_4_5 =
+            object : Migration(4, 5) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_pages(
+                            chapterId INTEGER NOT NULL,
+                            page INTEGER NOT NULL,
+                            html TEXT NOT NULL,
+                            updatedAt INTEGER NOT NULL,
+                            PRIMARY KEY(chapterId, page)
+                        )
+                        """.trimIndent(),
+                    )
+                }
+            }
+        private val MIGRATION_5_6 =
+            object : Migration(5, 6) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL("ALTER TABLE cached_series_detail ADD COLUMN metadataSummary TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail ADD COLUMN metadataWriters TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail ADD COLUMN metadataTags TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail ADD COLUMN metadataPublicationStatus INTEGER")
+                }
+            }
+        private val MIGRATION_6_7 =
+            object : Migration(6, 7) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_chapters(
+                            volumeId INTEGER NOT NULL,
+                            pageIndex INTEGER NOT NULL,
+                            title TEXT NOT NULL,
+                            status TEXT,
+                            updatedAt INTEGER NOT NULL,
+                            PRIMARY KEY(volumeId, pageIndex)
+                        )
+                        """.trimIndent(),
+                    )
+                }
+            }
+        private val MIGRATION_7_8 =
+            object : Migration(7, 8) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS download_tasks(
+                            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            seriesId INTEGER NOT NULL,
+                            volumeId INTEGER,
+                            chapterId INTEGER,
+                            pageStart INTEGER,
+                            pageEnd INTEGER,
+                            type TEXT NOT NULL,
+                            priority INTEGER NOT NULL DEFAULT 0,
+                            state TEXT NOT NULL DEFAULT 'pending',
+                            createdAt INTEGER NOT NULL DEFAULT 0,
+                            updatedAt INTEGER NOT NULL DEFAULT 0,
+                            error TEXT
+                        )
+                        """.trimIndent(),
+                    )
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS downloaded_pages(
+                            seriesId INTEGER NOT NULL,
+                            volumeId INTEGER,
+                            chapterId INTEGER NOT NULL,
+                            page INTEGER NOT NULL,
+                            htmlPath TEXT NOT NULL,
+                            assetsDir TEXT,
+                            sizeBytes INTEGER NOT NULL DEFAULT 0,
+                            status TEXT NOT NULL DEFAULT 'completed',
+                            checksum TEXT,
+                            updatedAt INTEGER NOT NULL DEFAULT 0,
+                            PRIMARY KEY(chapterId, page)
+                        )
+                        """.trimIndent(),
+                    )
+                }
+            }
+        private val MIGRATION_8_9 =
+            object : Migration(8, 9) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL("ALTER TABLE download_tasks ADD COLUMN workId TEXT")
+                }
+            }
+        private val MIGRATION_9_10 =
+            object : Migration(9, 10) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL("ALTER TABLE download_tasks ADD COLUMN progress INTEGER NOT NULL DEFAULT 0")
+                    database.execSQL("ALTER TABLE download_tasks ADD COLUMN total INTEGER NOT NULL DEFAULT 0")
+                    database.execSQL("ALTER TABLE download_tasks ADD COLUMN bytes INTEGER NOT NULL DEFAULT 0")
+                    database.execSQL("ALTER TABLE download_tasks ADD COLUMN bytesTotal INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+        private val MIGRATION_10_11 =
+            object : Migration(10, 11) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS local_progress(
+                            chapterId INTEGER NOT NULL PRIMARY KEY,
+                            page INTEGER,
+                            bookScrollId TEXT,
+                            seriesId INTEGER,
+                            volumeId INTEGER,
+                            libraryId INTEGER,
+                            lastModifiedUtc INTEGER NOT NULL DEFAULT 0
+                        )
+                        """.trimIndent(),
+                    )
+                }
+            }
+        private val MIGRATION_11_12 =
+            object : Migration(11, 12) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL("ALTER TABLE cached_chapters ADD COLUMN isSpecial INTEGER NOT NULL DEFAULT 0")
+                    database.execSQL("ALTER TABLE cached_series_detail ADD COLUMN specialsVolumeIds TEXT")
+                }
+            }
+
+        fun getInstance(context: Context): InkitaDatabase =
+            INSTANCE ?: synchronized(this) {
+                INSTANCE ?: Room
+                    .databaseBuilder(
+                        context.applicationContext,
+                        InkitaDatabase::class.java,
+                        "inkita.db",
+                    ).addMigrations(
+                        MIGRATION_1_2,
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5,
+                        MIGRATION_5_6,
+                        MIGRATION_6_7,
+                        MIGRATION_7_8,
+                        MIGRATION_8_9,
+                        MIGRATION_9_10,
+                        MIGRATION_10_11,
+                        MIGRATION_11_12,
+                    ).build()
+                    .also { INSTANCE = it }
+            }
+    }
+}

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="browse_filter_match_all">Jakákoli shoda</string>
+    <string name="browse_filter_match_any">Všechny shody</string>
+    <string name="browse_filter_sort_name">Název</string>
+    <string name="browse_filter_sort_by">Řadit podle</string>
+    <string name="browse_filter_sort_created">Vytvořeno</string>
+    <string name="browse_filter_sort_last_modified">Naposledy upraveno</string>
+    <string name="browse_filter_sort_item_added">Přidáno</string>
+    <string name="browse_filter_sort_time_to_read">Doba čtení</string>
+    <string name="browse_filter_sort_release_year">Rok vydání</string>
+    <string name="browse_filter_sort_last_read">Naposledy čteno</string>
+    <string name="browse_filter_sort_avg_rating">Průměrné hodnocení</string>
+    <string name="browse_filter_sort_random">Náhodně</string>
+    <string name="browse_filter_status">Stav</string>
+    <string name="browse_filter_release_year">Rok vydání</string>
+    <string name="browse_filter_age_rating">Věkové hodnocení</string>
+    <string name="browse_filter_special_list">Speciální seznam</string>
+    <string name="browse_filter_filter_no_others">Následující filtry nelze kombinovat s ostatními.</string>
+    <string name="browse_filter_smart_filters">Chytré filtry</string>
+</resources>

@@ -1,0 +1,8 @@
+{
+  "uniqueId": "font-open-sans",
+  "name": "Open Sans",
+  "website": "https://fonts.google.com/specimen/Open+Sans",
+  "licenses": ["ofl-1.1"],
+  "developers": [{ "name": "Steve Matteson" }],
+  "description": "Bundled variable font in assets/fonts/Open_Sans."
+}

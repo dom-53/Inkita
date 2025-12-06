@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="series_detail_detail">Detail</string>
+    <string name="series_detail_share_series">Sdílet sérii</string>
+    <string name="series_detail_chapter_not_available">Kapitola není k dispozici ke čtení.</string>
+    <string name="series_detail_start_over_question">Začít znovu?</string>
+    <string name="series_detail_reset_and_start_again">Tímto se resetuje tvůj postup čtení a začneš od začátku.</string>
+    <string name="series_detail_reset_progress">Resetovat postup</string>
+    <string name="series_detail_no_related_items">Žádné související položky.</string>
+    <string name="series_detail_no_related">Žádné související položky.</string>
+    <string name="series_detail_mark_prev_q">Označit předchozí volume jako přečtené?</string>
+    <string name="series_detail_mark_read_this_and_prev">Volume %1$s se označí jako přečtené. Chceš označit jako přečtené i předchozí nepřečtené volume?</string>
+    <string name="series_detail_mark_with_prev">Označit i předchozí</string>
+    <string name="series_detail_only_this_vol">Pouze toto volume</string>
+    <string name="series_detail_mark_this_and_later">Volume %1$s se označí jako nepřečtené. Chceš označit jako nepřečtené i pozdější volume, která byla přečtená?</string>
+    <string name="series_detail_mark_all">Označit vše</string>
+    <string name="series_detail_mark_this_vol">Pouze toto volume</string>
+    <string name="series_detail_prev_unread_mark_read_too_q">Předchozí volume jsou nepřečtená. Označit je také jako přečtená, nebo upravit jen tuto stránku?</string>
+    <string name="series_detail_mark_prev_and_continue">Označit předchozí a pokračovat</string>
+    <string name="series_detail_only_this_page">Pouze tuto stránku</string>
+    <string name="series_detail_mark_later_vol_unr_q">Označit následující volume jako nepřečtená?</string>
+    <string name="series_detail_mark_unred_vol_and_later_too_q">Následující volume jsou označena jako přečtená. Označit je také jako nepřečtená, nebo upravit jen toto volume?</string>
+    <string name="series_detail_scroll_top">Posunout nahoru</string>
+    <string name="series_detail_no_colls_reload">Žádné kolekce. Načti znovu.</string>
+    <string name="series_detail_load_colls">Načíst kolekce</string>
+    <string name="series_detail_resume_page">Pokračovat: strana</string>
+    <string name="series_detail_ch_loading_err">Kapitoly nelze načíst (pro toto volume chybí kniha).</string>
+</resources>

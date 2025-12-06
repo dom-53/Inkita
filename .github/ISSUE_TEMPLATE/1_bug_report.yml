@@ -1,0 +1,98 @@
+name: Issue report
+description: Report a bug in Inkita
+labels: [bug]
+body:
+  - type: textarea
+    id: reproduce-steps
+    attributes:
+      label: Steps to reproduce
+      description: Explain how the issue happens.
+      placeholder: |
+        Example:
+          1. Open a series
+          2. Tap on a chapter
+          3. App crashes
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: What should normally happen?
+      placeholder: |
+        Example:
+          "The chapter should load with correct pagination."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual behavior
+      description: What happens instead?
+      placeholder: |
+        Example:
+          "Blank screen, reader freezes."
+    validations:
+      required: true
+
+  - type: textarea
+    id: crash-logs
+    attributes:
+      label: Crash logs
+      description: |
+        If the app crashed, please share logs if possible (from Logcat or via a dump).
+      placeholder: |
+        Upload the file or paste crash logs.
+
+  - type: input
+    id: inkita-version
+    attributes:
+      label: Inkita version
+      description: You can find this in Settings → About.
+      placeholder: |
+        Example: "0.3.0"
+    validations:
+      required: true
+
+  - type: input
+    id: android-version
+    attributes:
+      label: Android version
+      description: Check your device settings.
+      placeholder: |
+        Example: "Android 14"
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device model
+      placeholder: |
+        Example: "Samsung S23 Ultra"
+    validations:
+      required: true
+
+  - type: textarea
+    id: other-details
+    attributes:
+      label: Other details
+      placeholder: |
+        Additional details and attachments.
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Acknowledgements
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues and this is not a duplicate.
+          required: true
+        - label: I have written a clear and descriptive title.
+          required: true
+        - label: I have updated the app to the latest available Inkita version.
+          required: true
+        - label: I have filled out all requested details including device and Android version.
+          required: true
