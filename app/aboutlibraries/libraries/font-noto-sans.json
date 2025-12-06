@@ -1,8 +1,0 @@
-{
-  "uniqueId": "font-noto-sans",
-  "name": "Noto Sans",
-  "website": "https://fonts.google.com/noto/specimen/Noto+Sans",
-  "licenses": ["ofl-1.1"],
-  "developers": [{ "name": "Google" }],
-  "description": "Bundled variable font in assets/fonts/Noto_Sans."
-}

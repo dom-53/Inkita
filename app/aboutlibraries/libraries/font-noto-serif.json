@@ -1,8 +1,0 @@
-{
-  "uniqueId": "font-noto-serif",
-  "name": "Noto Serif",
-  "website": "https://fonts.google.com/noto/specimen/Noto+Serif",
-  "licenses": ["ofl-1.1"],
-  "developers": [{ "name": "Google" }],
-  "description": "Bundled variable font in assets/fonts/Noto_Serif."
-}

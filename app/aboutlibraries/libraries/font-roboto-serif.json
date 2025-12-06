@@ -1,8 +1,0 @@
-{
-  "uniqueId": "font-roboto-serif",
-  "name": "Roboto Serif",
-  "website": "https://fonts.google.com/specimen/Roboto+Serif",
-  "licenses": ["ofl-1.1"],
-  "developers": [{ "name": "Google" }],
-  "description": "Bundled variable font in assets/fonts/Roboto_Serif."
-}
