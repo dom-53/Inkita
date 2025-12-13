@@ -51,6 +51,18 @@ Inkita is a Kotlin/Jetpack Compose Android app to browse and read from your Kavi
 
 ---
 
+## Connecting to your Kavita server
+
+Inkita ships without any preset server configuration. After the first launch:
+
+1. Open **Settings → Kavita**.
+2. Fill in your server URL credentials and your Kavita API key.
+3. Save the configuration and restart app; the app will then authenticate and sync your libraries.
+
+Without these details the app cannot reach your server, so make sure to keep them up to date (especially when rotating API keys).
+
+---
+
 ## Getting Started (dev)
 
 1. **Prereqs:** Android Studio Giraffe+, JDK 17.
