@@ -32,7 +32,7 @@ Inkita is a Kotlin/Jetpack Compose Android app to browse and read from your Kavi
 
 <div align="center">
 
-<a href="https://github.com/dom-53/Inkita">
+<a href="https://github.com/dom-53/Inkita/blob/master/.github/assets/inkita-prew.png">
     <img src="./.github/assets/inkita-prew.png" alt="Inkita logo" title="Inkita logo" width="160"/>
 </a>
 
