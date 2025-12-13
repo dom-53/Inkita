@@ -30,6 +30,14 @@ Inkita is a Kotlin/Jetpack Compose Android app to browse and read from your Kavi
 **Formats:** EPUB (primary); other formats planned.
 **Status:** Preview (0.x); APIs and UI may change.
 
+<div align="center">
+
+<a href="https://github.com/dom-53/Inkita">
+    <img src="./.github/assets/inkita-prew.png" alt="Inkita logo" title="Inkita logo" width="160"/>
+</a>
+
+</div>
+
 ---
 
 ## Features
