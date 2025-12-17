@@ -10,7 +10,7 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/dom-53/Inkita/release.yml?labelColor=27303D)](https://github.com/dom-53/Inkita/actions/workflows/release.yml)
 ![Platform](https://img.shields.io/badge/platform-Android-blue)
-![Kavita](https://img.shields.io/badge/API-Kavita_0.8.8.7-lightgrey)
+![Kavita](https://img.shields.io/badge/Kavita-nightly_0.8.8.15-orange)
 
 <br>
 
