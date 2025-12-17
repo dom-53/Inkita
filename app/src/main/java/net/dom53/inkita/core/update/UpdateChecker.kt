@@ -15,6 +15,7 @@ import net.dom53.inkita.core.notification.AppNotificationManager
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+
 /** Lightweight update checker used at app startup. */
 object UpdateChecker {
     private const val UPDATES_URL = "https://dom-53.github.io/Inkita/updates.json"
@@ -105,7 +106,10 @@ object UpdateChecker {
         return Version(maj.toInt(), min.toInt(), patch.toInt(), pre.ifBlank { null })
     }
 
-    private fun isRemoteNewer(current: Version, remote: Version): Boolean {
+    private fun isRemoteNewer(
+        current: Version,
+        remote: Version,
+    ): Boolean {
         if (remote.major != current.major) return remote.major > current.major
         if (remote.minor != current.minor) return remote.minor > current.minor
         if (remote.patch != current.patch) return remote.patch > current.patch
