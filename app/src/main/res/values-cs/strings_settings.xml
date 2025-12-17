@@ -18,6 +18,8 @@
     <string name="settings_kavita_status_in">Stav: nastaveno (API klíč uložen)</string>
     <string name="settings_kavita_status_out">Stav: nenastaveno</string>
     <string name="settings_kavita_button_login">Uložit</string>
+    <string name="settings_kavita_logout">Odhlásit</string>
+    <string name="settings_kavita_logged_out">Konfigurace vymazána.</string>
     <!--  About Inkita  -->
     <string name="settings_about_osl">Licence s otevřeným zdrojem</string>
     <string name="settings_about_osl_3rd">Knihovny třetích stran</string>

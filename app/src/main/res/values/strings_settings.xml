@@ -18,6 +18,8 @@
     <string name="settings_kavita_status_in">Status: configured (API key saved)</string>
     <string name="settings_kavita_status_out">Status: not configured</string>
     <string name="settings_kavita_button_login">Save</string>
+    <string name="settings_kavita_logout">Sign out</string>
+    <string name="settings_kavita_logged_out">Configuration cleared.</string>
     <!--  About Inkita  -->
     <string name="settings_about_version">Version</string>
     <string name="settings_about_build_time">Build time</string>
