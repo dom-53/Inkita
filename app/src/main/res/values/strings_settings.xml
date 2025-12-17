@@ -13,6 +13,7 @@
     <string name="settings_item_about">About</string>
     <!--  Kavita  -->
     <string name="settings_kavita_server">Kavita server URL</string>
+    <string name="settings_kavita_https_hint">HTTPS is required for a successful connection.</string>
     <string name="settings_kavita_api_key">API key</string>
     <string name="settings_kavita_status_in">Status: configured (API key saved)</string>
     <string name="settings_kavita_status_out">Status: not configured</string>

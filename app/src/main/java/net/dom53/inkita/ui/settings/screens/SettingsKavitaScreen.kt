@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -75,6 +76,7 @@ fun SettingsKavitaScreen(
                 value = serverUrl,
                 onValueChange = { serverUrl = it },
                 label = { Text(stringResource(R.string.settings_kavita_server)) },
+                placeholder = { Text("https://kavita.myserver.com") },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
@@ -82,6 +84,12 @@ fun SettingsKavitaScreen(
                 onValueChange = { apiKey = it },
                 label = { Text(stringResource(R.string.settings_kavita_api_key)) },
                 modifier = Modifier.fillMaxWidth(),
+                visualTransformation = PasswordVisualTransformation(),
+            )
+            Text(
+                text = stringResource(R.string.settings_kavita_https_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text =

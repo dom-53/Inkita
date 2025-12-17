@@ -13,6 +13,7 @@
     <string name="settings_item_about">O aplikaci</string>
     <!--  Kavita  -->
     <string name="settings_kavita_server">Kavita server URL</string>
+    <string name="settings_kavita_https_hint">K úspěšnému připojení je vyžadováno HTTPS.</string>
     <string name="settings_kavita_api_key">API klíč</string>
     <string name="settings_kavita_status_in">Stav: nastaveno (API klíč uložen)</string>
     <string name="settings_kavita_status_out">Stav: nenastaveno</string>
