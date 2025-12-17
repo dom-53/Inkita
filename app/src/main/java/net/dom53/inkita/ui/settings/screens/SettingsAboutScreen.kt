@@ -306,11 +306,11 @@ fun SettingsAboutScreen(onBack: () -> Unit) {
             leadingContent = { Icon(Icons.Outlined.Language, contentDescription = null, modifier = Modifier.size(24.dp)) },
             modifier =
                 Modifier
-                    .clickable { }
+                    .clickable { openUrl("https://www.kavitareader.com") }
                     .padding(vertical = 2.dp),
         )
         ListItem(
-            headlineContent = { Text("Discord") },
+            headlineContent = { Text("Kavita Discord") },
             leadingContent = {
                 Icon(
                     painterResource(id = R.drawable.ic_discord),
@@ -320,7 +320,7 @@ fun SettingsAboutScreen(onBack: () -> Unit) {
             },
             modifier =
                 Modifier
-                    .clickable { }
+                    .clickable { openUrl("https://discord.gg/b52wT37kt7") }
                     .padding(vertical = 2.dp),
         )
         ListItem(

@@ -42,7 +42,7 @@
     <string name="settings_about_update_confirm">Stáhnout</string>
     <!--  Others  -->
     <string name="settings_about_title">O Inkita</string>
-    <string name="settings_about_website">Webová stránka</string>
+    <string name="settings_about_website">Kavita web stránka</string>
     <string name="settings_kavita_login_toast">Vyplň URL a API klíč.</string>
     <string name="settings_appearance_by_system">Podle systému</string>
     <string name="settings_appearance_dark">Tmavý</string>

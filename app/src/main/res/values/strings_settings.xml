@@ -42,7 +42,7 @@
     <string name="settings_about_update_confirm">Download</string>
     <!--  Others  -->
     <string name="settings_about_title">About Inkita</string>
-    <string name="settings_about_website">Website</string>
+    <string name="settings_about_website">Kavita Website</string>
     <string name="settings_kavita_login_toast">Fill URL and API key.</string>
     <string name="settings_appearance_by_system">Follow system</string>
     <string name="settings_appearance_dark">Dark</string>
