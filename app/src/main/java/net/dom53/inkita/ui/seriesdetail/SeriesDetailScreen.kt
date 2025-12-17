@@ -176,7 +176,7 @@ fun SeriesDetailScreen(
     }
     val scope = rememberCoroutineScope()
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", username = "", apiKey = "", token = "", refreshToken = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
     )
     var summaryExpanded by remember { mutableStateOf(false) }
     var showCollectionDialog by remember { mutableStateOf(false) }

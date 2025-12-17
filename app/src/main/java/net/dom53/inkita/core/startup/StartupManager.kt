@@ -8,7 +8,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import net.dom53.inkita.core.auth.AuthManager
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.cache.CacheManagerImpl
 import net.dom53.inkita.core.logging.LoggingManager
@@ -41,7 +40,6 @@ object StartupManager {
         val collectionsRepository: CollectionsRepository,
         val authRepository: AuthRepository,
         val readerRepository: ReaderRepository,
-        val authManager: AuthManager,
     )
 
     @Volatile
@@ -57,7 +55,7 @@ object StartupManager {
 
         val appContext = context.applicationContext
         val preferences = AppPreferences(appContext)
-        // Migrate legacy token/apiKey storage into encrypted prefs.
+        // Migrate legacy API key storage into encrypted prefs.
         runCatching { kotlinx.coroutines.runBlocking { preferences.migrateSensitiveIfNeeded() } }
         AppNotificationManager.init(appContext)
         val database = InkitaDatabase.getInstance(appContext)
@@ -73,10 +71,6 @@ object StartupManager {
         val seriesRepository: SeriesRepository = SeriesRepositoryImpl(appContext, preferences, cacheManager)
         val collectionsRepository: CollectionsRepository = CollectionsRepositoryImpl(appContext, preferences)
         val authRepository: AuthRepository = AuthRepositoryImpl(preferences)
-        val authManager = AuthManager(preferences)
-        // Install dependencies so authenticated clients can auto-refresh tokens.
-        net.dom53.inkita.core.network.KavitaApiFactory
-            .installAuthDependencies(preferences, authManager)
         val networkMonitor = NetworkMonitor.getInstance(appContext, preferences)
         val isDebuggable = (appContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         if (isDebuggable) {
@@ -112,7 +106,6 @@ object StartupManager {
                 collectionsRepository = collectionsRepository,
                 authRepository = authRepository,
                 readerRepository = readerRepository,
-                authManager = authManager,
             )
         cached = components
         return components

@@ -142,7 +142,7 @@ class DownloadManager(
             .Request(uri)
             .setTitle(title ?: fileName)
             .setDescription("Inkita PDF")
-            .addRequestHeader("Authorization", "Bearer ${config.token}")
+            .addRequestHeader("x-api-key", config.apiKey)
             .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalFilesDir(
                 appContext,

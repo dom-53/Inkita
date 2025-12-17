@@ -23,6 +23,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.collectLatest
@@ -40,17 +41,15 @@ fun SettingsKavitaScreen(
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     var serverUrl by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
     var isConfigured by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         appPreferences.configFlow.collectLatest { config: AppConfig ->
             serverUrl = config.serverUrl
-            username = config.username
             apiKey = config.apiKey
             isConfigured = config.isConfigured
         }
@@ -79,18 +78,6 @@ fun SettingsKavitaScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text(stringResource(R.string.general_username)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text(stringResource(R.string.general_password)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it },
                 label = { Text(stringResource(R.string.settings_kavita_api_key)) },
@@ -111,23 +98,22 @@ fun SettingsKavitaScreen(
                 onClick = {
                     scope.launch {
                         try {
-                            if (serverUrl.isBlank() || username.isBlank() || password.isBlank() || apiKey.isBlank()) {
-                                snackbarHostState.showSnackbar("Fill URL, username, password, and API key.")
+                            if (serverUrl.isBlank() || apiKey.isBlank()) {
+                                snackbarHostState.showSnackbar(
+                                    context.getString(R.string.settings_kavita_login_toast),
+                                )
                                 return@launch
                             }
 
-                            authRepository.login(
+                            authRepository.configure(
                                 serverUrl = serverUrl.trim(),
-                                username = username.trim(),
-                                password = password,
                                 apiKey = apiKey.trim(),
                             )
 
-                            password = ""
-                            snackbarHostState.showSnackbar("Login successful.")
+                            snackbarHostState.showSnackbar("Configuration saved.")
                         } catch (e: Exception) {
                             snackbarHostState.showSnackbar(
-                                "Login failed: ${e.message ?: "unknown error"}",
+                                "Save failed: ${e.message ?: "unknown error"}",
                             )
                         }
                     }

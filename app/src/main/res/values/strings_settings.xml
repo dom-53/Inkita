@@ -13,10 +13,10 @@
     <string name="settings_item_about">About</string>
     <!--  Kavita  -->
     <string name="settings_kavita_server">Kavita server URL</string>
-    <string name="settings_kavita_api_key">API key (for login)</string>
-    <string name="settings_kavita_status_in">Status: signed in (token saved)</string>
-    <string name="settings_kavita_status_out">Status: signed out</string>
-    <string name="settings_kavita_button_login">Sign in and save</string>
+    <string name="settings_kavita_api_key">API key</string>
+    <string name="settings_kavita_status_in">Status: configured (API key saved)</string>
+    <string name="settings_kavita_status_out">Status: not configured</string>
+    <string name="settings_kavita_button_login">Save</string>
     <!--  About Inkita  -->
     <string name="settings_about_version">Version</string>
     <string name="settings_about_build_time">Build time</string>
@@ -40,7 +40,7 @@
     <!--  Others  -->
     <string name="settings_about_title">About Inkita</string>
     <string name="settings_about_website">Website</string>
-    <string name="settings_kavita_login_toast">Fill URL, username, password, and API key.</string>
+    <string name="settings_kavita_login_toast">Fill URL and API key.</string>
     <string name="settings_appearance_by_system">Follow system</string>
     <string name="settings_appearance_dark">Dark</string>
     <string name="settings_appearance_light">Light</string>

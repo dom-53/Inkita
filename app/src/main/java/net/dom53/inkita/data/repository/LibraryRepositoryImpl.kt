@@ -28,7 +28,7 @@ class LibraryRepositoryImpl(
         val api =
             KavitaApiFactory.createAuthenticated(
                 baseUrl = config.serverUrl,
-                token = config.token,
+                apiKey = config.apiKey,
             )
 
         val response = api.getLibraries()

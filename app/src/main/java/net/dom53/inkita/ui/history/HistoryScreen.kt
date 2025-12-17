@@ -51,17 +51,17 @@ import java.util.Locale
 @Composable
 fun HistoryScreen(appPreferences: AppPreferences) {
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", username = "", apiKey = "", token = "", refreshToken = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
     )
     val isLoading = remember { mutableStateOf(true) }
     val error = remember { mutableStateOf<String?>(null) }
     val history = remember { mutableStateOf<List<ReadHistoryEventDto>>(emptyList()) }
     val context = LocalContext.current
 
-    LaunchedEffect(config.token) {
+    LaunchedEffect(config.serverUrl, config.apiKey) {
         if (!config.isConfigured) {
             isLoading.value = false
-            error.value = context.resources.getString(R.string.general_server_or_token_not_set)
+            error.value = context.resources.getString(R.string.general_server_or_api_key_not_set)
             return@LaunchedEffect
         }
         if (!NetworkUtils.isOnline(context)) {
@@ -71,7 +71,7 @@ fun HistoryScreen(appPreferences: AppPreferences) {
         }
         isLoading.value = true
         error.value = null
-        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.token)
+        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
         val userIdToUse =
             if (config.userId > 0) {
                 config.userId

@@ -67,7 +67,7 @@ class PageDownloadWorker(
             return if (networkStatus.offlineMode) Result.success() else Result.retry()
         }
 
-        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.token)
+        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
 
         val baseDir =
             applicationContext.getExternalFilesDir("Inkita/downloads/series_$seriesId")
@@ -103,7 +103,7 @@ class PageDownloadWorker(
                 if (!htmlResp.isSuccessful) throw HttpException(htmlResp)
                 val htmlRaw = htmlResp.body() ?: ""
 
-                val (rewrittenHtml, assetsBytes) = rewriteAndDownloadImages(htmlRaw, assetsDir, config.serverUrl)
+                val (rewrittenHtml, assetsBytes) = rewriteAndDownloadImages(htmlRaw, assetsDir, config.serverUrl, config.apiKey)
                 val htmlName = "page_${chapterId}_$page.html"
                 val htmlFile = File(baseDir, htmlName)
                 withContext(Dispatchers.IO) {
@@ -247,6 +247,7 @@ class PageDownloadWorker(
         html: String,
         assetsDir: File,
         baseUrl: String,
+        apiKey: String,
     ): Pair<String, Long> =
         withContext(Dispatchers.IO) {
             var result = html
@@ -274,7 +275,7 @@ class PageDownloadWorker(
                         .orEmpty()
                 val fileName = hashName(absoluteUrl) + ext
                 try {
-                    val (uri, bytes, legacyFile) = downloadBinary(absoluteUrl, fileName, assetsDir)
+                    val (uri, bytes, legacyFile) = downloadBinary(absoluteUrl, fileName, assetsDir, apiKey)
                     totalBytes += bytes
                     val replacement =
                         when {
@@ -299,6 +300,7 @@ class PageDownloadWorker(
         url: String,
         fileName: String,
         targetDir: File,
+        apiKey: String,
     ): Triple<Uri?, Long, File?> =
         withContext(Dispatchers.IO) {
             val existing = File(targetDir, fileName)
@@ -306,7 +308,12 @@ class PageDownloadWorker(
                 return@withContext Triple(null, existing.length(), existing)
             }
 
-            val request = Request.Builder().url(url).build()
+            val request =
+                Request
+                    .Builder()
+                    .url(url)
+                    .addHeader("x-api-key", apiKey)
+                    .build()
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
                 val body = response.body ?: throw IOException("Empty body")
