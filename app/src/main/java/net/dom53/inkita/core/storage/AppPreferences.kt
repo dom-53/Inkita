@@ -72,6 +72,7 @@ class AppPreferences(
         private val KEY_CACHE_ENABLED = booleanPreferencesKey("cache_enabled")
         private val KEY_LIBRARY_CACHE_ENABLED = booleanPreferencesKey("library_cache_enabled")
         private val KEY_BROWSE_CACHE_ENABLED = booleanPreferencesKey("browse_cache_enabled")
+        private val KEY_NOTIF_PROMPT_SHOWN = booleanPreferencesKey("notifications_prompt_shown")
         private val KEY_CACHE_REFRESH_TTL_MIN = intPreferencesKey("cache_refresh_ttl_min")
         private val KEY_LAST_LIBRARY_REFRESH = longPreferencesKey("last_library_refresh")
         private val KEY_LAST_BROWSE_REFRESH = longPreferencesKey("last_browse_refresh")
@@ -126,6 +127,9 @@ class AppPreferences(
 
     val appLanguageFlow: Flow<String> =
         context.dataStore.data.map { prefs -> prefs[KEY_APP_LANGUAGE] ?: "en" }
+
+    val notificationsPromptShownFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_NOTIF_PROMPT_SHOWN] ?: false }
 
     val appThemeFlow: Flow<AppTheme> =
         context.dataStore.data.map { prefs ->
@@ -270,6 +274,12 @@ class AppPreferences(
     suspend fun setAppLanguage(languageTag: String) {
         context.dataStore.edit { prefs ->
             prefs[KEY_APP_LANGUAGE] = languageTag
+        }
+    }
+
+    suspend fun setNotificationsPromptShown(shown: Boolean = true) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_NOTIF_PROMPT_SHOWN] = shown
         }
     }
 
