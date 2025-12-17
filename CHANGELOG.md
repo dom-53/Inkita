@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented here.
 
+## Unreleased
+
 ## v0.2.0-beta.1
 
 ### Added
@@ -10,7 +12,6 @@ All notable changes to this project will be documented here.
 - Network: All Kavita API calls use `x-api-key` header (Bearer/JWT flow removed). Download manager and page worker send the API key on requests/assets.
 - About: Added links to Kavita website and Kavita Discord.
 - Settings: Downloads screen is scrollable to fit on smaller displays.
-- Updates/notifications: Startup update checker now shows a progress notification and, if a newer build exists, a tap-to-download notification. First app start prompts once to enable notifications; choice is remembered.
 
 ### Changed
 - Auth: Removed login/refresh endpoints, `AuthManager`, and token/refresh storage. `KavitaApiFactory` injects `x-api-key` instead of Bearer.
