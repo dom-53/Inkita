@@ -185,13 +185,6 @@ fun SettingsStatsScreen(
             }
         }
 
-        item {
-            Text(
-                text = stringResource(R.string.stats_source_kavita_api_description),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 

@@ -9,6 +9,7 @@ All notable changes to this project will be documented here.
 - Auth/config: Toggle to choose HTTPS/HTTP (default HTTPS). HTTP use prompts a confirmation dialog; cleartext traffic enabled for HTTP servers. Sign-out button clears server/API key.
 - Network: All Kavita API calls use `x-api-key` header (Bearer/JWT flow removed). Download manager and page worker send the API key on requests/assets.
 - About: Added links to Kavita website and Kavita Discord.
+- Settings: Downloads screen is scrollable to fit on smaller displays.
 
 ### Changed
 - Auth: Removed login/refresh endpoints, `AuthManager`, and token/refresh storage. `KavitaApiFactory` injects `x-api-key` instead of Bearer.
