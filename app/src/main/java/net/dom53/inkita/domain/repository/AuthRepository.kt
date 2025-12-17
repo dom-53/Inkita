@@ -1,10 +1,9 @@
 package net.dom53.inkita.domain.repository
 
 interface AuthRepository {
-    suspend fun login(
+    suspend fun configure(
         serverUrl: String,
-        username: String,
-        password: String,
         apiKey: String,
+        userId: Int = 0,
     )
 }

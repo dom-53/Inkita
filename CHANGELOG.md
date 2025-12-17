@@ -5,8 +5,19 @@ All notable changes to this project will be documented here.
 ## Unreleased
 
 ### Added
+- Auth/config: Kavita settings now accept only server URL + API key (username/password/login removed). API key is stored in encrypted prefs; UI masks saved keys and requires re-entry to change.
+- Auth/config: Toggle to choose HTTPS/HTTP (default HTTPS). HTTP use prompts a confirmation dialog; cleartext traffic enabled for HTTP servers. Sign-out button clears server/API key.
+- Network: All Kavita API calls use `x-api-key` header (Bearer/JWT flow removed). Download manager and page worker send the API key on requests/assets.
+- About: Added links to Kavita website and Kavita Discord.
+- Settings: Downloads screen is scrollable to fit on smaller displays.
 
-## v0.1.0-beta.2
+### Changed
+- Auth: Removed login/refresh endpoints, `AuthManager`, and token/refresh storage. `KavitaApiFactory` injects `x-api-key` instead of Bearer.
+- Storage: `AppConfig`/`AppPreferences` now store only server URL, API key, and userId; legacy token fields migrated/cleared.
+- Downloads: WorkManager requests no longer use expedited mode (fix crash with battery constraints).
+- Settings: Server input takes host only (scheme via HTTPS/HTTP toggle).
+
+## v0.1.0-beta.3
 
 ### Added
 - Reader: In-app PDF viewer (PdfRenderer) with progress sync; PDFs are downloaded directly via API.

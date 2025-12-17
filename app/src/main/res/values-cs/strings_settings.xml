@@ -13,10 +13,17 @@
     <string name="settings_item_about">O aplikaci</string>
     <!--  Kavita  -->
     <string name="settings_kavita_server">Kavita server URL</string>
-    <string name="settings_kavita_api_key">API klíč (pro přihlášení)</string>
-    <string name="settings_kavita_status_in">Stav: přihlášen (token uložen)</string>
-    <string name="settings_kavita_status_out">Stav: nepřihlášen</string>
-    <string name="settings_kavita_button_login">Přihlásit se a uložit</string>
+    <string name="settings_kavita_use_https">Použít HTTPS</string>
+    <string name="settings_kavita_api_key">API klíč</string>
+    <string name="settings_kavita_status_in">Stav: nastaveno (API klíč uložen)</string>
+    <string name="settings_kavita_status_out">Stav: nenastaveno</string>
+    <string name="settings_kavita_button_login">Uložit</string>
+    <string name="settings_kavita_logout">Odhlásit</string>
+    <string name="settings_kavita_logged_out">Konfigurace vymazána.</string>
+    <string name="settings_kavita_http_warning_title">Použít HTTP?</string>
+    <string name="settings_kavita_http_warning_body">HTTP není šifrované. Používejte ho jen v důvěryhodné lokální síti. Pokračovat?</string>
+    <string name="settings_kavita_http_warning_confirm">Pokračovat s HTTP</string>
+    <string name="settings_kavita_http_warning_cancel">Zrušit</string>
     <!--  About Inkita  -->
     <string name="settings_about_osl">Licence s otevřeným zdrojem</string>
     <string name="settings_about_osl_3rd">Knihovny třetích stran</string>
@@ -39,8 +46,8 @@
     <string name="settings_about_update_confirm">Stáhnout</string>
     <!--  Others  -->
     <string name="settings_about_title">O Inkita</string>
-    <string name="settings_about_website">Webová stránka</string>
-    <string name="settings_kavita_login_toast">Vyplň URL, uživatelské jméno, heslo a API klíč.</string>
+    <string name="settings_about_website">Kavita web stránka</string>
+    <string name="settings_kavita_login_toast">Vyplň URL a API klíč.</string>
     <string name="settings_appearance_by_system">Podle systému</string>
     <string name="settings_appearance_dark">Tmavý</string>
     <string name="settings_appearance_light">Světlý</string>

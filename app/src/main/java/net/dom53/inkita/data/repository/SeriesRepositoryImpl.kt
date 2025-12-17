@@ -31,7 +31,7 @@ class SeriesRepositoryImpl(
         val config = appPreferences.configFlow.first()
 
         if (!config.isConfigured) {
-            // No token configured, skip network call.
+            // No API key configured, skip network call.
             return emptyList()
         }
 
@@ -43,7 +43,7 @@ class SeriesRepositoryImpl(
         val api =
             KavitaApiFactory.createAuthenticated(
                 baseUrl = config.serverUrl,
-                token = config.token,
+                apiKey = config.apiKey,
             )
 
         val filterDto = query.toFilterV2Dto()
@@ -73,7 +73,7 @@ class SeriesRepositoryImpl(
             val cached = cacheManager.getCachedSeriesDetail(seriesId)
             LoggingManager.d("SeriesRepo", "Detail offline-only (not configured), cached=${cached != null}")
             if (cached != null) return cached
-            throw Exception("The app is not logged in, token is missing.")
+            throw Exception("The app is not configured, API key is missing.")
         }
 
         if (!NetworkUtils.isOnline(context)) {
@@ -86,7 +86,7 @@ class SeriesRepositoryImpl(
         val api =
             KavitaApiFactory.createAuthenticated(
                 baseUrl = config.serverUrl,
-                token = config.token,
+                apiKey = config.apiKey,
             )
 
         val cachedFallback = cacheManager.getCachedSeriesDetail(seriesId).also { LoggingManager.d("SeriesRepo", "Cached detail fallback present=${it != null}") }

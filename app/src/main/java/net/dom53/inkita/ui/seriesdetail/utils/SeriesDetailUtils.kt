@@ -14,7 +14,7 @@ internal suspend fun toggleWantToRead(
     seriesId: Int,
     config: AppConfig,
 ) {
-    val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.token)
+    val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
     val body = WantToReadDto(seriesIds = listOf(seriesId))
     if (add) api.addWantToRead(body) else api.removeWantToRead(body)
 }
@@ -27,7 +27,7 @@ internal suspend fun loadRelated(
     onResult: (List<RelatedGroup>) -> Unit,
 ) {
     onLoading(true)
-    val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.token)
+    val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
     runCatching { api.getAllRelated(seriesId) }
         .onSuccess { resp ->
             if (resp.isSuccessful) {

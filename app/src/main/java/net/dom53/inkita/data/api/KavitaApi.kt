@@ -7,8 +7,6 @@ import net.dom53.inkita.data.api.dto.FilterDefinitionDto
 import net.dom53.inkita.data.api.dto.FilterV2Dto
 import net.dom53.inkita.data.api.dto.LanguageDto
 import net.dom53.inkita.data.api.dto.LibraryDto
-import net.dom53.inkita.data.api.dto.LoginRequest
-import net.dom53.inkita.data.api.dto.LoginResponse
 import net.dom53.inkita.data.api.dto.NamedDto
 import net.dom53.inkita.data.api.dto.SeriesDto
 import okhttp3.ResponseBody
@@ -20,11 +18,6 @@ import retrofit2.http.Query
 import retrofit2.http.Streaming
 
 interface KavitaApi {
-    @POST("api/Account/login")
-    suspend fun login(
-        @Body req: LoginRequest,
-    ): LoginResponse
-
     @GET("api/Library")
     suspend fun getLibraries(): retrofit2.Response<List<LibraryDto>>
 
@@ -249,9 +242,4 @@ interface KavitaApi {
     suspend fun markMultipleUnread(
         @Body body: net.dom53.inkita.data.api.dto.MarkMultipleDto,
     ): Response<Unit>
-
-    @POST("api/Account/refresh-token")
-    suspend fun refreshToken(
-        @Body body: net.dom53.inkita.data.api.dto.TokenRequestDto,
-    ): Response<net.dom53.inkita.data.api.dto.TokenRequestDto>
 }

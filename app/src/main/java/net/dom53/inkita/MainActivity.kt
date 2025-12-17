@@ -101,7 +101,7 @@ fun InkitaApp(
     val currentRoute = backStackEntry?.destination?.route
     val mainRoutes = MainScreen.items.map { it.route }
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", username = "", apiKey = "", token = "", refreshToken = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
     )
 
     InkitaTheme(darkTheme = darkTheme, dynamicColor = false) {

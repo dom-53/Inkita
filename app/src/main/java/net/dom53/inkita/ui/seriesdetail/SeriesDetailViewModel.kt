@@ -286,7 +286,7 @@ class SeriesDetailViewModel(
             if (!_state.value.wantLoaded) {
                 runCatching {
                     KavitaApiFactory
-                        .createAuthenticated(cfg.serverUrl, cfg.token)
+                        .createAuthenticated(cfg.serverUrl, cfg.apiKey)
                         .getWantToRead(filter = emptyFilter(), pageNumber = 1, pageSize = 200)
                 }.onSuccess { resp ->
                     if (resp.isSuccessful) {
@@ -306,7 +306,7 @@ class SeriesDetailViewModel(
         if (_state.value.isUpdatingWant) return
         viewModelScope.launch {
             _state.update { it.copy(isUpdatingWant = true) }
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.token)
+            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
             val add = !_state.value.wantToRead
             val result =
                 runCatching {
@@ -340,7 +340,7 @@ class SeriesDetailViewModel(
     ) {
         val cfg = latestConfig ?: return
         viewModelScope.launch {
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.token)
+            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
             val result =
                 runCatching {
                     if (add) {
@@ -385,7 +385,7 @@ class SeriesDetailViewModel(
         if (title.isBlank()) return
         val cfg = latestConfig ?: return
         viewModelScope.launch {
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.token)
+            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
             val response =
                 runCatching {
                     api.addSeriesToCollection(
@@ -414,7 +414,7 @@ class SeriesDetailViewModel(
     private fun refreshCollectionsForSeries() {
         val cfg = latestConfig ?: return
         viewModelScope.launch {
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.token)
+            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
             runCatching {
                 api.getCollectionsForSeries(seriesId)
             }.onSuccess { resp ->

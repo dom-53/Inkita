@@ -13,10 +13,17 @@
     <string name="settings_item_about">About</string>
     <!--  Kavita  -->
     <string name="settings_kavita_server">Kavita server URL</string>
-    <string name="settings_kavita_api_key">API key (for login)</string>
-    <string name="settings_kavita_status_in">Status: signed in (token saved)</string>
-    <string name="settings_kavita_status_out">Status: signed out</string>
-    <string name="settings_kavita_button_login">Sign in and save</string>
+    <string name="settings_kavita_use_https">Use HTTPS</string>
+    <string name="settings_kavita_api_key">API key</string>
+    <string name="settings_kavita_status_in">Status: configured (API key saved)</string>
+    <string name="settings_kavita_status_out">Status: not configured</string>
+    <string name="settings_kavita_button_login">Save</string>
+    <string name="settings_kavita_logout">Sign out</string>
+    <string name="settings_kavita_logged_out">Configuration cleared.</string>
+    <string name="settings_kavita_http_warning_title">Use HTTP?</string>
+    <string name="settings_kavita_http_warning_body">HTTP is unencrypted. Use it only on trusted local networks. Continue anyway?</string>
+    <string name="settings_kavita_http_warning_confirm">Continue with HTTP</string>
+    <string name="settings_kavita_http_warning_cancel">Cancel</string>
     <!--  About Inkita  -->
     <string name="settings_about_version">Version</string>
     <string name="settings_about_build_time">Build time</string>
@@ -39,8 +46,8 @@
     <string name="settings_about_update_confirm">Download</string>
     <!--  Others  -->
     <string name="settings_about_title">About Inkita</string>
-    <string name="settings_about_website">Website</string>
-    <string name="settings_kavita_login_toast">Fill URL, username, password, and API key.</string>
+    <string name="settings_about_website">Kavita Website</string>
+    <string name="settings_kavita_login_toast">Fill URL and API key.</string>
     <string name="settings_appearance_by_system">Follow system</string>
     <string name="settings_appearance_dark">Dark</string>
     <string name="settings_appearance_light">Light</string>
