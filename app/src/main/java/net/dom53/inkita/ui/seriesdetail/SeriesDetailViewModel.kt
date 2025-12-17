@@ -265,18 +265,19 @@ class SeriesDetailViewModel(
         val seriesFormat = detail?.series?.format
         val isPdf = seriesFormat == Format.Pdf
         val volumes = detail?.volumes.orEmpty()
-        return volumes.mapNotNull { volume ->
-            val bookId = volume.bookId ?: return@mapNotNull null
-            val isDownloaded =
-                if (isPdf) {
-                    downloadManager.pdfFileFor(bookId).exists()
-                } else {
-                    val total = volume.chapters.size
-                    val pages = downloads[bookId] ?: emptySet()
-                    total > 0 && pages.size >= total
-                }
-            volume.takeIf { isDownloaded }?.id
-        }.toSet()
+        return volumes
+            .mapNotNull { volume ->
+                val bookId = volume.bookId ?: return@mapNotNull null
+                val isDownloaded =
+                    if (isPdf) {
+                        downloadManager.pdfFileFor(bookId).exists()
+                    } else {
+                        val total = volume.chapters.size
+                        val pages = downloads[bookId] ?: emptySet()
+                        total > 0 && pages.size >= total
+                    }
+                volume.takeIf { isDownloaded }?.id
+            }.toSet()
     }
 
     private fun ensureWantAndCollections() {
