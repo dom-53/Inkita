@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.cache.CacheManagerImpl
 import net.dom53.inkita.core.logging.LoggingManager
@@ -15,6 +16,7 @@ import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.notification.AppNotificationManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.sync.ProgressSyncWorker
+import net.dom53.inkita.core.update.UpdateChecker
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.repository.AuthRepositoryImpl
 import net.dom53.inkita.data.repository.CollectionsRepositoryImpl
@@ -45,6 +47,7 @@ object StartupManager {
     @Volatile
     private var cached: Components? = null
     private val logScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /**
      * Initialise singletons used across the app. Safe to call multiple times; returns cached instance.
@@ -96,6 +99,8 @@ object StartupManager {
 
         // Kick off sync of offline reader progress; worker will only run when online.
         ProgressSyncWorker.enqueue(appContext)
+        // Check for app updates and post a notification if available (best-effort).
+        appScope.launch { UpdateChecker.checkForUpdate(appContext) }
 
         val components =
             Components(
