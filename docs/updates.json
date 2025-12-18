@@ -1,7 +1,7 @@
 {
   "channel": "preview",
-  "version": "0.1.0-beta.3",
-  "versionCode": 5,
-  "url": "https://github.com/dom-53/Inkita/releases/download/v0.1.0-beta.3/inkita-universal-v0.1.0-beta.3.apk",
-  "sha256": "8fd9577825a74d8bb6860179c67a1e17a5ec8e161769abb5878c7dc4e35863d6"
+  "version": "0.2.0-beta.1",
+  "versionCode": 6,
+  "url": "https://github.com/dom-53/Inkita/releases/download/v0.2.0-beta.1/inkita-universal-v0.2.0-beta.1.apk",
+  "sha256": "d388723a280fc84a8dcd88d77a15d84a9aef044959aace1c2aee57c01b6dfdbf"
 }
