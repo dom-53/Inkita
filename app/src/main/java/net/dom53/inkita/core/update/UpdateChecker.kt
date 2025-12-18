@@ -35,6 +35,9 @@ object UpdateChecker {
                     ongoing = true,
                 )
             val info = fetchUpdateInfo(context)
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("UpdateChecker", "Update info=${info?.versionName ?: "none"}")
+            }
             val pending =
                 info?.let { update ->
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(update.url))

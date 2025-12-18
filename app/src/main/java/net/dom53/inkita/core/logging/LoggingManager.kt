@@ -95,10 +95,13 @@ object LoggingManager {
     /**
      * Bundle existing log files into a zip ready for sharing.
      */
-    fun exportLogs(context: Context): File? {
+    fun exportLogs(
+        context: Context,
+        extras: Map<String, String> = emptyMap(),
+    ): File? {
         val dir = logDir ?: return null
         val files = dir.listFiles()?.sortedBy { it.lastModified() } ?: return null
-        if (files.isEmpty()) return null
+        if (files.isEmpty() && extras.isEmpty()) return null
 
         val zipName = "inkita-logs-${System.currentTimeMillis()}.zip"
         val outFile = File(context.cacheDir, zipName)
@@ -106,6 +109,11 @@ object LoggingManager {
             files.forEach { f ->
                 zos.putNextEntry(ZipEntry(f.name))
                 f.inputStream().use { it.copyTo(zos) }
+                zos.closeEntry()
+            }
+            extras.forEach { (name, content) ->
+                zos.putNextEntry(ZipEntry(name))
+                zos.write(content.toByteArray())
                 zos.closeEntry()
             }
         }

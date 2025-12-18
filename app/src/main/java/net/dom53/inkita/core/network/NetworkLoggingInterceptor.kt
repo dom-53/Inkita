@@ -26,7 +26,7 @@ object NetworkLoggingInterceptor : Interceptor {
             if (LoggingManager.isDebugEnabled()) {
                 LoggingManager.e(
                     "HTTP",
-                    "${request.method} ${request.url.encodedPath} failed: ${e.message}",
+                    "${request.method} ${request.url.encodedPath} failed: ${e.javaClass.simpleName}: ${e.message}",
                     e,
                 )
             }

@@ -38,6 +38,7 @@ import android.content.Intent
 import android.widget.Toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
@@ -690,7 +691,14 @@ fun SettingsAdvancedScreen(
                     if (exporting) return@OutlinedButton
                     exporting = true
                     scope.launch {
-                        val zip = withContext(Dispatchers.IO) { LoggingManager.exportLogs(context) }
+                        val zip =
+                            withContext(Dispatchers.IO) {
+                                val snapshot = buildConfigSnapshot(context, appPreferences)
+                                LoggingManager.exportLogs(
+                                    context,
+                                    extras = mapOf("config.txt" to snapshot),
+                                )
+                            }
                         exporting = false
                         if (zip == null) {
                             Toast
@@ -799,4 +807,56 @@ private fun formatTs(ts: Long): String {
     if (ts <= 0) return "--"
     val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
     return sdf.format(java.util.Date(ts))
+}
+
+private suspend fun buildConfigSnapshot(
+    context: android.content.Context,
+    prefs: net.dom53.inkita.core.storage.AppPreferences,
+): String {
+    val cfg = prefs.configFlow.first()
+    val hostMasked =
+        if (cfg.serverUrl.isBlank()) {
+            "unset"
+        } else {
+            val visible = cfg.serverUrl.take(4)
+            "$visible***"
+        }
+    val lang = prefs.appLanguageFlow.first()
+    val theme = prefs.appThemeFlow.first()
+    val offline = prefs.offlineModeFlow.first()
+    val cacheGlobal = prefs.cacheEnabledFlow.first()
+    val cacheLib = prefs.libraryCacheEnabledFlow.first()
+    val cacheBrowse = prefs.browseCacheEnabledFlow.first()
+    val cacheTtl = prefs.cacheRefreshTtlMinutesFlow.first()
+    val prefetchInProgress = prefs.prefetchInProgressFlow.first()
+    val prefetchWant = prefs.prefetchWantFlow.first()
+    val prefetchColl = prefs.prefetchCollectionsFlow.first()
+    val prefetchDetails = prefs.prefetchDetailsFlow.first()
+    val prefetchMetered = prefs.prefetchAllowMeteredFlow.first()
+    val prefetchLowBatt = prefs.prefetchAllowLowBatteryFlow.first()
+    val prefetchAll = prefs.prefetchCollectionsAllFlow.first()
+    val prefetchIds = prefs.prefetchCollectionIdsFlow.first()
+    val downloadConcurrent = prefs.downloadMaxConcurrentFlow.first()
+    val downloadRetry = prefs.downloadRetryEnabledFlow.first()
+    val downloadRetryMax = prefs.downloadRetryMaxAttemptsFlow.first()
+    val preferOfflinePages = prefs.preferOfflinePagesFlow.first()
+    val deleteAfter = prefs.deleteAfterMarkReadFlow.first()
+    val deleteDepth = prefs.deleteAfterReadDepthFlow.first()
+    val verbose = prefs.verboseLoggingFlow.first()
+
+    return buildString {
+        appendLine("App: ${context.packageName}")
+        appendLine("ServerHost: $hostMasked")
+        appendLine("Language: $lang")
+        appendLine("Theme: $theme")
+        appendLine("OfflineMode: $offline")
+        appendLine("CacheEnabled: $cacheGlobal lib=$cacheLib browse=$cacheBrowse ttlMin=$cacheTtl")
+        appendLine(
+            "Prefetch: inProgress=$prefetchInProgress want=$prefetchWant collections=$prefetchColl details=$prefetchDetails meter=$prefetchMetered lowBatt=$prefetchLowBatt all=$prefetchAll ids=$prefetchIds",
+        )
+        appendLine(
+            "Downloads: concurrent=$downloadConcurrent autoRetry=$downloadRetry maxRetry=$downloadRetryMax preferOffline=$preferOfflinePages deleteAfter=$deleteAfter depth=$deleteDepth",
+        )
+        appendLine("VerboseLogging: $verbose")
+    }
 }
