@@ -25,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -103,14 +104,14 @@ fun SettingsDownloadScreen(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                Icon(Icons.Filled.ArrowBack, contentDescription = stringResource(net.dom53.inkita.R.string.general_back))
             }
-            Text("Downloads", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(net.dom53.inkita.R.string.settings_downloads_title), style = MaterialTheme.typography.titleLarge)
         }
 
         SettingToggleRow(
-            title = "Allow metered data",
-            subtitle = "Permit downloads on mobile data. When off, downloads require Wi‑Fi.",
+            title = stringResource(net.dom53.inkita.R.string.settings_downloads_allow_metered_title),
+            subtitle = stringResource(net.dom53.inkita.R.string.settings_downloads_allow_metered_subtitle),
             checked = allowMetered,
             onCheckedChange = {
                 allowMetered = it
@@ -119,8 +120,8 @@ fun SettingsDownloadScreen(
         )
 
         SettingToggleRow(
-            title = "Allow when battery is low",
-            subtitle = "When off, downloads wait until battery is not low.",
+            title = stringResource(net.dom53.inkita.R.string.settings_downloads_allow_low_battery_title),
+            subtitle = stringResource(net.dom53.inkita.R.string.settings_downloads_allow_low_battery_subtitle),
             checked = allowLowBattery,
             onCheckedChange = {
                 allowLowBattery = it
@@ -129,8 +130,8 @@ fun SettingsDownloadScreen(
         )
 
         SettingToggleRow(
-            title = "Prefer offline pages",
-            subtitle = "When available, reader will use downloaded pages even when online.",
+            title = stringResource(net.dom53.inkita.R.string.settings_downloads_prefer_offline_title),
+            subtitle = stringResource(net.dom53.inkita.R.string.settings_downloads_prefer_offline_subtitle),
             checked = preferOffline,
             onCheckedChange = {
                 preferOffline = it
@@ -139,11 +140,11 @@ fun SettingsDownloadScreen(
         )
 
         Divider(modifier = Modifier.padding(vertical = 8.dp))
-        Text("Delete after reading", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(net.dom53.inkita.R.string.settings_downloads_delete_after_section), style = MaterialTheme.typography.titleMedium)
 
         SettingToggleRow(
-            title = "Delete when marked as read",
-            subtitle = "Automatically remove downloads after you mark items as read.",
+            title = stringResource(net.dom53.inkita.R.string.settings_downloads_delete_after_mark_title),
+            subtitle = stringResource(net.dom53.inkita.R.string.settings_downloads_delete_after_mark_subtitle),
             checked = deleteAfterMarkRead,
             onCheckedChange = {
                 deleteAfterMarkRead = it
@@ -152,8 +153,8 @@ fun SettingsDownloadScreen(
         )
 
         SelectionRow(
-            title = "Keep recent downloaded pages",
-            subtitle = "How many recently read downloaded pages stay on device before older ones are removed.",
+            title = stringResource(net.dom53.inkita.R.string.settings_downloads_keep_recent_title),
+            subtitle = stringResource(net.dom53.inkita.R.string.settings_downloads_keep_recent_subtitle),
             options = deleteAfterOptions(),
             selected = deleteAfterReadDepth,
             onSelect = { next ->
@@ -165,8 +166,8 @@ fun SettingsDownloadScreen(
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
         SettingToggleRow(
-            title = "Automatic retries",
-            subtitle = "Retry failed downloads automatically.",
+            title = stringResource(net.dom53.inkita.R.string.settings_downloads_auto_retry_title),
+            subtitle = stringResource(net.dom53.inkita.R.string.settings_downloads_auto_retry_subtitle),
             checked = retryEnabled,
             onCheckedChange = {
                 retryEnabled = it
@@ -176,8 +177,8 @@ fun SettingsDownloadScreen(
 
         if (retryEnabled) {
             NumberStepperRow(
-                title = "Max retry attempts",
-                subtitle = "Total attempts per task before it fails.",
+                title = stringResource(net.dom53.inkita.R.string.settings_downloads_max_retry_title),
+                subtitle = stringResource(net.dom53.inkita.R.string.settings_downloads_max_retry_subtitle),
                 value = maxRetries,
                 range = 1..5,
                 onChange = { next ->
@@ -199,22 +200,22 @@ fun SettingsDownloadScreen(
 
         Spacer(Modifier.height(8.dp))
         Text(
-            "These limits are applied to download and prefetch workers.",
+            stringResource(net.dom53.inkita.R.string.settings_downloads_limits_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         Divider(modifier = Modifier.padding(vertical = 8.dp))
         Button(onClick = { showClearDialog = true }) {
-            Text("Clear downloaded pages")
+            Text(stringResource(net.dom53.inkita.R.string.settings_downloads_clear_downloaded))
         }
     }
 
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            title = { Text("Clear downloaded pages") },
-            text = { Text("Remove all downloaded HTML pages and assets from device storage?") },
+            title = { Text(stringResource(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_confirm_title)) },
+            text = { Text(stringResource(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_confirm_text)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -223,16 +224,16 @@ fun SettingsDownloadScreen(
                             withContext(Dispatchers.IO) {
                                 downloadRepo.clearAllDownloads()
                             }
-                            Toast.makeText(context, "Downloaded pages cleared", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast), Toast.LENGTH_SHORT).show()
                         }
                     },
                 ) {
-                    Text("Clear")
+                    Text(stringResource(net.dom53.inkita.R.string.settings_downloads_clear))
                 }
             },
             dismissButton = {
                 Button(onClick = { showClearDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(net.dom53.inkita.R.string.general_cancel))
                 }
             },
         )
@@ -282,9 +283,9 @@ private fun ConcurrentRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text("Max concurrent downloads", style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(net.dom53.inkita.R.string.settings_downloads_max_concurrent_title), style = MaterialTheme.typography.bodyLarge)
             Text(
-                "Limit how many page downloads run in parallel (1-6).",
+                stringResource(net.dom53.inkita.R.string.settings_downloads_max_concurrent_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

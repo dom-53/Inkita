@@ -328,6 +328,34 @@
     <string name="download_completed_size">Size: %1$s</string>
     <string name="download_completed_open">Open</string>
     <string name="download_completed_delete">Delete</string>
+    <!-- Download settings -->
+    <string name="settings_downloads_title">Downloads</string>
+    <string name="settings_downloads_allow_metered_title">Allow metered data</string>
+    <string name="settings_downloads_allow_metered_subtitle">Permit downloads on mobile data. When off, downloads require Wi‑Fi.</string>
+    <string name="settings_downloads_allow_low_battery_title">Allow when battery is low</string>
+    <string name="settings_downloads_allow_low_battery_subtitle">When off, downloads wait until battery is not low.</string>
+    <string name="settings_downloads_prefer_offline_title">Prefer offline pages</string>
+    <string name="settings_downloads_prefer_offline_subtitle">When available, reader will use downloaded pages even when online.</string>
+    <string name="settings_downloads_delete_after_section">Delete after reading</string>
+    <string name="settings_downloads_delete_after_mark_title">Delete when marked as read</string>
+    <string name="settings_downloads_delete_after_mark_subtitle">Automatically remove downloads after you mark items as read.</string>
+    <string name="settings_downloads_keep_recent_title">Keep recent downloaded pages</string>
+    <string name="settings_downloads_keep_recent_subtitle">How many recently read downloaded pages stay on device before older ones are removed.</string>
+    <string name="settings_downloads_auto_retry_title">Automatic retries</string>
+    <string name="settings_downloads_auto_retry_subtitle">Retry failed downloads automatically.</string>
+    <string name="settings_downloads_max_retry_title">Max retry attempts</string>
+    <string name="settings_downloads_max_retry_subtitle">Total attempts per task before it fails.</string>
+    <string name="settings_downloads_limits_note">These limits are applied to download and prefetch workers.</string>
+    <string name="settings_downloads_clear_downloaded">Clear downloaded pages</string>
+    <string name="settings_downloads_clear_downloaded_confirm_title">Clear downloaded pages</string>
+    <string name="settings_downloads_clear_downloaded_confirm_text">Remove all downloaded HTML pages and assets from device storage?</string>
+    <string name="settings_downloads_clear_downloaded_toast">Downloaded pages cleared</string>
+    <string name="settings_downloads_clear">Clear</string>
+    <string name="settings_downloads_cancel">Cancel</string>
+    <string name="settings_downloads_max_concurrent_title">Max concurrent downloads</string>
+    <string name="settings_downloads_max_concurrent_subtitle">Limit how many page downloads run in parallel (1-6).</string>
+    <string name="settings_downloads_selection_placeholder">Select</string>
+    <string name="settings_downloads_delete_after_option">After %1$s read</string>
     <!-- History -->
     <string name="history_error_http">HTTP %1$d</string>
     <string name="history_no_cover">No cover</string>
