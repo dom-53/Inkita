@@ -6,7 +6,7 @@ All notable changes to this project will be documented here.
 
 ### Added
 - Localization: Declared supported locales (EN, CS) via `locale-config` and AppCompat auto locale storage so per-app language works from system settings and the in-app picker.
-- Logging: Added rotating on-device log files with export/clear controls and a verbose logging toggle in Advanced settings (no secrets, share as zip for debugging).
+- Logging: Added rotating on-device log files with export/save/clear controls, a verbose logging toggle, sanitization of hosts/IPs/API keys, and config snapshot in exported zips.
 
 ### Changed
 - UI: Switched theme base to `Theme.AppCompat.DayNight.NoActionBar` (required for per-app language support with Compose).
