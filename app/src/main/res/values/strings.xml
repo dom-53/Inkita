@@ -290,6 +290,20 @@
     <string name="series_download_missing">Download missing</string>
     <string name="series_clear_downloads">Clear downloads</string>
     <string name="series_open_download_queue">Download queue</string>
+    <!-- Advanced settings -->
+    <string name="advanced_clear_cache">Clear cache</string>
+    <string name="advanced_downloaded_pages">Downloaded pages</string>
+    <string name="advanced_cache_stats_series">Series: %1$d</string>
+    <string name="advanced_cache_stats_tabs">Tab refs: %1$d</string>
+    <string name="advanced_cache_stats_browse">Browse refs: %1$d</string>
+    <string name="advanced_cache_stats_details">Details: %1$d</string>
+    <string name="advanced_cache_stats_volumes">Volumes: %1$d</string>
+    <string name="advanced_cache_stats_chapters">Chapters: %1$d</string>
+    <string name="advanced_cache_stats_db_size">DB size: %1$s</string>
+    <string name="advanced_cache_stats_thumbnails">Thumbnails: %1$s</string>
+    <string name="advanced_cache_stats_last_library">Last library refresh: %1$s</string>
+    <string name="advanced_cache_stats_last_browse">Last browse refresh: %1$s</string>
+    <string name="advanced_cache_clear_downloaded_pages">Downloaded pages</string>
     <!-- Downloads queue -->
     <string name="download_screen_title">Downloads</string>
     <string name="download_clear_completed">Clear completed</string>
