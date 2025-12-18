@@ -15,8 +15,6 @@
     <string name="general_reading_status_completed">Completed</string>
     <string name="general_reading_status_in_progress">In progress</string>
     <string name="general_reading_status_unread">Unread</string>
-    <string name="general_username">Username</string>
-    <string name="general_password">Password</string>
     <string name="general_option_soon">Theme options coming soon</string>
     <string name="general_nav_option_soon">Navigation options coming soon</string>
     <string name="general_decrease">Decrease</string>
@@ -96,10 +94,11 @@
     <string name="general_words">Words</string>
     <string name="general_time">Time</string>
     <string name="general_weekly">Weekly</string>
+    <string name="general_queue">Queue</string>
+    <string name="general_downloaded">Downloaded</string>
+    <string name="download_screen_title">Downloads</string>
     <!-- Languages -->
     <string name="general_language_system">System</string>
-    <string name="general_language_english">English</string>
-    <string name="general_language_czech">Czech</string>
     <string name="general_language_label">Language</string>
     <string name="general_language_en">English</string>
     <string name="general_language_cs">Czech</string>
@@ -277,16 +276,13 @@
     <string name="stats_failed_stat_load">Failed to load statistics.</string>
     <string name="stats_reading_sum">Reading summary</string>
     <string name="stats_activity_last_30d">Activity (last 30 days)</string>
-    <string name="stats_pages_per_yer">Pages per year</string>
-    <string name="stats_words_per_yer">Words per year</string>
-    <string name="stats_source_kavita_api_description">Data comes from Kavita’s /api/Stats endpoint. Can be expanded with additional charts (day of week, formats, publication types, etc.).</string>
+    <string name="stats_pages_per_year">Pages per year</string>
+    <string name="stats_words_per_year">Words per year</string>
     <!-- Update -->
     <string name="update_notification_title">Update available: %1$s</string>
     <string name="update_notification_text">Tap to download the latest version.</string>
     <string name="update_checking_title">Checking for updates…</string>
     <string name="update_checking_text">Looking for a newer Inkita build.</string>
-    <string name="update_up_to_date_title">Inkita is up to date</string>
-    <string name="update_up_to_date_text">No newer version found.</string>
     <string name="notifications_prompt_title">Enable notifications</string>
     <string name="notifications_prompt_body">Please allow notifications so we can alert you about updates and downloads.</string>
     <string name="notifications_prompt_accept">Enable</string>

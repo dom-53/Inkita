@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import net.dom53.inkita.R
 import net.dom53.inkita.data.local.db.entity.DownloadTaskEntity
 import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
 import java.io.File
@@ -76,16 +77,16 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Downloads", style = MaterialTheme.typography.headlineSmall)
+        Text(context.getString(R.string.download_screen_title), style = MaterialTheme.typography.headlineSmall)
         TabRow(selectedTabIndex = selectedTab) {
             Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
-                Text("Queue", modifier = Modifier.padding(12.dp))
+                Text(context.getString(R.string.general_queue), modifier = Modifier.padding(12.dp))
             }
             Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
-                Text("Completed", modifier = Modifier.padding(12.dp))
+                Text(context.getString(R.string.general_completed), modifier = Modifier.padding(12.dp))
             }
             Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) {
-                Text("Downloaded", modifier = Modifier.padding(12.dp))
+                Text(context.getString(R.string.general_downloaded), modifier = Modifier.padding(12.dp))
             }
         }
         when (selectedTab) {

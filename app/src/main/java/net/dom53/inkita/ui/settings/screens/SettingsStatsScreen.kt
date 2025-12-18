@@ -163,7 +163,7 @@ fun SettingsStatsScreen(
 
         if (pagesPerYear.value.isNotEmpty()) {
             val max = (pagesPerYear.value.maxOfOrNull { it.count ?: 0 } ?: 1L).toInt()
-            item { Text(stringResource(R.string.stats_pages_per_yer), style = MaterialTheme.typography.titleMedium) }
+            item { Text(stringResource(R.string.stats_pages_per_year), style = MaterialTheme.typography.titleMedium) }
             items(pagesPerYear.value) { item ->
                 BarRow(
                     label = item.value?.toString() ?: "",
@@ -175,7 +175,7 @@ fun SettingsStatsScreen(
 
         if (wordsPerYear.value.isNotEmpty()) {
             val max = (wordsPerYear.value.maxOfOrNull { it.count ?: 0 } ?: 1L).toInt()
-            item { Text(stringResource(R.string.stats_words_per_yer), style = MaterialTheme.typography.titleMedium) }
+            item { Text(stringResource(R.string.stats_words_per_year), style = MaterialTheme.typography.titleMedium) }
             items(wordsPerYear.value) { item ->
                 BarRow(
                     label = item.value?.toString() ?: "",
