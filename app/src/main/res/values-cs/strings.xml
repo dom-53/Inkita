@@ -98,12 +98,17 @@
     <string name="general_words">Slova</string>
     <string name="general_time">Čas</string>
     <string name="general_weekly">Týdně</string>
+    <string name="general_queue">Fronta</string>
+    <string name="general_downloaded">Staženo</string>
+    <string name="general_unknown_error">neznámá chyba</string>
     <!-- Languages -->
     <string name="general_language_system">Systém</string>
     <string name="general_language_label">Jazyk</string>
     <string name="general_language_en">Angličtina</string>
     <string name="general_language_cs">Čeština</string>
     <string name="general_title">Obecné</string>
+    <string name="settings_general_offline_mode_title">Offline režim</string>
+    <string name="settings_general_offline_mode_subtitle">Přinutit aplikaci chovat se jako offline (přeskočit síťové požadavky/práci), i když je dostupné připojení.</string>
     <string name="settings_cache_global_subtitle">Použídat data z mezimapěti pro offline a aktualizovat online</string>
     <string name="settings_cache_library_title">Cache knihovny pro offline</string>
     <string name="settings_cache_library_subtitle">Offline zobrazí cache a na pozadí se obnoví.</string>
@@ -169,6 +174,11 @@
     <string name="browse_filter_smart_filters">Chytré filtry</string>
     <!-- History -->
     <string name="history_no_history">Zatím žádná historie.</string>
+    <string name="history_chapter_range">K. %1$s–%2$s</string>
+    <string name="history_chapter_single">K. %1$s</string>
+    <string name="history_entries_count">Záznamy: %1$d</string>
+    <string name="history_error_http">HTTP %1$d</string>
+    <string name="history_no_cover">Bez obálky</string>
     <!-- Library -->
     <string name="library_empty_want_to_read">Nemáš žádné tituly označené jako „chci číst“.</string>
     <!-- Reader -->
@@ -223,6 +233,10 @@
     <string name="series_detail_load_colls">Načíst kolekce</string>
     <string name="series_detail_resume_page">Pokračovat: strana</string>
     <string name="series_detail_ch_loading_err">Kapitoly nelze načíst (pro toto volume chybí kniha).</string>
+    <string name="series_download_all">Stáhnout vše</string>
+    <string name="series_download_missing">Stáhnout chybějící</string>
+    <string name="series_open_download_queue">Fronta stahování</string>
+    <string name="series_clear_downloads">Smazat stažené</string>
     <!--  Settings  -->
     <string name="settings_title">Nastavení</string>
     <string name="settings_item_general">Obecné</string>
@@ -234,6 +248,56 @@
     <string name="settings_item_advanced">Pokročilé</string>
     <string name="settings_item_stats">Moje Statistiky</string>
     <string name="settings_item_about">O aplikaci</string>
+    <!-- Downloads -->
+    <string name="download_screen_title">Stahování</string>
+    <string name="download_action_clear">Vymazat</string>
+    <string name="download_action_pause">Pozastavit</string>
+    <string name="download_action_resume">Pokračovat</string>
+    <string name="download_action_retry">Zkusit znovu</string>
+    <string name="download_clear_completed">Vyčistit dokončené</string>
+    <string name="download_item_title">Série %1$s · %2$s</string>
+    <string name="download_item_state">Stav: %1$s</string>
+    <string name="download_item_progress">Průběh: %1$d/%2$d (%3$d%%)</string>
+    <string name="download_item_bytes">Bajtů: %1$s / %2$s (%3$d%%)</string>
+    <string name="download_item_error">Chyba: %1$s</string>
+    <string name="download_item_created">Vytvořeno: %1$s</string>
+    <string name="download_item_updated">Aktualizováno: %1$s</string>
+    <string name="download_item_chapter_pages">Kapitola %1$s stránky %2$s..%3$s</string>
+    <string name="download_type_volume">Svazek</string>
+    <string name="download_completed_title">Série %1$s · Kapitola %2$s · Strana %3$s</string>
+    <string name="download_completed_status">Stav: %1$s</string>
+    <string name="download_completed_size">Velikost: %1$s</string>
+    <string name="download_completed_updated">Aktualizováno: %1$s</string>
+    <string name="download_completed_open">Otevřít</string>
+    <string name="download_completed_delete">Smazat</string>
+    <!-- Download settings -->
+    <string name="settings_downloads_title">Stahování</string>
+    <string name="settings_downloads_selection_placeholder">Vyber</string>
+    <string name="settings_downloads_limits_note">Tato omezení platí pro stahování i přednačítání.</string>
+    <string name="settings_downloads_prefer_offline_title">Preferovat offline stránky</string>
+    <string name="settings_downloads_prefer_offline_subtitle">Pokud je to možné, čtečka použije stažené stránky, i když je online.</string>
+    <string name="settings_downloads_max_concurrent_title">Max současných stahování</string>
+    <string name="settings_downloads_max_concurrent_subtitle">Omez počet paralelně běžících stahování stránek (1-6).</string>
+    <string name="settings_downloads_auto_retry_title">Automatické opakování</string>
+    <string name="settings_downloads_auto_retry_subtitle">Automaticky zkusit znovu neúspěšné stahování.</string>
+    <string name="settings_downloads_max_retry_title">Max pokusů o opakování</string>
+    <string name="settings_downloads_max_retry_subtitle">Celkový počet pokusů na úlohu před selháním.</string>
+    <string name="settings_downloads_allow_metered_title">Povolit měřené připojení</string>
+    <string name="settings_downloads_allow_metered_subtitle">Povolit stahování na mobilních datech. Pokud je vypnuto, stahuje se pouze na Wi‑Fi.</string>
+    <string name="settings_downloads_allow_low_battery_title">Povolit při nízké baterii</string>
+    <string name="settings_downloads_allow_low_battery_subtitle">Pokud je vypnuto, stahování počká, dokud nebude baterie v normálu.</string>
+    <string name="settings_downloads_delete_after_section">Smazat po přečtení</string>
+    <string name="settings_downloads_delete_after_mark_title">Smazat při označení jako přečtené</string>
+    <string name="settings_downloads_delete_after_mark_subtitle">Automaticky odstranit stažené po označení jako přečtené.</string>
+    <string name="settings_downloads_delete_after_option">Po %1$s přečteních</string>
+    <string name="settings_downloads_keep_recent_title">Ponechat nedávno stažené stránky</string>
+    <string name="settings_downloads_keep_recent_subtitle">Kolik nedávno čtených stažených stránek zůstane v zařízení, než se starší odstraní.</string>
+    <string name="settings_downloads_clear_downloaded">Vymazat stažené stránky</string>
+    <string name="settings_downloads_clear_downloaded_confirm_title">Vymazat stažené stránky</string>
+    <string name="settings_downloads_clear_downloaded_confirm_text">Odstranit všechny stažené HTML stránky a assety z úložiště zařízení?</string>
+    <string name="settings_downloads_clear_downloaded_toast">Stažené stránky odstraněny</string>
+    <string name="settings_downloads_clear">Vyčistit</string>
+    <string name="settings_downloads_cancel">Zrušit</string>
     <!--  Kavita  -->
     <string name="settings_kavita_server">Kavita server URL</string>
     <string name="settings_kavita_use_https">Použít HTTPS</string>
@@ -246,6 +310,23 @@
     <string name="settings_kavita_http_warning_title">Použít HTTP?</string>
     <string name="settings_kavita_http_warning_body">HTTP není šifrované. Používejte ho jen v důvěryhodné lokální síti. Pokračovat?</string>
     <string name="settings_kavita_http_warning_confirm">Pokračovat s HTTP</string>
+    <string name="settings_kavita_http_warning_cancel">Zrušit</string>
+    <string name="settings_kavita_saved_toast">Konfigurace uložena. Prosím restartujte aplikaci.</string>
+    <string name="settings_kavita_save_failed">Uložení selhalo: %1$s</string>
+    <!-- Advanced -->
+    <string name="advanced_clear_cache">Vyčistit mezipaměť</string>
+    <string name="advanced_cache_clear_downloaded_pages">Stažené stránky</string>
+    <string name="advanced_downloaded_pages">Stažené stránky</string>
+    <string name="advanced_cache_stats_db_size">Velikost DB: %1$s</string>
+    <string name="advanced_cache_stats_series">Série: %1$d</string>
+    <string name="advanced_cache_stats_details">Detaily: %1$d</string>
+    <string name="advanced_cache_stats_volumes">Svazky: %1$d</string>
+    <string name="advanced_cache_stats_chapters">Kapitoly: %1$d</string>
+    <string name="advanced_cache_stats_tabs">Odkazy na záložky: %1$d</string>
+    <string name="advanced_cache_stats_browse">Reference pro prohlížení: %1$d</string>
+    <string name="advanced_cache_stats_thumbnails">Náhledy: %1$s</string>
+    <string name="advanced_cache_stats_last_library">Poslední obnovení Knihovny: %1$s</string>
+    <string name="advanced_cache_stats_last_browse">Poslední obnovení Procházet: %1$s</string>
     <!--  About Inkita  -->
     <string name="settings_about_osl">Licence s otevřeným zdrojem</string>
     <string name="settings_about_osl_3rd">Knihovny třetích stran</string>
@@ -273,6 +354,7 @@
     <string name="settings_appearance_by_system">Podle systému</string>
     <string name="settings_appearance_dark">Tmavý</string>
     <string name="settings_appearance_light">Světlý</string>
+    <string name="settings_appearance_title">Vzhled</string>
     <!-- Stats -->
     <string name="stats_failed_stat_load">Nepodařilo se načíst statistiky.</string>
     <string name="stats_reading_sum">Souhrn čtení</string>

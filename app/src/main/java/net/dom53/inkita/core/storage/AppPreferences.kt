@@ -126,7 +126,7 @@ class AppPreferences(
         }
 
     val appLanguageFlow: Flow<String> =
-        context.dataStore.data.map { prefs -> prefs[KEY_APP_LANGUAGE] ?: "en" }
+        context.dataStore.data.map { prefs -> prefs[KEY_APP_LANGUAGE] ?: "system" }
 
     val notificationsPromptShownFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_NOTIF_PROMPT_SHOWN] ?: false }

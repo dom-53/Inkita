@@ -6,10 +6,11 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Window
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.os.LocaleListCompat
 import androidx.core.view.WindowCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -43,7 +45,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.startup.StartupManager
 import net.dom53.inkita.core.storage.AppConfig
@@ -65,15 +69,30 @@ import net.dom53.inkita.ui.settings.SettingsScreen
 import net.dom53.inkita.ui.theme.InkitaTheme
 import net.dom53.inkita.ui.updates.UpdatesScreen
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val components = StartupManager.init(applicationContext)
         val appPreferences = components.preferences
+        // Apply saved locale before composing UI so strings use correct language on first draw.
+        val storedLanguage = runBlocking { appPreferences.appLanguageFlow.first() }
+        val appLocales = AppCompatDelegate.getApplicationLocales()
+        val localeTag = appLocales.toLanguageTags()
+        val initialLanguage =
+            when {
+                localeTag.isNotBlank() -> localeTag
+                storedLanguage.isNotBlank() -> storedLanguage
+                else -> "system"
+            }
+        if (storedLanguage != initialLanguage) {
+            runBlocking { appPreferences.setAppLanguage(initialLanguage) }
+        }
+        applyLocale(initialLanguage)
 
         setContent {
             InkitaApp(
+                initialLanguage = initialLanguage,
                 appPreferences = components.preferences,
                 libraryRepository = components.libraryRepository,
                 authRepository = components.authRepository,
@@ -92,8 +111,21 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private fun applyLocale(languageTag: String) {
+    val locales =
+        if (languageTag.isBlank() || languageTag == "system") {
+            LocaleListCompat.getEmptyLocaleList()
+        } else {
+            LocaleListCompat.forLanguageTags(languageTag)
+        }
+    if (AppCompatDelegate.getApplicationLocales() != locales) {
+        AppCompatDelegate.setApplicationLocales(locales)
+    }
+}
+
 @Composable
 fun InkitaApp(
+    initialLanguage: String,
     appPreferences: AppPreferences,
     libraryRepository: LibraryRepository,
     authRepository: AuthRepository,
@@ -108,6 +140,7 @@ fun InkitaApp(
     val notificationsEnabled =
         NotificationManagerCompat.from(context).areNotificationsEnabled()
     val showNotifDialog = remember { mutableStateOf(false) }
+    val appLanguage by appPreferences.appLanguageFlow.collectAsState(initial = initialLanguage)
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
             // Regardless of result, don't ask again.
@@ -121,6 +154,10 @@ fun InkitaApp(
         } else if (!notifPromptShown && notificationsEnabled) {
             appPreferences.setNotificationsPromptShown(true)
         }
+    }
+
+    LaunchedEffect(appLanguage) {
+        applyLocale(appLanguage)
     }
 
     val appTheme by appPreferences.appThemeFlow.collectAsState(initial = AppTheme.System)

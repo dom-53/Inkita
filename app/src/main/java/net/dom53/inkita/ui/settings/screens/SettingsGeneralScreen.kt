@@ -42,7 +42,7 @@ fun SettingsGeneralScreen(
 ) {
     val scope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
-    var selectedLang by remember { mutableStateOf("en") }
+    var selectedLang by remember { mutableStateOf("system") }
     var offlineMode by remember { mutableStateOf(false) }
 
     val languages =
