@@ -96,7 +96,6 @@
     <string name="general_weekly">Weekly</string>
     <string name="general_queue">Queue</string>
     <string name="general_downloaded">Downloaded</string>
-    <string name="download_screen_title">Downloads</string>
     <!-- Languages -->
     <string name="general_language_system">System</string>
     <string name="general_language_label">Language</string>
@@ -244,7 +243,6 @@
     <string name="settings_kavita_http_warning_title">Use HTTP?</string>
     <string name="settings_kavita_http_warning_body">HTTP is unencrypted. Use it only on trusted local networks. Continue anyway?</string>
     <string name="settings_kavita_http_warning_confirm">Continue with HTTP</string>
-    <string name="settings_kavita_http_warning_cancel">Cancel</string>
     <!-- About Inkita  -->
     <string name="settings_about_version">Version</string>
     <string name="settings_about_build_time">Build time</string>
@@ -288,10 +286,9 @@
     <string name="notifications_prompt_accept">Enable</string>
     <string name="notifications_prompt_dismiss">Not now</string>
     <!-- Downloads queue -->
+    <string name="download_screen_title">Downloads</string>
     <string name="download_clear_completed">Clear completed</string>
-    <string name="download_type_pages">Pages</string>
     <string name="download_type_volume">Volume</string>
-    <string name="download_type_series">Series</string>
     <string name="download_item_title">Series %1$s · %2$s</string>
     <string name="download_item_chapter_pages">Chapter %1$s pages %2$s..%3$s</string>
     <string name="download_item_state">State: %1$s</string>
@@ -301,7 +298,6 @@
     <string name="download_item_bytes">Bytes: %1$s / %2$s (%3$d%%)</string>
     <string name="download_item_error">Error: %1$s</string>
     <string name="download_action_pause">Pause</string>
-    <string name="download_action_cancel">Cancel</string>
     <string name="download_action_resume">Resume</string>
     <string name="download_action_retry">Retry</string>
     <string name="download_action_clear">Clear</string>

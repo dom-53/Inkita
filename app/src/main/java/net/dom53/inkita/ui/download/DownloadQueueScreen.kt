@@ -165,9 +165,9 @@ private fun TaskRow(
 ) {
     val labelType =
         when (task.type) {
-            DownloadTaskEntity.TYPE_PAGES -> stringResource(R.string.download_type_pages)
+            DownloadTaskEntity.TYPE_PAGES -> stringResource(R.string.general_pages)
             DownloadTaskEntity.TYPE_VOLUME -> stringResource(R.string.download_type_volume)
-            DownloadTaskEntity.TYPE_SERIES -> stringResource(R.string.download_type_series)
+            DownloadTaskEntity.TYPE_SERIES -> stringResource(R.string.general_series)
             else -> task.type
         }
     Column(
@@ -240,7 +240,7 @@ private fun TaskRow(
                         Text(stringResource(R.string.download_action_pause))
                     }
                     Button(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
-                        Text(stringResource(R.string.download_action_cancel))
+                        Text(stringResource(R.string.general_cancel))
                     }
                 }
                 DownloadTaskEntity.STATE_PAUSED -> {
@@ -253,7 +253,7 @@ private fun TaskRow(
                         Text(stringResource(R.string.download_action_retry))
                     }
                     Button(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
-                        Text(stringResource(R.string.download_action_cancel))
+                        Text(stringResource(R.string.general_cancel))
                     }
                 }
                 DownloadTaskEntity.STATE_CANCELED -> {

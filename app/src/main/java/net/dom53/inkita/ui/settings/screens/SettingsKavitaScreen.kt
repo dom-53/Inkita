@@ -297,7 +297,7 @@ fun SettingsKavitaScreen(
                         warningFromSave = false
                     },
                 ) {
-                    Text(stringResource(R.string.settings_kavita_http_warning_cancel))
+                    Text(stringResource(R.string.general_cancel))
                 }
             },
         )

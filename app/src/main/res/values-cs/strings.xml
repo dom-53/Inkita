@@ -246,7 +246,6 @@
     <string name="settings_kavita_http_warning_title">Použít HTTP?</string>
     <string name="settings_kavita_http_warning_body">HTTP není šifrované. Používejte ho jen v důvěryhodné lokální síti. Pokračovat?</string>
     <string name="settings_kavita_http_warning_confirm">Pokračovat s HTTP</string>
-    <string name="settings_kavita_http_warning_cancel">Zrušit</string>
     <!--  About Inkita  -->
     <string name="settings_about_osl">Licence s otevřeným zdrojem</string>
     <string name="settings_about_osl_3rd">Knihovny třetích stran</string>
