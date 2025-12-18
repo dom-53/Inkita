@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import net.dom53.inkita.R
 import net.dom53.inkita.data.local.db.entity.DownloadTaskEntity
@@ -74,19 +75,22 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
         }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(context.getString(R.string.download_screen_title), style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.download_screen_title), style = MaterialTheme.typography.headlineSmall)
         TabRow(selectedTabIndex = selectedTab) {
             Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
-                Text(context.getString(R.string.general_queue), modifier = Modifier.padding(12.dp))
+                Text(stringResource(R.string.general_queue), modifier = Modifier.padding(12.dp))
             }
             Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
-                Text(context.getString(R.string.general_completed), modifier = Modifier.padding(12.dp))
+                Text(stringResource(R.string.general_completed), modifier = Modifier.padding(12.dp))
             }
             Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) {
-                Text(context.getString(R.string.general_downloaded), modifier = Modifier.padding(12.dp))
+                Text(stringResource(R.string.general_downloaded), modifier = Modifier.padding(12.dp))
             }
         }
         when (selectedTab) {
@@ -126,7 +130,7 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
                         horizontalArrangement = Arrangement.End,
                     ) {
                         Button(onClick = { viewModel.clearCompleted() }) {
-                            Text("Clear completed")
+                            Text(stringResource(R.string.download_clear_completed))
                         }
                     }
                 }
@@ -161,32 +165,67 @@ private fun TaskRow(
 ) {
     val labelType =
         when (task.type) {
-            DownloadTaskEntity.TYPE_PAGES -> "Pages"
-            DownloadTaskEntity.TYPE_VOLUME -> "Volume"
-            DownloadTaskEntity.TYPE_SERIES -> "Series"
+            DownloadTaskEntity.TYPE_PAGES -> stringResource(R.string.download_type_pages)
+            DownloadTaskEntity.TYPE_VOLUME -> stringResource(R.string.download_type_volume)
+            DownloadTaskEntity.TYPE_SERIES -> stringResource(R.string.download_type_series)
             else -> task.type
         }
     Column(
         modifier = Modifier.fillMaxWidth().padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text("Series ${task.seriesId} · $labelType", style = MaterialTheme.typography.bodyLarge)
-        Text("Chapter ${task.chapterId ?: "-"} pages ${task.pageStart ?: "-"}..${task.pageEnd ?: "-"}")
-        Text("State: ${task.state}")
+        Text(
+            stringResource(R.string.download_item_title, task.seriesId, labelType),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Text(
+            stringResource(
+                R.string.download_item_chapter_pages,
+                task.chapterId ?: "-",
+                task.pageStart ?: "-",
+                task.pageEnd ?: "-",
+            ),
+        )
+        Text(stringResource(R.string.download_item_state, task.state))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Created: ${formatDate(task.createdAt)}", style = MaterialTheme.typography.bodySmall)
-            Text("Updated: ${formatDate(task.updatedAt)}", style = MaterialTheme.typography.bodySmall)
+            if (task.createdAt > 0) {
+                Text(
+                    stringResource(R.string.download_item_created, formatDate(task.createdAt)),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (task.updatedAt > 0) {
+                Text(
+                    stringResource(R.string.download_item_updated, formatDate(task.updatedAt)),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
         if (task.total > 0) {
             val pct = (task.progress * 100f / task.total).toInt().coerceIn(0, 100)
-            Text("Progress: ${task.progress}/${task.total} ($pct%)", style = MaterialTheme.typography.bodySmall)
+            Text(
+                stringResource(R.string.download_item_progress, task.progress, task.total, pct),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         if (task.bytesTotal > 0) {
             val pct = (task.bytes * 100f / task.bytesTotal).toInt().coerceIn(0, 100)
-            Text("Bytes: ${formatBytes(task.bytes)} / ${formatBytes(task.bytesTotal)} ($pct%)", style = MaterialTheme.typography.bodySmall)
+            Text(
+                stringResource(
+                    R.string.download_item_bytes,
+                    formatBytes(task.bytes),
+                    formatBytes(task.bytesTotal),
+                    pct,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         task.error?.takeIf { it.isNotBlank() }?.let { err ->
-            Text("Error: $err", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Text(
+                stringResource(R.string.download_item_error, err),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -198,28 +237,28 @@ private fun TaskRow(
                 DownloadTaskEntity.STATE_RUNNING,
                 -> {
                     Button(onClick = onPause) {
-                        Text("Pause")
+                        Text(stringResource(R.string.download_action_pause))
                     }
                     Button(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.download_action_cancel))
                     }
                 }
                 DownloadTaskEntity.STATE_PAUSED -> {
                     Button(onClick = onResume) {
-                        Text("Resume")
+                        Text(stringResource(R.string.download_action_resume))
                     }
                 }
                 DownloadTaskEntity.STATE_FAILED -> {
                     Button(onClick = onRetry) {
-                        Text("Retry")
+                        Text(stringResource(R.string.download_action_retry))
                     }
                     Button(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.download_action_cancel))
                     }
                 }
                 DownloadTaskEntity.STATE_CANCELED -> {
                     Button(onClick = onClear) {
-                        Text("Clear")
+                        Text(stringResource(R.string.download_action_clear))
                     }
                 }
                 else -> Unit
@@ -239,13 +278,18 @@ private fun DownloadedRow(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            "Series ${page.seriesId} · Chapter ${page.chapterId} · Page ${page.page}",
+            stringResource(
+                R.string.download_completed_title,
+                page.seriesId,
+                page.chapterId,
+                page.page,
+            ),
             style = MaterialTheme.typography.bodyLarge,
         )
-        Text("Status: ${page.status}")
+        Text(stringResource(R.string.download_completed_status, page.status))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Updated: ${formatDate(page.updatedAt)}", style = MaterialTheme.typography.bodySmall)
-            Text("Size: ${formatBytes(page.sizeBytes)}", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.download_completed_updated, formatDate(page.updatedAt)), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.download_completed_size, formatBytes(page.sizeBytes)), style = MaterialTheme.typography.bodySmall)
         }
         Text(page.htmlPath, style = MaterialTheme.typography.bodySmall)
         Row(
@@ -254,10 +298,10 @@ private fun DownloadedRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Button(onClick = onOpen) {
-                Text("Open")
+                Text(stringResource(R.string.download_completed_open))
             }
             Button(onClick = onDelete, modifier = Modifier.padding(start = 8.dp)) {
-                Text("Delete")
+                Text(stringResource(R.string.download_completed_delete))
             }
         }
     }
