@@ -88,7 +88,7 @@ fun HistoryScreen(appPreferences: AppPreferences) {
                 if (resp.isSuccessful) {
                     history.value = resp.body().orEmpty()
                 } else {
-                    error.value = "HTTP ${resp.code()}"
+                    error.value = context.getString(R.string.history_error_http, resp.code())
                 }
             }.onFailure { e -> error.value = e.message }
         isLoading.value = false
@@ -220,7 +220,7 @@ private fun HistoryRow(
             ) {
                 when (painter.state) {
                     is AsyncImagePainter.State.Loading -> CircularProgressIndicator(modifier = Modifier.size(18.dp))
-                    is AsyncImagePainter.State.Error -> Text("No cover", style = MaterialTheme.typography.labelSmall)
+                    is AsyncImagePainter.State.Error -> Text(stringResource(R.string.history_no_cover), style = MaterialTheme.typography.labelSmall)
                     else -> SubcomposeAsyncImageContent()
                 }
             }
@@ -238,8 +238,12 @@ private fun HistoryRow(
             val chapterRange =
                 when {
                     item.chapterStart != null && item.chapterEnd != null && item.chapterStart != item.chapterEnd ->
-                        "Ch. ${chapterLabel(item.chapterStart)}–${chapterLabel(item.chapterEnd)}"
-                    item.chapterEnd != null -> "Ch. ${chapterLabel(item.chapterEnd)}"
+                        stringResource(
+                            R.string.history_chapter_range,
+                            chapterLabel(item.chapterStart),
+                            chapterLabel(item.chapterEnd),
+                        )
+                    item.chapterEnd != null -> stringResource(R.string.history_chapter_single, chapterLabel(item.chapterEnd))
                     else -> null
                 }
             chapterRange?.let {
@@ -249,7 +253,7 @@ private fun HistoryRow(
             if (timeRange != null) {
                 Text(timeRange, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text("Entries: ${item.count}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.history_entries_count, item.count), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
