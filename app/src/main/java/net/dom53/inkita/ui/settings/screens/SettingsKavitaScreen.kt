@@ -230,7 +230,7 @@ fun SettingsKavitaScreen(
                             serverUrl = host
                             apiKeyInput = ""
                             isEditingApiKey = false
-                            snackbarHostState.showSnackbar("Configuration saved.")
+                            snackbarHostState.showSnackbar("Configuration saved. Please restart the app.")
                         } catch (e: Exception) {
                             snackbarHostState.showSnackbar(
                                 "Save failed: ${e.message ?: "unknown error"}",
@@ -273,7 +273,7 @@ fun SettingsKavitaScreen(
                                     isEditingApiKey = false
                                     showHttpWarning = false
                                     warningFromSave = false
-                                    snackbarHostState.showSnackbar("Configuration saved.")
+                                    snackbarHostState.showSnackbar("Configuration saved. Please restart the app.")
                                 } catch (e: Exception) {
                                     showHttpWarning = false
                                     warningFromSave = false
