@@ -23,7 +23,7 @@ Thanks for considering a contribution! A few guidelines to keep things smooth:
 - Network issues: note server URL scheme/port (HTTP vs HTTPS) and network environment.
 
 ## Translations
-- Help translate on POEditor: https://poeditor.com/projects/view?id=815516
+- Help translate on [POEditor](https://poeditor.com/join/project/XLBygoGhOX)
 
 ## Forks
 Forks are allowed as long as they follow the [project LICENSE](https://github.com/dom-53/Inkita/blob/master/LICENSE).
