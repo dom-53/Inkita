@@ -96,6 +96,7 @@
     <string name="general_weekly">Weekly</string>
     <string name="general_queue">Queue</string>
     <string name="general_downloaded">Downloaded</string>
+    <string name="general_unknown_error">unknown error</string>
     <!-- Languages -->
     <string name="general_language_system">System</string>
     <string name="general_language_label">Language</string>
@@ -243,6 +244,10 @@
     <string name="settings_kavita_http_warning_title">Use HTTP?</string>
     <string name="settings_kavita_http_warning_body">HTTP is unencrypted. Use it only on trusted local networks. Continue anyway?</string>
     <string name="settings_kavita_http_warning_confirm">Continue with HTTP</string>
+    <string name="settings_kavita_http_warning_cancel">Cancel</string>
+    <string name="settings_kavita_placeholder_host">kavita.myserver.com</string>
+    <string name="settings_kavita_saved_toast">Configuration saved. Please restart the app.</string>
+    <string name="settings_kavita_save_failed">Save failed: %1$s</string>
     <!-- About Inkita  -->
     <string name="settings_about_version">Version</string>
     <string name="settings_about_build_time">Build time</string>

@@ -230,10 +230,10 @@ fun SettingsKavitaScreen(
                             serverUrl = host
                             apiKeyInput = ""
                             isEditingApiKey = false
-                            snackbarHostState.showSnackbar("Configuration saved. Please restart the app.")
+                            snackbarHostState.showSnackbar(context.getString(R.string.settings_kavita_saved_toast))
                         } catch (e: Exception) {
                             snackbarHostState.showSnackbar(
-                                "Save failed: ${e.message ?: "unknown error"}",
+                                context.getString(R.string.settings_kavita_save_failed, e.message ?: "unknown error"),
                             )
                         }
                     }
@@ -273,11 +273,13 @@ fun SettingsKavitaScreen(
                                     isEditingApiKey = false
                                     showHttpWarning = false
                                     warningFromSave = false
-                                    snackbarHostState.showSnackbar("Configuration saved. Please restart the app.")
+                                    snackbarHostState.showSnackbar(context.getString(R.string.settings_kavita_saved_toast))
                                 } catch (e: Exception) {
                                     showHttpWarning = false
                                     warningFromSave = false
-                                    snackbarHostState.showSnackbar("Save failed: ${e.message ?: "unknown error"}")
+                                    snackbarHostState.showSnackbar(
+                                        context.getString(R.string.settings_kavita_save_failed, e.message ?: context.getString(R.string.general_unknown_error)),
+                                    )
                                 }
                             } else {
                                 useHttps = false
