@@ -5,7 +5,7 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import net.dom53.inkita.data.api.KavitaApi
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
+import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.converter.scalars.ScalarsConverterFactory
@@ -30,15 +30,10 @@ object KavitaApiFactory {
     }
 
     fun createUnauthenticated(baseUrl: String): KavitaApi {
-        val logging =
-            HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
-            }
-
         val client =
             OkHttpClient
                 .Builder()
-                .addInterceptor(logging)
+                .addInterceptor(NetworkLoggingInterceptor)
                 .build()
 
         val retrofit = baseRetrofitBuilder(baseUrl, client).build()
@@ -60,19 +55,15 @@ object KavitaApiFactory {
                 chain.proceed(newRequest)
             }
 
-        val logging =
-            HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
-            }
-
         val client =
             OkHttpClient
                 .Builder()
                 .addInterceptor(apiKeyInterceptor)
-                .addInterceptor(logging)
+                .addInterceptor(NetworkLoggingInterceptor)
                 .build()
 
         val retrofit = baseRetrofitBuilder(baseUrl, client).build()
         return retrofit.create(KavitaApi::class.java)
     }
+
 }

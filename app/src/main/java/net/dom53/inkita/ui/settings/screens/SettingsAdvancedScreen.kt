@@ -33,6 +33,9 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
+import android.content.Intent
+import android.widget.Toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -40,6 +43,7 @@ import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.download.DownloadManager
+import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.repository.CollectionsRepositoryImpl
@@ -76,6 +80,8 @@ fun SettingsAdvancedScreen(
     val context = LocalContext.current
     var cacheSizeBytes by remember { mutableStateOf(0L) }
     var statsDialog by remember { mutableStateOf<String?>(null) }
+    var exporting by remember { mutableStateOf(false) }
+    var verboseLogging by remember { mutableStateOf(false) }
     val collectionsRepo = remember { CollectionsRepositoryImpl(context, appPreferences) }
     val downloadRepo =
         remember {
@@ -128,6 +134,9 @@ fun SettingsAdvancedScreen(
     }
     LaunchedEffect(Unit) {
         appPreferences.prefetchCollectionIdsFlow.collectLatest { ids -> selectedCollectionIds = ids.toSet() }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.verboseLoggingFlow.collectLatest { verboseLogging = it }
     }
     LaunchedEffect(Unit) {
         val cached = runCatching { appPreferences.loadCachedCollections() }.getOrDefault(emptyList())
@@ -640,6 +649,95 @@ fun SettingsAdvancedScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.settings_cache_stats_button))
+        }
+
+        Divider()
+
+        Text(
+            text = stringResource(R.string.advanced_logs_title),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.advanced_logs_verbose_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.advanced_logs_verbose_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = verboseLogging,
+                onCheckedChange = { checked ->
+                    verboseLogging = checked
+                    scope.launch { appPreferences.setVerboseLogging(checked) }
+                },
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(
+                onClick = {
+                    if (exporting) return@OutlinedButton
+                    exporting = true
+                    scope.launch {
+                        val zip = withContext(Dispatchers.IO) { LoggingManager.exportLogs(context) }
+                        exporting = false
+                        if (zip == null) {
+                            Toast
+                                .makeText(context, R.string.advanced_logs_none, Toast.LENGTH_SHORT)
+                                .show()
+                            return@launch
+                        }
+                        runCatching {
+                            val uri =
+                                FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.provider",
+                                    zip,
+                                )
+                            val shareIntent =
+                                Intent(Intent.ACTION_SEND).apply {
+                                    type = "application/zip"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                            context.startActivity(
+                                Intent.createChooser(
+                                    shareIntent,
+                                    context.getString(R.string.advanced_logs_share_chooser),
+                                ),
+                            )
+                        }.onFailure {
+                            Toast
+                                .makeText(context, R.string.advanced_logs_export_failed, Toast.LENGTH_SHORT)
+                                .show()
+                        }
+                    }
+                },
+                colors = ButtonDefaults.outlinedButtonColors(),
+                enabled = !exporting,
+            ) {
+                Text(text = stringResource(R.string.advanced_logs_export))
+            }
+            OutlinedButton(
+                onClick = {
+                    LoggingManager.clearLogs()
+                    Toast.makeText(context, R.string.advanced_logs_cleared, Toast.LENGTH_SHORT).show()
+                },
+                colors = ButtonDefaults.outlinedButtonColors(),
+            ) {
+                Text(text = stringResource(R.string.advanced_logs_clear))
+            }
         }
 
         statsDialog?.let { body ->

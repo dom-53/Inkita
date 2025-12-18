@@ -21,6 +21,7 @@ import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import okio.buffer
 import okio.sink
 import retrofit2.HttpException
@@ -41,7 +42,11 @@ class PageDownloadWorker(
     private val appPreferences = AppPreferences(appContext)
     private val db = InkitaDatabase.getInstance(appContext)
     private val downloadDao = db.downloadDao()
-    private val httpClient = OkHttpClient()
+    private val httpClient =
+        OkHttpClient
+            .Builder()
+            .addInterceptor(NetworkLoggingInterceptor)
+            .build()
     private var currentTaskId: Long = -1L
 
     /**

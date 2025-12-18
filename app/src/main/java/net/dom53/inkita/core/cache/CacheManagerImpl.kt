@@ -20,6 +20,7 @@ import net.dom53.inkita.domain.model.filter.SeriesQuery
 import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import java.io.File
 import java.io.FileOutputStream
 import net.dom53.inkita.data.mapper.toDomain as toDomainLocal
@@ -30,7 +31,12 @@ class CacheManagerImpl(
     private val thumbnailsDir: File?,
     private val dbFile: File? = null,
 ) : CacheManager {
-    private val httpClient by lazy { OkHttpClient() }
+    private val httpClient by lazy {
+        OkHttpClient
+            .Builder()
+            .addInterceptor(NetworkLoggingInterceptor)
+            .build()
+    }
 
     companion object {
         const val MAX_DIM = 512

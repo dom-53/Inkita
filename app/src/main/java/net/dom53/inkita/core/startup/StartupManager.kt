@@ -58,6 +58,7 @@ object StartupManager {
 
         val appContext = context.applicationContext
         val preferences = AppPreferences(appContext)
+        LoggingManager.init(appContext)
         // Migrate legacy API key storage into encrypted prefs.
         runCatching { kotlinx.coroutines.runBlocking { preferences.migrateSensitiveIfNeeded() } }
         AppNotificationManager.init(appContext)
@@ -76,19 +77,26 @@ object StartupManager {
         val authRepository: AuthRepository = AuthRepositoryImpl(preferences)
         val networkMonitor = NetworkMonitor.getInstance(appContext, preferences)
         val isDebuggable = (appContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-        if (isDebuggable) {
-            LoggingManager.setEnabled(Debug.isDebuggerConnected())
-            LoggingManager.setErrorsEnabled(true)
-            networkMonitor.status
-                .onEach { status ->
-                    if (Debug.isDebuggerConnected()) {
-                        LoggingManager.d(
-                            "NetworkMonitor",
-                            "online=${status.isOnline} allowed=${status.isOnlineAllowed} type=${status.connectionType} metered=${status.isMetered} roaming=${status.isRoaming} offlineMode=${status.offlineMode}",
-                        )
-                    }
-                }.launchIn(logScope)
+        LoggingManager.setErrorsEnabled(true)
+        // Log uncaught exceptions to file/logcat for post-mortem debugging.
+        val prevHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, ex ->
+            LoggingManager.e("Uncaught", "Thread=${thread.name}", ex)
+            prevHandler?.uncaughtException(thread, ex)
         }
+        preferences.verboseLoggingFlow
+            .onEach { enabled ->
+                LoggingManager.setEnabled(enabled || (isDebuggable && Debug.isDebuggerConnected()))
+            }.launchIn(logScope)
+        networkMonitor.status
+            .onEach { status ->
+                if (LoggingManager.isDebugEnabled()) {
+                    LoggingManager.d(
+                        "NetworkMonitor",
+                        "online=${status.isOnline} allowed=${status.isOnlineAllowed} type=${status.connectionType} metered=${status.isMetered} roaming=${status.isRoaming} offlineMode=${status.offlineMode}",
+                    )
+                }
+            }.launchIn(logScope)
         val readerRepository: ReaderRepository =
             ReaderRepositoryImpl(
                 appContext,
