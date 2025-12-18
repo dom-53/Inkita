@@ -8,6 +8,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import kotlinx.coroutines.flow.first
 import net.dom53.inkita.core.network.NetworkMonitor
+import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.entity.DownloadTaskEntity
@@ -50,7 +51,12 @@ class DownloadManager(
                         DownloadTaskEntity.STATE_RUNNING,
                     ),
             )
-        if (dup != null) return
+        if (dup != null) {
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("DownloadManager", "Skip enqueue duplicate pages series=$seriesId chapter=$chapterId $pageStart-$pageEnd")
+            }
+            return
+        }
 
         val now = System.currentTimeMillis()
         val task =
@@ -111,11 +117,15 @@ class DownloadManager(
         task: DownloadTaskEntity,
         title: String?,
     ) {
+        val chapterId = task.chapterId ?: return
         val request =
             buildPdfRequest(
-                bookId = task.chapterId ?: return,
+                bookId = chapterId,
                 title = title,
             )
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("DownloadManager", "Enqueue PDF chapter=$chapterId title=$title")
+        }
         enqueueRaw(request)
         downloadDao.updateTaskState(
             id = task.id,
@@ -170,6 +180,9 @@ class DownloadManager(
     /** Cancel a running/pending task and mark it as canceled. */
     suspend fun cancelTask(taskId: Long) {
         val task = downloadDao.getTaskById(taskId) ?: return
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("DownloadManager", "Cancel task id=$taskId work=${task.workId}")
+        }
         task.workId?.let { workManager.cancelWorkById(UUID.fromString(it)) }
         downloadDao.updateTaskState(
             id = taskId,
@@ -187,6 +200,9 @@ class DownloadManager(
     /** Pause a running task and release the worker slot. */
     suspend fun pauseTask(taskId: Long) {
         val task = downloadDao.getTaskById(taskId) ?: return
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("DownloadManager", "Pause task id=$taskId work=${task.workId}")
+        }
         task.workId?.let { workManager.cancelWorkById(UUID.fromString(it)) }
         downloadDao.updateTaskState(
             id = taskId,
@@ -205,6 +221,9 @@ class DownloadManager(
     suspend fun resumeTask(taskId: Long) {
         val task = downloadDao.getTaskById(taskId) ?: return
         if (task.state != DownloadTaskEntity.STATE_PAUSED && task.state != DownloadTaskEntity.STATE_FAILED) return
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("DownloadManager", "Resume task id=$taskId")
+        }
         enqueueTask(
             task.copy(
                 state = DownloadTaskEntity.STATE_PENDING,
@@ -219,6 +238,9 @@ class DownloadManager(
     suspend fun retryTask(taskId: Long) {
         val task = downloadDao.getTaskById(taskId) ?: return
         if (task.state != DownloadTaskEntity.STATE_FAILED && task.state != DownloadTaskEntity.STATE_CANCELED) return
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("DownloadManager", "Retry task id=$taskId")
+        }
         enqueueTask(
             task.copy(
                 state = DownloadTaskEntity.STATE_PENDING,
@@ -232,6 +254,9 @@ class DownloadManager(
     /** Permanently delete a task and cancel its work if needed. */
     suspend fun deleteTask(taskId: Long) {
         val task = downloadDao.getTaskById(taskId) ?: return
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("DownloadManager", "Delete task id=$taskId")
+        }
         task.workId?.let { workManager.cancelWorkById(UUID.fromString(it)) }
         downloadDao.deleteTask(taskId)
     }
@@ -267,6 +292,9 @@ class DownloadManager(
         val now = System.currentTimeMillis()
         val pending = task.copy(workId = null, state = DownloadTaskEntity.STATE_PENDING, updatedAt = now)
         val newId = downloadDao.upsertTask(pending)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("DownloadManager", "Queue task id=${if (pending.id == 0L) newId else pending.id} type=${pending.type} series=${pending.seriesId} chapter=${pending.chapterId} pages=${pending.pageStart}-${pending.pageEnd}")
+        }
         if (pending.id == 0L) {
             // Pokud bylo vloženo nové ID, uložíme ho zpět (kvůli dedupu/observingu)
             downloadDao.upsertTask(pending.copy(id = newId))
@@ -276,7 +304,12 @@ class DownloadManager(
 
     /** Enqueue pending tasks up to the configured concurrency limit. */
     private suspend fun maybeEnqueuePending() {
-        if (networkMonitor.shouldDeferNetworkWork()) return
+        if (networkMonitor.shouldDeferNetworkWork()) {
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("DownloadManager", "Deferring enqueue due to network constraints")
+            }
+            return
+        }
         val limit = appPreferences.downloadMaxConcurrentFlow.first().coerceAtLeast(1)
         val enqueued =
             downloadDao.countEnqueuedStates(
@@ -286,9 +319,17 @@ class DownloadManager(
                 ),
             )
         val freeSlots = (limit - enqueued).coerceAtLeast(0)
-        if (freeSlots <= 0) return
+        if (freeSlots <= 0) {
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("DownloadManager", "No free slots (limit=$limit enqueued=$enqueued)")
+            }
+            return
+        }
 
         val toEnqueue = downloadDao.getPendingUnenqueued(limit = freeSlots)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("DownloadManager", "Enqueuing ${toEnqueue.size} tasks (freeSlots=$freeSlots)")
+        }
         toEnqueue.forEach { task ->
             actuallyEnqueue(task)
         }
@@ -323,5 +364,8 @@ class DownloadManager(
                 .build()
 
         workManager.enqueue(request)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("DownloadManager", "Work enqueued id=$workId task=${task.id} chapter=${task.chapterId} pages=${task.pageStart}-${task.pageEnd}")
+        }
     }
 }

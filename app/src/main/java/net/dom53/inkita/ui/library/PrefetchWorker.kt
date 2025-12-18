@@ -70,6 +70,10 @@ class PrefetchWorker(
                 return Result.success()
             }
             LoggingManager.d(tag, "Flags inProgress=$prefetchInProgress want=$prefetchWant collections=$prefetchCollections details=$prefetchDetails")
+            LoggingManager.d(
+                tag,
+                "Constraints met? metered=${status.isMetered} offlineAllowed=${status.isOnlineAllowed}",
+            )
 
             val config = prefs.configFlow.first()
             if (!config.isConfigured) {

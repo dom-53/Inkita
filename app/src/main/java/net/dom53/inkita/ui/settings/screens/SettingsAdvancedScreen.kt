@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import android.content.Intent
+import android.os.Environment
 import android.widget.Toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
@@ -81,7 +82,8 @@ fun SettingsAdvancedScreen(
     val context = LocalContext.current
     var cacheSizeBytes by remember { mutableStateOf(0L) }
     var statsDialog by remember { mutableStateOf<String?>(null) }
-    var exporting by remember { mutableStateOf(false) }
+    var exportingShare by remember { mutableStateOf(false) }
+    var exportingSave by remember { mutableStateOf(false) }
     var verboseLogging by remember { mutableStateOf(false) }
     val collectionsRepo = remember { CollectionsRepositoryImpl(context, appPreferences) }
     val downloadRepo =
@@ -682,69 +684,107 @@ fun SettingsAdvancedScreen(
                 },
             )
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedButton(
-                onClick = {
-                    if (exporting) return@OutlinedButton
-                    exporting = true
-                    scope.launch {
-                        val zip =
-                            withContext(Dispatchers.IO) {
-                                val snapshot = buildConfigSnapshot(context, appPreferences)
-                                LoggingManager.exportLogs(
-                                    context,
-                                    extras = mapOf("config.txt" to snapshot),
-                                )
-                            }
-                        exporting = false
-                        if (zip == null) {
-                            Toast
-                                .makeText(context, R.string.advanced_logs_none, Toast.LENGTH_SHORT)
-                                .show()
-                            return@launch
-                        }
-                        runCatching {
-                            val uri =
-                                FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.provider",
-                                    zip,
-                                )
-                            val shareIntent =
-                                Intent(Intent.ACTION_SEND).apply {
-                                    type = "application/zip"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        if (exportingShare) return@OutlinedButton
+                        exportingShare = true
+                        scope.launch {
+                            val snapshot = withContext(Dispatchers.IO) { buildConfigSnapshot(context, appPreferences) }
+                            val zip =
+                                withContext(Dispatchers.IO) {
+                                    LoggingManager.exportLogsForShare(
+                                        context,
+                                        extras = mapOf("config.txt" to snapshot),
+                                    )
                                 }
-                            context.startActivity(
-                                Intent.createChooser(
-                                    shareIntent,
-                                    context.getString(R.string.advanced_logs_share_chooser),
-                                ),
-                            )
-                        }.onFailure {
-                            Toast
-                                .makeText(context, R.string.advanced_logs_export_failed, Toast.LENGTH_SHORT)
-                                .show()
+                            exportingShare = false
+                            if (zip == null) {
+                                Toast.makeText(context, R.string.advanced_logs_none, Toast.LENGTH_SHORT).show()
+                                return@launch
+                            }
+                            runCatching {
+                                val uri =
+                                    FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.provider",
+                                        zip,
+                                    )
+                                val shareIntent =
+                                    Intent(Intent.ACTION_SEND).apply {
+                                        type = "application/zip"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                context.startActivity(
+                                    Intent.createChooser(
+                                        shareIntent,
+                                        context.getString(R.string.advanced_logs_share_chooser),
+                                    ),
+                                )
+                            }.onFailure {
+                                Toast
+                                    .makeText(context, R.string.advanced_logs_export_failed, Toast.LENGTH_SHORT)
+                                    .show()
+                            }
                         }
-                    }
-                },
-                colors = ButtonDefaults.outlinedButtonColors(),
-                enabled = !exporting,
-            ) {
-                Text(text = stringResource(R.string.advanced_logs_export))
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(),
+                    enabled = !exportingShare,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(text = stringResource(R.string.advanced_logs_export))
+                }
+                OutlinedButton(
+                    onClick = {
+                        if (exportingSave) return@OutlinedButton
+                        exportingSave = true
+                        scope.launch {
+                            val snapshot = withContext(Dispatchers.IO) { buildConfigSnapshot(context, appPreferences) }
+                            val saved =
+                                withContext(Dispatchers.IO) {
+                                    LoggingManager.saveLogsToDocuments(
+                                        context,
+                                        extras = mapOf("config.txt" to snapshot),
+                                    )
+                                }
+                            exportingSave = false
+                            if (saved == null) {
+                                Toast.makeText(context, R.string.advanced_logs_export_failed, Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.advanced_logs_saved, saved.absolutePath),
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(),
+                    enabled = !exportingSave,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(text = stringResource(R.string.advanced_logs_save))
+                }
             }
-            OutlinedButton(
-                onClick = {
-                    LoggingManager.clearLogs()
-                    Toast.makeText(context, R.string.advanced_logs_cleared, Toast.LENGTH_SHORT).show()
-                },
-                colors = ButtonDefaults.outlinedButtonColors(),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start,
             ) {
-                Text(text = stringResource(R.string.advanced_logs_clear))
+                OutlinedButton(
+                    onClick = {
+                        LoggingManager.clearLogs()
+                        Toast.makeText(context, R.string.advanced_logs_cleared, Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(text = stringResource(R.string.advanced_logs_clear))
+                }
             }
         }
 

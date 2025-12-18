@@ -1,6 +1,7 @@
 package net.dom53.inkita.core.logging
 
 import android.content.Context
+import android.os.Environment
 import android.util.Log
 import java.io.File
 import java.io.FileOutputStream
@@ -95,7 +96,7 @@ object LoggingManager {
     /**
      * Bundle existing log files into a zip ready for sharing.
      */
-    fun exportLogs(
+    fun exportLogsForShare(
         context: Context,
         extras: Map<String, String> = emptyMap(),
     ): File? {
@@ -105,19 +106,7 @@ object LoggingManager {
 
         val zipName = "inkita-logs-${System.currentTimeMillis()}.zip"
         val outFile = File(context.cacheDir, zipName)
-        ZipOutputStream(FileOutputStream(outFile)).use { zos ->
-            files.forEach { f ->
-                zos.putNextEntry(ZipEntry(f.name))
-                f.inputStream().use { it.copyTo(zos) }
-                zos.closeEntry()
-            }
-            extras.forEach { (name, content) ->
-                zos.putNextEntry(ZipEntry(name))
-                zos.write(content.toByteArray())
-                zos.closeEntry()
-            }
-        }
-        return outFile
+        return buildZip(files, extras, outFile)
     }
 
     /**
@@ -209,5 +198,44 @@ object LoggingManager {
             out = out.replace(Regex(pattern, RegexOption.IGNORE_CASE), replacement)
         }
         return out
+    }
+
+    /**
+     * Save logs to the app's external Documents/Inkita/logs directory for manual access.
+     */
+    fun saveLogsToDocuments(
+        context: Context,
+        extras: Map<String, String> = emptyMap(),
+    ): File? {
+        val dir = logDir ?: return null
+        val files = dir.listFiles()?.sortedBy { it.lastModified() } ?: return null
+        if (files.isEmpty() && extras.isEmpty()) return null
+
+        val docsRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) ?: return null
+        val targetDir = File(docsRoot, "Inkita/logs").apply { if (!exists()) mkdirs() }
+        val outFile = File(targetDir, "inkita-logs-${System.currentTimeMillis()}.zip")
+        return buildZip(files, extras, outFile)
+    }
+
+    private fun buildZip(
+        files: List<File>,
+        extras: Map<String, String>,
+        target: File,
+    ): File? {
+        return runCatching {
+            ZipOutputStream(FileOutputStream(target)).use { zos ->
+                files.forEach { f ->
+                    zos.putNextEntry(ZipEntry(f.name))
+                    f.inputStream().use { it.copyTo(zos) }
+                    zos.closeEntry()
+                }
+                extras.forEach { (name, content) ->
+                    zos.putNextEntry(ZipEntry(name))
+                    zos.write(content.toByteArray())
+                    zos.closeEntry()
+                }
+            }
+            target
+        }.getOrNull()
     }
 }

@@ -50,7 +50,15 @@ object UpdateChecker {
                 }
 
             if (showingProgress) AppNotificationManager.cancel(NOTIFICATION_ID)
-            if (info == null || pending == null) return
+            if (info == null || pending == null) {
+                if (LoggingManager.isDebugEnabled()) {
+                    LoggingManager.d("UpdateChecker", "No update available")
+                }
+                return
+            }
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("UpdateChecker", "Update found version=${info.versionName}")
+            }
             AppNotificationManager.showInfo(
                 id = NOTIFICATION_ID,
                 channel = AppNotificationManager.CHANNEL_GENERAL,
