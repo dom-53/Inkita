@@ -364,7 +364,7 @@ fun SettingsAboutScreen(onBack: () -> Unit) {
             },
             modifier =
                 Modifier
-                    .clickable { }
+                    .clickable { openUrl("https://poeditor.com/projects/view?id=815516") }
                     .padding(vertical = 2.dp),
         )
         ListItem(
