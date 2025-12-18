@@ -4,7 +4,12 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
-## v0.2.0-beta.1
+### Added
+- Localization: Declared supported locales (EN, CS) via `locale-config` and AppCompat auto locale storage so per-app language works from system settings and the in-app picker.
+
+### Changed
+- UI: Switched theme base to `Theme.AppCompat.DayNight.NoActionBar` (required for per-app language support with Compose).
+- Localization: Language picker now applies the chosen locale through `AppCompatDelegate` and aligns with the system “App language” setting; Czech strings completed and cleaned up.
 
 ## v0.2.0-beta.1
 
