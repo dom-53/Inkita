@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented here.
 
-## Unreleased
+## v0.2.0-beta.1
 
 ### Added
 - Auth/config: Kavita settings now accept only server URL + API key (username/password/login removed). API key is stored in encrypted prefs; UI masks saved keys and requires re-entry to change.
