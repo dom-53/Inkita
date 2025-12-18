@@ -45,8 +45,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.startup.StartupManager
 import net.dom53.inkita.core.storage.AppConfig
@@ -67,7 +68,6 @@ import net.dom53.inkita.ui.seriesdetail.SeriesDetailScreen
 import net.dom53.inkita.ui.settings.SettingsScreen
 import net.dom53.inkita.ui.theme.InkitaTheme
 import net.dom53.inkita.ui.updates.UpdatesScreen
-import kotlinx.coroutines.runBlocking
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
