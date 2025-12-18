@@ -96,7 +96,7 @@
     <string name="general_words">Words</string>
     <string name="general_time">Time</string>
     <string name="general_weekly">Weekly</string>
-    <!--  Languages  -->
+    <!-- Languages -->
     <string name="general_language_system">System</string>
     <string name="general_language_english">English</string>
     <string name="general_language_czech">Czech</string>
@@ -147,4 +147,148 @@
     <string name="reader_page_not_downloaded">This page is not downloaded</string>
     <string name="series_detail_specials">Specials</string>
     <string name="series_detail_no_specials">No specials available.</string>
+    <!-- Browse-->
+    <string name="browse_filter_match_all">Match all</string>
+    <string name="browse_filter_match_any">Match any</string>
+    <string name="browse_filter_sort_name">Name</string>
+    <string name="browse_filter_sort_by">Sort by</string>
+    <string name="browse_filter_sort_created">Created</string>
+    <string name="browse_filter_sort_last_modified">Last modified</string>
+    <string name="browse_filter_sort_item_added">Item added</string>
+    <string name="browse_filter_sort_time_to_read">Time to read</string>
+    <string name="browse_filter_sort_release_year">Release year</string>
+    <string name="browse_filter_sort_last_read">Last read</string>
+    <string name="browse_filter_sort_avg_rating">Avg rating</string>
+    <string name="browse_filter_sort_random">Random</string>
+    <string name="browse_filter_status">Status</string>
+    <string name="browse_filter_release_year">Release year</string>
+    <string name="browse_filter_age_rating">Age rating</string>
+    <string name="browse_filter_special_list">Special list</string>
+    <string name="browse_filter_filter_no_others">The following filters cannot be combined with the others.</string>
+    <string name="browse_filter_smart_filters">Smart filters</string>
+    <!-- History screen -->
+    <string name="history_no_history">No history yet.</string>
+    <!-- ibrary Screen-->
+    <string name="library_empty_want_to_read">You have no titles marked as \'want to read\'.</string>
+    <!-- Reader screen-->
+    <string name="reader_title">Reader</string>
+    <string name="reader_no_previous_chapter">No previous chapter</string>
+    <string name="reader_no_next_chapter">This is the last volume</string>
+    <string name="reader_time_left">Time left</string>
+    <string name="reader_prev_chapter">Prev chapter</string>
+    <string name="reader_jump_to_start">Jump to start</string>
+    <string name="reader_prev_page">Prev page</string>
+    <string name="reader_reader_settings">Reader settings</string>
+    <string name="reader_next_page">Next Page</string>
+    <string name="reader_jump_to_end">Jump to end</string>
+    <string name="reader_next_chapter">Next Chapter</string>
+    <string name="reader_font_selection">Select font</string>
+    <string name="reader_text_settings">Text settings</string>
+    <string name="reader_font_size">Font size</string>
+    <string name="reader_line_height">Line height</string>
+    <string name="reader_padding">Padding</string>
+    <string name="reader_alignment">Alignment</string>
+    <string name="reader_font_family">Font family</string>
+    <string name="reader_theme_header">Reader theme</string>
+    <string name="reader_theme_day">Day</string>
+    <string name="reader_theme_night">Night</string>
+    <string name="reader_theme_night_high_contrast">Night (High Contrast)</string>
+    <string name="reader_theme_sepia">Sepia</string>
+    <string name="reader_theme_sepia_high_contrast">Sepia (High Contrast)</string>
+    <string name="reader_theme_gray">Gray</string>
+    <!-- Series detail-->
+    <string name="series_detail_detail">Detail</string>
+    <string name="series_detail_share_series">Share series</string>
+    <string name="series_detail_chapter_not_available">Chapter is not available for reading.</string>
+    <string name="series_detail_start_over_question">Start over?</string>
+    <string name="series_detail_reset_and_start_again">This will reset your reading progress and start from the beginning.</string>
+    <string name="series_detail_reset_progress">Reset progress</string>
+    <string name="series_detail_no_related_items">No related items.</string>
+    <string name="series_detail_no_related">No related items.</string>
+    <string name="series_detail_mark_prev_q">Mark previous volumes as read?</string>
+    <string name="series_detail_mark_read_this_and_prev">Volume %1$s is being marked read. Do you want to mark previous unread volumes as read too?</string>
+    <string name="series_detail_mark_with_prev">Mark with previous</string>
+    <string name="series_detail_only_this_vol">This volume only</string>
+    <string name="series_detail_mark_this_and_later">Volume %1$s is being marked unread. Do you want to mark later read volumes as unread too?</string>
+    <string name="series_detail_mark_all">Mark all</string>
+    <string name="series_detail_mark_this_vol">Only this volume</string>
+    <string name="series_detail_prev_unread_mark_read_too_q">Previous volumes are unread. Mark them as read too, or only set this page?</string>
+    <string name="series_detail_mark_prev_and_continue">Mark previous and continue</string>
+    <string name="series_detail_only_this_page">Only this page</string>
+    <string name="series_detail_mark_later_vol_unr_q">Mark later volumes as unread?</string>
+    <string name="series_detail_mark_unred_vol_and_later_too_q">Later volumes are marked read. Mark them unread too, or only update this volume?</string>
+    <string name="series_detail_scroll_top">Scroll to top</string>
+    <string name="series_detail_no_colls_reload">No collections. Reload.</string>
+    <string name="series_detail_load_colls">Load collections</string>
+    <string name="series_detail_resume_page">Resume: page</string>
+    <string name="series_detail_ch_loading_err">Chapters cannot be loaded (missing book for this volume).</string>
+    <!-- Settings  -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_item_general">General</string>
+    <string name="settings_item_appearance">Appearance</string>
+    <string name="settings_item_reader">Reader</string>
+    <string name="settings_item_downloads">Downloads</string>
+    <string name="settings_item_security">Security</string>
+    <string name="settings_item_kavita">Kavita</string>
+    <string name="settings_item_advanced">Advanced</string>
+    <string name="settings_item_stats">My Statistics</string>
+    <string name="settings_item_about">About</string>
+    <!-- Kavita  -->
+    <string name="settings_kavita_server">Kavita server URL</string>
+    <string name="settings_kavita_use_https">Use HTTPS</string>
+    <string name="settings_kavita_api_key">API key</string>
+    <string name="settings_kavita_status_in">Status: configured (API key saved)</string>
+    <string name="settings_kavita_status_out">Status: not configured</string>
+    <string name="settings_kavita_button_login">Save</string>
+    <string name="settings_kavita_logout">Sign out</string>
+    <string name="settings_kavita_logged_out">Configuration cleared.</string>
+    <string name="settings_kavita_http_warning_title">Use HTTP?</string>
+    <string name="settings_kavita_http_warning_body">HTTP is unencrypted. Use it only on trusted local networks. Continue anyway?</string>
+    <string name="settings_kavita_http_warning_confirm">Continue with HTTP</string>
+    <string name="settings_kavita_http_warning_cancel">Cancel</string>
+    <!-- About Inkita  -->
+    <string name="settings_about_version">Version</string>
+    <string name="settings_about_build_time">Build time</string>
+    <string name="settings_about_label_whats_new">What\'s new</string>
+    <string name="settings_about_changelog_title">What\'s new in this version</string>
+    <string name="settings_about_changelog_desc">Changelog</string>
+    <string name="settings_about_check_updates">Check for updates</string>
+    <string name="settings_about_label_community">Community</string>
+    <string name="settings_about_label_contribute">Contribute</string>
+    <string name="settings_about_help_transalate">Help translate</string>
+    <string name="settings_about_kofi">Support on Ko-fi</string>
+    <string name="settings_about_osl">Open source licenses</string>
+    <string name="settings_about_osl_3rd">Third-party libraries</string>
+    <string name="settings_about_license">License</string>
+    <string name="settings_about_update_available">Update available: %1$s</string>
+    <string name="settings_about_up_to_date">You are up to date</string>
+    <string name="settings_about_update_failed">Unable to check for updates</string>
+    <string name="settings_about_update_downloading">Downloading update…</string>
+    <string name="settings_about_update_prompt">A new version is available. Do you want to download and install it now?</string>
+    <string name="settings_about_update_confirm">Download</string>
+    <!-- Others  -->
+    <string name="settings_about_title">About Inkita</string>
+    <string name="settings_about_website">Kavita Website</string>
+    <string name="settings_kavita_login_toast">Fill URL and API key.</string>
+    <string name="settings_appearance_by_system">Follow system</string>
+    <string name="settings_appearance_dark">Dark</string>
+    <string name="settings_appearance_light">Light</string>
+    <!-- Stats-->
+    <string name="stats_failed_stat_load">Failed to load statistics.</string>
+    <string name="stats_reading_sum">Reading summary</string>
+    <string name="stats_activity_last_30d">Activity (last 30 days)</string>
+    <string name="stats_pages_per_yer">Pages per year</string>
+    <string name="stats_words_per_yer">Words per year</string>
+    <string name="stats_source_kavita_api_description">Data comes from Kavita’s /api/Stats endpoint. Can be expanded with additional charts (day of week, formats, publication types, etc.).</string>
+    <!-- Update -->
+    <string name="update_notification_title">Update available: %1$s</string>
+    <string name="update_notification_text">Tap to download the latest version.</string>
+    <string name="update_checking_title">Checking for updates…</string>
+    <string name="update_checking_text">Looking for a newer Inkita build.</string>
+    <string name="update_up_to_date_title">Inkita is up to date</string>
+    <string name="update_up_to_date_text">No newer version found.</string>
+    <string name="notifications_prompt_title">Enable notifications</string>
+    <string name="notifications_prompt_body">Please allow notifications so we can alert you about updates and downloads.</string>
+    <string name="notifications_prompt_accept">Enable</string>
+    <string name="notifications_prompt_dismiss">Not now</string>
 </resources>
