@@ -356,6 +356,9 @@
     <string name="settings_downloads_max_concurrent_subtitle">Limit how many page downloads run in parallel (1-6).</string>
     <string name="settings_downloads_selection_placeholder">Select</string>
     <string name="settings_downloads_delete_after_option">After %1$s read</string>
+    <!-- General settings -->
+    <string name="settings_general_offline_mode_title">Offline mode</string>
+    <string name="settings_general_offline_mode_subtitle">Force the app to behave as offline (skip network calls/work) even if connectivity is available.</string>
     <!-- History -->
     <string name="history_error_http">HTTP %1$d</string>
     <string name="history_no_cover">No cover</string>
