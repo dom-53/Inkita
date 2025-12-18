@@ -285,6 +285,11 @@
     <string name="notifications_prompt_body">Please allow notifications so we can alert you about updates and downloads.</string>
     <string name="notifications_prompt_accept">Enable</string>
     <string name="notifications_prompt_dismiss">Not now</string>
+    <!-- Series detail actions -->
+    <string name="series_download_all">Download all</string>
+    <string name="series_download_missing">Download missing</string>
+    <string name="series_clear_downloads">Clear downloads</string>
+    <string name="series_open_download_queue">Download queue</string>
     <!-- Downloads queue -->
     <string name="download_screen_title">Downloads</string>
     <string name="download_clear_completed">Clear completed</string>
