@@ -32,6 +32,7 @@ object LoggingManager {
     private var errorsEnabled: Boolean = true
     private var fileLoggingEnabled: Boolean = true
     private var logDir: File? = null
+    private var hostMasks: List<Regex> = emptyList()
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun init(context: Context) {
@@ -47,6 +48,17 @@ object LoggingManager {
 
     fun setErrorsEnabled(value: Boolean) {
         errorsEnabled = value
+    }
+
+    fun updateHostMask(host: String?) {
+        val h = host?.trim().orEmpty()
+        val masks =
+            if (h.isNotBlank()) {
+                listOf(Regex(Regex.escape(h), RegexOption.IGNORE_CASE))
+            } else {
+                emptyList()
+            }
+        hostMasks = masks
     }
 
     fun setFileLoggingEnabled(value: Boolean) {
@@ -197,6 +209,13 @@ object LoggingManager {
         patterns.forEach { (pattern, replacement) ->
             out = out.replace(Regex(pattern, RegexOption.IGNORE_CASE), replacement)
         }
+        // Mask URLs/hosts/IPs to avoid leaking server info but keep stack trace readability.
+        val ipPattern = Regex("\\d{1,3}(?:\\.\\d{1,3}){3}(?::\\d+)?")
+        out = out.replace(ipPattern, "[ip]")
+        // Mask scheme URLs host part.
+        out = out.replace(Regex("(https?://)([^/\\s]+)"), "$1[host]")
+        hostMasks.forEach { mask -> out = out.replace(mask, "[host]") }
+        out = out.replace(Regex("\\blocalhost(?::\\d+)?\\b", RegexOption.IGNORE_CASE), "[host]")
         return out
     }
 
@@ -226,12 +245,13 @@ object LoggingManager {
             ZipOutputStream(FileOutputStream(target)).use { zos ->
                 files.forEach { f ->
                     zos.putNextEntry(ZipEntry(f.name))
-                    f.inputStream().use { it.copyTo(zos) }
+                    val sanitized = scrub(f.readText())
+                    zos.write(sanitized.toByteArray())
                     zos.closeEntry()
                 }
                 extras.forEach { (name, content) ->
                     zos.putNextEntry(ZipEntry(name))
-                    zos.write(content.toByteArray())
+                    zos.write(scrub(content).toByteArray())
                     zos.closeEntry()
                 }
             }

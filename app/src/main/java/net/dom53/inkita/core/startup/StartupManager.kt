@@ -84,6 +84,16 @@ object StartupManager {
             LoggingManager.e("Uncaught", "Thread=${thread.name}", ex)
             prevHandler?.uncaughtException(thread, ex)
         }
+        preferences.configFlow
+            .onEach { config ->
+                val host =
+                    kotlin.runCatching {
+                        val raw = config.serverUrl
+                        val parsed = java.net.URI(if (raw.startsWith("http")) raw else "https://$raw")
+                        parsed.host ?: raw
+                    }.getOrDefault("")
+                LoggingManager.updateHostMask(host)
+            }.launchIn(logScope)
         preferences.verboseLoggingFlow
             .onEach { enabled ->
                 LoggingManager.setEnabled(enabled || (isDebuggable && Debug.isDebuggerConnected()))
