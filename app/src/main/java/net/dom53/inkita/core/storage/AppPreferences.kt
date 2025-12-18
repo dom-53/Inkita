@@ -23,14 +23,11 @@ enum class ReaderThemeMode { Light, Dark, DarkHighContrast, Sepia, SepiaHighCont
 
 data class AppConfig(
     val serverUrl: String,
-    val username: String,
     val apiKey: String,
-    val token: String,
-    val refreshToken: String,
     val userId: Int,
 ) {
     val isConfigured: Boolean
-        get() = serverUrl.isNotBlank() && token.isNotBlank()
+        get() = serverUrl.isNotBlank() && apiKey.isNotBlank()
 }
 
 data class ReaderPrefs(
@@ -57,10 +54,9 @@ class AppPreferences(
 
     companion object {
         private val KEY_SERVER_URL = stringPreferencesKey("server_url")
-        private val KEY_USERNAME = stringPreferencesKey("username")
         private val KEY_API_KEY = stringPreferencesKey("api_key")
-        private val KEY_TOKEN = stringPreferencesKey("token")
-        private val KEY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
+        private val LEGACY_KEY_TOKEN = stringPreferencesKey("token")
+        private val LEGACY_KEY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
         private val KEY_USER_ID = stringPreferencesKey("user_id")
 
         private val KEY_FONT_SIZE = floatPreferencesKey("reader_font_size")
@@ -76,6 +72,7 @@ class AppPreferences(
         private val KEY_CACHE_ENABLED = booleanPreferencesKey("cache_enabled")
         private val KEY_LIBRARY_CACHE_ENABLED = booleanPreferencesKey("library_cache_enabled")
         private val KEY_BROWSE_CACHE_ENABLED = booleanPreferencesKey("browse_cache_enabled")
+        private val KEY_NOTIF_PROMPT_SHOWN = booleanPreferencesKey("notifications_prompt_shown")
         private val KEY_CACHE_REFRESH_TTL_MIN = intPreferencesKey("cache_refresh_ttl_min")
         private val KEY_LAST_LIBRARY_REFRESH = longPreferencesKey("last_library_refresh")
         private val KEY_LAST_BROWSE_REFRESH = longPreferencesKey("last_browse_refresh")
@@ -105,18 +102,9 @@ class AppPreferences(
         context.dataStore.data.map { prefs ->
             AppConfig(
                 serverUrl = prefs[KEY_SERVER_URL] ?: "",
-                username = prefs[KEY_USERNAME] ?: "",
                 apiKey =
                     secureStorage.getApiKey().ifBlank {
                         prefs[KEY_API_KEY] ?: ""
-                    },
-                token =
-                    secureStorage.getToken().ifBlank {
-                        prefs[KEY_TOKEN] ?: ""
-                    },
-                refreshToken =
-                    secureStorage.getRefreshToken().ifBlank {
-                        prefs[KEY_REFRESH_TOKEN] ?: ""
                     },
                 userId = prefs[KEY_USER_ID]?.toIntOrNull() ?: 0,
             )
@@ -139,6 +127,9 @@ class AppPreferences(
 
     val appLanguageFlow: Flow<String> =
         context.dataStore.data.map { prefs -> prefs[KEY_APP_LANGUAGE] ?: "en" }
+
+    val notificationsPromptShownFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_NOTIF_PROMPT_SHOWN] ?: false }
 
     val appThemeFlow: Flow<AppTheme> =
         context.dataStore.data.map { prefs ->
@@ -200,24 +191,17 @@ class AppPreferences(
                 ?: emptyList()
         }
 
-    suspend fun updateAfterLogin(
+    suspend fun updateKavitaConfig(
         serverUrl: String,
-        username: String,
         apiKey: String,
-        token: String,
-        refreshToken: String,
-        userId: Int,
+        userId: Int = 0,
     ) {
         context.dataStore.edit { prefs ->
             prefs[KEY_SERVER_URL] = serverUrl
-            prefs[KEY_USERNAME] = username
             prefs.remove(KEY_API_KEY)
-            prefs.remove(KEY_TOKEN)
-            prefs.remove(KEY_REFRESH_TOKEN)
             prefs[KEY_USER_ID] = userId.toString()
         }
         secureStorage.setApiKey(apiKey)
-        secureStorage.setTokens(token, refreshToken)
     }
 
     suspend fun clearAuth(clearServer: Boolean = false) {
@@ -225,24 +209,10 @@ class AppPreferences(
             if (clearServer) {
                 prefs[KEY_SERVER_URL] = ""
             }
-            prefs[KEY_USERNAME] = ""
             prefs.remove(KEY_API_KEY)
-            prefs.remove(KEY_TOKEN)
-            prefs.remove(KEY_REFRESH_TOKEN)
             prefs[KEY_USER_ID] = "0"
         }
         secureStorage.clear()
-    }
-
-    suspend fun setTokens(
-        token: String,
-        refreshToken: String,
-    ) {
-        context.dataStore.edit { prefs ->
-            prefs.remove(KEY_TOKEN)
-            prefs.remove(KEY_REFRESH_TOKEN)
-        }
-        secureStorage.setTokens(token, refreshToken)
     }
 
     /**
@@ -250,27 +220,21 @@ class AppPreferences(
      */
     suspend fun migrateSensitiveIfNeeded() {
         val prefs = context.dataStore.data.first()
-        val legacyToken = prefs[KEY_TOKEN] ?: ""
-        val legacyRefresh = prefs[KEY_REFRESH_TOKEN] ?: ""
+        secureStorage.clearLegacyTokens()
         val legacyApiKey = prefs[KEY_API_KEY] ?: ""
-        val hasLegacyToken = prefs[KEY_TOKEN] != null
-        val hasLegacyRefresh = prefs[KEY_REFRESH_TOKEN] != null
+        val hasLegacyToken = prefs[LEGACY_KEY_TOKEN] != null
+        val hasLegacyRefresh = prefs[LEGACY_KEY_REFRESH_TOKEN] != null
         val hasLegacyApi = prefs[KEY_API_KEY] != null
 
-        val secureToken = secureStorage.getToken()
-        val secureRefresh = secureStorage.getRefreshToken()
         val secureApiKey = secureStorage.getApiKey()
 
-        if (secureToken.isBlank() && secureRefresh.isBlank() && (legacyToken.isNotBlank() || legacyRefresh.isNotBlank())) {
-            secureStorage.setTokens(legacyToken, legacyRefresh)
-        }
         if (secureApiKey.isBlank() && legacyApiKey.isNotBlank()) {
             secureStorage.setApiKey(legacyApiKey)
         }
-        if (hasLegacyToken || hasLegacyRefresh || hasLegacyApi) {
+        if (hasLegacyApi || hasLegacyToken || hasLegacyRefresh) {
             context.dataStore.edit { ds ->
-                ds.remove(KEY_TOKEN)
-                ds.remove(KEY_REFRESH_TOKEN)
+                ds.remove(LEGACY_KEY_TOKEN)
+                ds.remove(LEGACY_KEY_REFRESH_TOKEN)
                 ds.remove(KEY_API_KEY)
             }
         }
@@ -310,6 +274,12 @@ class AppPreferences(
     suspend fun setAppLanguage(languageTag: String) {
         context.dataStore.edit { prefs ->
             prefs[KEY_APP_LANGUAGE] = languageTag
+        }
+    }
+
+    suspend fun setNotificationsPromptShown(shown: Boolean = true) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_NOTIF_PROMPT_SHOWN] = shown
         }
     }
 

@@ -50,7 +50,7 @@ fun SettingsStatsScreen(
     onBack: () -> Unit,
 ) {
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", username = "", apiKey = "", token = "", refreshToken = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
     )
     val isLoading = remember { mutableStateOf(true) }
     val error = remember { mutableStateOf<String?>(null) }
@@ -60,15 +60,15 @@ fun SettingsStatsScreen(
     val wordsPerYear = remember { mutableStateOf<List<Int32StatCountDto>>(emptyList()) }
     val context = LocalContext.current
 
-    LaunchedEffect(config.token) {
+    LaunchedEffect(config.serverUrl, config.apiKey) {
         if (!config.isConfigured) {
             isLoading.value = false
-            error.value = context.resources.getString(R.string.general_server_or_token_not_set)
+            error.value = context.resources.getString(R.string.general_server_or_api_key_not_set)
             return@LaunchedEffect
         }
         isLoading.value = true
         error.value = null
-        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.token)
+        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
         runCatching {
             val uid =
                 if (config.userId > 0) {
@@ -183,14 +183,6 @@ fun SettingsStatsScreen(
                     max = max,
                 )
             }
-        }
-
-        item {
-            Text(
-                text = stringResource(R.string.stats_source_kavita_api_description),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

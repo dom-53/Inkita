@@ -23,7 +23,7 @@
     <string name="general_page">Strana</string>
     <string name="general_prev">Předchozí</string>
     <string name="general_next">Následující</string>
-    <string name="general_server_or_token_not_set">Server nebo token není nastaven.</string>
+    <string name="general_server_or_api_key_not_set">Server nebo API klíč není nastaven.</string>
     <string name="general_today">Dnes</string>
     <string name="general_yesterday">Včera</string>
     <string name="general_unknown_date">Neznámé datum</string>

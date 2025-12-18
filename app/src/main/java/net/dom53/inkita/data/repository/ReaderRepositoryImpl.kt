@@ -341,7 +341,7 @@ class ReaderRepositoryImpl(
 
         return KavitaApiFactory.createAuthenticated(
             baseUrl = config.serverUrl,
-            token = config.token,
+            apiKey = config.apiKey,
         )
     }
 

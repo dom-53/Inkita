@@ -10,7 +10,7 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/dom-53/Inkita/release.yml?labelColor=27303D)](https://github.com/dom-53/Inkita/actions/workflows/release.yml)
 ![Platform](https://img.shields.io/badge/platform-Android-blue)
-![Kavita](https://img.shields.io/badge/API-Kavita_0.8.8.7-lightgrey)
+![Kavita](https://img.shields.io/badge/Kavita-nightly_0.8.8.15-orange)
 
 <br>
 
@@ -74,7 +74,7 @@ Without these details the app cannot reach your server, so make sure to keep the
 ## Getting Started (dev)
 
 1. **Prereqs:** Android Studio Giraffe+, JDK 17.
-2. **Configure Kavita:** In-app settings → set server URL and API key/token.
+2. **Configure Kavita:** In-app settings → set server URL and API key.
 3. **Run:** `./gradlew assembleDebug` or launch from Android Studio (preview/release buildTypes available).
 
 > Requires your own Kavita server; no content is bundled.

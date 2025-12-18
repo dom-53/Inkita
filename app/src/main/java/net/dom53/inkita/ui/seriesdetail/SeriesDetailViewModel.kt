@@ -3,6 +3,7 @@ package net.dom53.inkita.ui.seriesdetail
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -11,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import net.dom53.inkita.core.download.DownloadManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
@@ -18,11 +21,13 @@ import net.dom53.inkita.data.api.dto.AppUserCollectionDto
 import net.dom53.inkita.data.api.dto.CollectionTagBulkAddDto
 import net.dom53.inkita.data.api.dto.UpdateSeriesForTagDto
 import net.dom53.inkita.domain.model.Collection
+import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.model.ReadState
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.SeriesDetail
 import net.dom53.inkita.domain.model.Volume
 import net.dom53.inkita.domain.repository.CollectionsRepository
+import net.dom53.inkita.domain.repository.DownloadRepository
 import net.dom53.inkita.domain.repository.ReaderRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
 import net.dom53.inkita.ui.seriesdetail.model.RelatedGroup
@@ -64,6 +69,8 @@ data class SeriesDetailState(
     val continueVolumeId: Int? = null,
     val continuePage: Int? = null,
     val continueChapterId: Int? = null,
+    val downloadedChapters: Map<Int, Set<Int>> = emptyMap(),
+    val downloadedVolumeIds: Set<Int> = emptySet(),
 )
 
 class SeriesDetailViewModel(
@@ -72,6 +79,8 @@ class SeriesDetailViewModel(
     private val collectionsRepository: CollectionsRepository,
     private val readerRepository: ReaderRepository?,
     private val appPreferences: AppPreferences,
+    private val downloadRepository: DownloadRepository,
+    private val downloadManager: DownloadManager,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SeriesDetailState())
     val state: StateFlow<SeriesDetailState> = _state.asStateFlow()
@@ -79,6 +88,7 @@ class SeriesDetailViewModel(
     private var latestConfig: AppConfig? = null
     private val _events = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 1)
     val events: SharedFlow<String> = _events
+    private var latestDownloads: Map<Int, Set<Int>> = emptyMap()
 
     init {
         viewModelScope.launch {
@@ -91,6 +101,14 @@ class SeriesDetailViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            downloadRepository.observeValidDownloadedPages().collectLatest { pages ->
+                val grouped = pages.groupBy { it.chapterId }.mapValues { entry -> entry.value.map { it.page }.toSet() }
+                latestDownloads = grouped
+                updateDownloadState(_state.value.detail, grouped)
+            }
+        }
+        viewModelScope.launch { downloadRepository.cleanupMissingDownloads() }
     }
 
     fun loadDetail() {
@@ -112,6 +130,8 @@ class SeriesDetailViewModel(
                         continueVolumeId = continueTarget?.first,
                         continuePage = continueTarget?.second,
                         continueChapterId = continueTarget?.third,
+                        downloadedChapters = latestDownloads,
+                        downloadedVolumeIds = computeDownloadedVolumes(cached, latestDownloads),
                     )
                 }
             }
@@ -130,6 +150,8 @@ class SeriesDetailViewModel(
                             continueVolumeId = continueTarget?.first,
                             continuePage = continueTarget?.second,
                             continueChapterId = continueTarget?.third,
+                            downloadedChapters = latestDownloads,
+                            downloadedVolumeIds = computeDownloadedVolumes(loaded, latestDownloads),
                         )
                     }
                 }.onFailure { e ->
@@ -146,6 +168,8 @@ class SeriesDetailViewModel(
                                 continueVolumeId = continueTarget?.first,
                                 continuePage = continueTarget?.second,
                                 continueChapterId = continueTarget?.third,
+                                downloadedChapters = latestDownloads,
+                                downloadedVolumeIds = computeDownloadedVolumes(cached, latestDownloads),
                             )
                         }
                         if (e !is UnknownHostException) {
@@ -222,13 +246,47 @@ class SeriesDetailViewModel(
         return Triple(volumeId, page, chapterId)
     }
 
+    private fun updateDownloadState(
+        detail: SeriesDetail?,
+        downloads: Map<Int, Set<Int>>,
+    ) {
+        _state.update {
+            it.copy(
+                downloadedChapters = downloads,
+                downloadedVolumeIds = computeDownloadedVolumes(detail, downloads),
+            )
+        }
+    }
+
+    private fun computeDownloadedVolumes(
+        detail: SeriesDetail?,
+        downloads: Map<Int, Set<Int>>,
+    ): Set<Int> {
+        val seriesFormat = detail?.series?.format
+        val isPdf = seriesFormat == Format.Pdf
+        val volumes = detail?.volumes.orEmpty()
+        return volumes
+            .mapNotNull { volume ->
+                val bookId = volume.bookId ?: return@mapNotNull null
+                val isDownloaded =
+                    if (isPdf) {
+                        downloadManager.pdfFileFor(bookId).exists()
+                    } else {
+                        val total = volume.chapters.size
+                        val pages = downloads[bookId] ?: emptySet()
+                        total > 0 && pages.size >= total
+                    }
+                volume.takeIf { isDownloaded }?.id
+            }.toSet()
+    }
+
     private fun ensureWantAndCollections() {
         val cfg = latestConfig ?: return
         viewModelScope.launch {
             if (!_state.value.wantLoaded) {
                 runCatching {
                     KavitaApiFactory
-                        .createAuthenticated(cfg.serverUrl, cfg.token)
+                        .createAuthenticated(cfg.serverUrl, cfg.apiKey)
                         .getWantToRead(filter = emptyFilter(), pageNumber = 1, pageSize = 200)
                 }.onSuccess { resp ->
                     if (resp.isSuccessful) {
@@ -248,7 +306,7 @@ class SeriesDetailViewModel(
         if (_state.value.isUpdatingWant) return
         viewModelScope.launch {
             _state.update { it.copy(isUpdatingWant = true) }
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.token)
+            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
             val add = !_state.value.wantToRead
             val result =
                 runCatching {
@@ -282,7 +340,7 @@ class SeriesDetailViewModel(
     ) {
         val cfg = latestConfig ?: return
         viewModelScope.launch {
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.token)
+            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
             val result =
                 runCatching {
                     if (add) {
@@ -327,7 +385,7 @@ class SeriesDetailViewModel(
         if (title.isBlank()) return
         val cfg = latestConfig ?: return
         viewModelScope.launch {
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.token)
+            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
             val response =
                 runCatching {
                     api.addSeriesToCollection(
@@ -356,7 +414,7 @@ class SeriesDetailViewModel(
     private fun refreshCollectionsForSeries() {
         val cfg = latestConfig ?: return
         viewModelScope.launch {
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.token)
+            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
             runCatching {
                 api.getCollectionsForSeries(seriesId)
             }.onSuccess { resp ->
@@ -430,6 +488,10 @@ class SeriesDetailViewModel(
         volume: Volume,
         direction: SwipeDirection,
     ) {
+        if (direction == SwipeDirection.Left) {
+            downloadVolume(volume)
+            return
+        }
         val current = _state.value.detail ?: return
         if (direction != SwipeDirection.Right) return
         val volumesList = current.volumes
@@ -475,6 +537,10 @@ class SeriesDetailViewModel(
         chapterIndex: Int,
         direction: SwipeDirection,
     ) {
+        if (direction == SwipeDirection.Left) {
+            downloadChapter(volume, chapterIndex)
+            return
+        }
         val current = _state.value.detail ?: return
         val libraryId = current.series.libraryId ?: return
         val bookId = volume.bookId ?: return
@@ -654,6 +720,101 @@ class SeriesDetailViewModel(
         }
     }
 
+    fun downloadAllVolumes() {
+        val detail = _state.value.detail ?: return
+        val seriesIdValue = detail.series.id ?: seriesId
+        val isPdf = detail.series.format == Format.Pdf
+        viewModelScope.launch {
+            detail.volumes.forEach { vol ->
+                val bookId = vol.bookId ?: return@forEach
+                runCatching {
+                    if (isPdf) {
+                        downloadRepository.enqueuePdf(seriesIdValue, vol.id, bookId, vol.name)
+                    } else {
+                        val lastPage = (vol.chapters.size - 1).coerceAtLeast(0)
+                        downloadRepository.enqueuePages(seriesIdValue, vol.id, bookId, 0, lastPage)
+                    }
+                }.onFailure { e -> _events.tryEmit(e.message ?: "Download failed") }
+            }
+        }
+    }
+
+    fun downloadMissingVolumes() {
+        val detail = _state.value.detail ?: return
+        val seriesIdValue = detail.series.id ?: seriesId
+        val isPdf = detail.series.format == Format.Pdf
+        val alreadyDownloaded = _state.value.downloadedVolumeIds
+        viewModelScope.launch {
+            detail.volumes.forEach { vol ->
+                val bookId = vol.bookId ?: return@forEach
+                runCatching {
+                    if (isPdf) {
+                        if (!alreadyDownloaded.contains(vol.id)) {
+                            downloadRepository.enqueuePdf(seriesIdValue, vol.id, bookId, vol.name)
+                        }
+                    } else {
+                        val lastPage = (vol.chapters.size - 1).coerceAtLeast(0)
+                        downloadRepository.enqueuePages(seriesIdValue, vol.id, bookId, 0, lastPage)
+                    }
+                }.onFailure { e -> _events.tryEmit(e.message ?: "Download failed") }
+            }
+        }
+    }
+
+    fun clearDownloads() {
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { downloadRepository.clearAllDownloads() } }
+                .onSuccess { _events.tryEmit("Downloads cleared") }
+                .onFailure { e -> _events.tryEmit(e.message ?: "Failed to clear downloads") }
+        }
+    }
+
+    private fun downloadVolume(volume: Volume) {
+        val detail = _state.value.detail ?: return
+        val seriesIdValue = detail.series.id ?: seriesId
+        val bookId =
+            volume.bookId
+                ?: run {
+                    _events.tryEmit("Chapters are not available yet.")
+                    return
+                }
+        val isPdf = detail.series.format == Format.Pdf
+        viewModelScope.launch {
+            runCatching {
+                if (isPdf) {
+                    downloadRepository.enqueuePdf(seriesIdValue, volume.id, bookId, volume.name)
+                } else {
+                    val lastPage = (volume.chapters.size - 1).coerceAtLeast(0)
+                    downloadRepository.enqueuePages(seriesIdValue, volume.id, bookId, 0, lastPage)
+                }
+            }.onFailure { e -> _events.tryEmit(e.message ?: "Download failed") }
+        }
+    }
+
+    private fun downloadChapter(
+        volume: Volume,
+        chapterIndex: Int,
+    ) {
+        val detail = _state.value.detail ?: return
+        val seriesIdValue = detail.series.id ?: seriesId
+        val bookId =
+            volume.bookId
+                ?: run {
+                    _events.tryEmit("Chapters are not available yet.")
+                    return
+                }
+        val isPdf = detail.series.format == Format.Pdf
+        viewModelScope.launch {
+            runCatching {
+                if (isPdf) {
+                    downloadRepository.enqueuePdf(seriesIdValue, volume.id, bookId, volume.name)
+                } else {
+                    downloadRepository.enqueuePages(seriesIdValue, volume.id, bookId, chapterIndex, chapterIndex)
+                }
+            }.onFailure { e -> _events.tryEmit(e.message ?: "Download failed") }
+        }
+    }
+
     companion object {
         @Suppress("UNCHECKED_CAST")
         fun provideFactory(
@@ -662,6 +823,8 @@ class SeriesDetailViewModel(
             collectionsRepository: CollectionsRepository,
             readerRepository: ReaderRepository?,
             appPreferences: AppPreferences,
+            downloadRepository: DownloadRepository,
+            downloadManager: DownloadManager,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
@@ -671,6 +834,8 @@ class SeriesDetailViewModel(
                         collectionsRepository = collectionsRepository,
                         readerRepository = readerRepository,
                         appPreferences = appPreferences,
+                        downloadRepository = downloadRepository,
+                        downloadManager = downloadManager,
                     ) as T
             }
     }

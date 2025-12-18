@@ -113,12 +113,14 @@ object AppNotificationManager {
         title: String,
         text: String,
         autoCancel: Boolean = true,
+        contentIntent: PendingIntent? = null,
     ): Boolean {
         if (!readyWithPermission()) return false
         val builder =
             baseBuilder(channel, title, text)
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .setAutoCancel(autoCancel)
+                .setContentIntent(contentIntent)
         NotificationManagerCompat.from(appContext).notify(id, builder.build())
         return true
     }

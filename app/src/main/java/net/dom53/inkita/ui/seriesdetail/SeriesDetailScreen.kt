@@ -98,9 +98,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
 import net.dom53.inkita.core.download.DownloadManager
 import net.dom53.inkita.core.storage.AppConfig
@@ -163,40 +161,12 @@ fun SeriesDetailScreen(
                     collectionsRepository = collectionsRepository,
                     readerRepository = readerRepository,
                     appPreferences = appPreferences,
+                    downloadRepository = downloadRepo,
+                    downloadManager = downloadManager,
                 ),
         )
     val uiState by viewModel.state.collectAsState()
     val toast = remember { Toast.makeText(context, "", Toast.LENGTH_SHORT) }
-    val downloadedPages by downloadRepo.observeValidDownloadedPages().collectAsState(initial = emptyList())
-    val downloadedByChapter =
-        remember(downloadedPages) { downloadedPages.groupBy { it.chapterId } }
-    LaunchedEffect(Unit) {
-        downloadRepo.cleanupMissingDownloads()
-    }
-
-    fun pdfDownloaded(bookId: Int?): Boolean = bookId?.let { id -> downloadManager.pdfFileFor(id).exists() } == true
-
-    fun volumeFullyDownloaded(volume: Volume): Boolean {
-        if (uiState.detail?.series?.format == Format.Pdf) {
-            return pdfDownloaded(volume.bookId)
-        }
-        val id = volume.bookId ?: return false
-        val total = volume.chapters.size
-        if (total == 0) return false
-        val pages = downloadedByChapter[id] ?: return false
-        return pages.size >= total
-    }
-
-    fun chapterDownloaded(
-        volume: Volume,
-        pageIdx: Int,
-    ): Boolean {
-        if (uiState.detail?.series?.format == Format.Pdf) {
-            return pdfDownloaded(volume.bookId)
-        }
-        val id = volume.bookId ?: return false
-        return downloadedByChapter[id]?.any { it.page == pageIdx } == true
-    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { msg ->
@@ -206,7 +176,7 @@ fun SeriesDetailScreen(
     }
     val scope = rememberCoroutineScope()
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", username = "", apiKey = "", token = "", refreshToken = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
     )
     var summaryExpanded by remember { mutableStateOf(false) }
     var showCollectionDialog by remember { mutableStateOf(false) }
@@ -247,81 +217,6 @@ fun SeriesDetailScreen(
             volume.id,
             currentDetail?.series?.format?.id ?: Format.Epub.id,
         )
-    }
-
-    // UI delegates swipe handling to VM
-    val onVolumeSwipe: (Volume, SwipeDirection) -> Unit = { volume, dir ->
-        if (dir == SwipeDirection.Left) {
-            val sId = uiState.detail?.series?.id ?: seriesId
-            val bookId = volume.bookId
-            if (bookId == null) {
-                toast.setText(context.getString(R.string.series_detail_ch_loading_err))
-                toast.show()
-            } else {
-                scope.launch {
-                    runCatching {
-                        if (uiState.detail?.series?.format == Format.Pdf) {
-                            downloadRepo.enqueuePdf(
-                                seriesId = sId,
-                                volumeId = volume.id,
-                                bookId = bookId,
-                                title = volume.name,
-                            )
-                        } else {
-                            val lastPage = (volume.chapters.size - 1).coerceAtLeast(0)
-                            downloadRepo.enqueuePages(
-                                seriesId = sId,
-                                volumeId = volume.id,
-                                chapterId = bookId,
-                                pageStart = 0,
-                                pageEnd = lastPage,
-                            )
-                        }
-                    }.onFailure { e ->
-                        toast.setText(e.message ?: context.getString(R.string.general_error))
-                        toast.show()
-                    }
-                }
-            }
-        } else {
-            viewModel.onVolumeSwipe(volume, dir)
-        }
-    }
-    val onChapterSwipe: (Volume, Int, SwipeDirection) -> Unit = { volume, chapterIndex, dir ->
-        if (dir == SwipeDirection.Left) {
-            val sId = uiState.detail?.series?.id ?: seriesId
-            val bookId = volume.bookId
-            if (bookId == null) {
-                toast.setText(context.getString(R.string.series_detail_ch_loading_err))
-                toast.show()
-            } else {
-                scope.launch {
-                    runCatching {
-                        if (uiState.detail?.series?.format == Format.Pdf) {
-                            downloadRepo.enqueuePdf(
-                                seriesId = sId,
-                                volumeId = volume.id,
-                                bookId = bookId,
-                                title = volume.name,
-                            )
-                        } else {
-                            downloadRepo.enqueuePages(
-                                seriesId = sId,
-                                volumeId = volume.id,
-                                chapterId = bookId,
-                                pageStart = chapterIndex,
-                                pageEnd = chapterIndex,
-                            )
-                        }
-                    }.onFailure { e ->
-                        toast.setText(e.message ?: context.getString(R.string.general_error))
-                        toast.show()
-                    }
-                }
-            }
-        } else {
-            viewModel.onChapterSwipe(volume, chapterIndex, dir)
-        }
     }
 
     // Return to last read page on detail when reader is closed
@@ -422,79 +317,21 @@ fun SeriesDetailScreen(
                                         text = { Text("Download all") },
                                         onClick = {
                                             menuOpen = false
-                                            currentDetail?.let { detail ->
-                                                scope.launch {
-                                                    val isPdf = detail.series.format == Format.Pdf
-                                                    detail.volumes.forEach { vol ->
-                                                        val bookId = vol.bookId ?: return@forEach
-                                                        runCatching {
-                                                            if (isPdf) {
-                                                                downloadRepo.enqueuePdf(
-                                                                    seriesId = detail.series.id ?: seriesId,
-                                                                    volumeId = vol.id,
-                                                                    bookId = bookId,
-                                                                    title = vol.name,
-                                                                )
-                                                            } else {
-                                                                val lastPage = (vol.chapters.size - 1).coerceAtLeast(0)
-                                                                downloadRepo.enqueuePages(
-                                                                    seriesId = detail.series.id ?: seriesId,
-                                                                    volumeId = vol.id,
-                                                                    chapterId = bookId,
-                                                                    pageStart = 0,
-                                                                    pageEnd = lastPage,
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                            viewModel.downloadAllVolumes()
                                         },
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Download missing") },
                                         onClick = {
                                             menuOpen = false
-                                            currentDetail?.let { detail ->
-                                                scope.launch {
-                                                    val isPdf = detail.series.format == Format.Pdf
-                                                    detail.volumes.forEach { vol ->
-                                                        val bookId = vol.bookId ?: return@forEach
-                                                        runCatching {
-                                                            if (isPdf) {
-                                                                if (!pdfDownloaded(bookId)) {
-                                                                    downloadRepo.enqueuePdf(
-                                                                        seriesId = detail.series.id ?: seriesId,
-                                                                        volumeId = vol.id,
-                                                                        bookId = bookId,
-                                                                        title = vol.name,
-                                                                    )
-                                                                }
-                                                            } else {
-                                                                val lastPage = (vol.chapters.size - 1).coerceAtLeast(0)
-                                                                downloadRepo.enqueuePages(
-                                                                    seriesId = detail.series.id ?: seriesId,
-                                                                    volumeId = vol.id,
-                                                                    chapterId = bookId,
-                                                                    pageStart = 0,
-                                                                    pageEnd = lastPage,
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                            viewModel.downloadMissingVolumes()
                                         },
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Clear downloads") },
                                         onClick = {
                                             menuOpen = false
-                                            scope.launch {
-                                                withContext(Dispatchers.IO) { downloadRepo.clearAllDownloads() }
-                                                toast.setText("Downloads cleared")
-                                                toast.show()
-                                            }
+                                            viewModel.clearDownloads()
                                         },
                                     )
                                     DropdownMenuItem(
@@ -674,10 +511,10 @@ fun SeriesDetailScreen(
                                         onOpenChapter = { idx -> openChapter(currentDetail, volume, idx, onOpenReader) },
                                         initiallyExpanded = volume.id == targetVolumeId,
                                         targetPageIndex = if (volume.id == targetVolumeId) targetPageIndex else null,
-                                        onVolumeSwipe = onVolumeSwipe,
-                                        onChapterSwipe = onChapterSwipe,
-                                        isDownloaded = volumeFullyDownloaded(volume),
-                                        isChapterDownloaded = { chapterDownloaded(volume, it) },
+                                        onVolumeSwipe = { vol, dir -> viewModel.onVolumeSwipe(vol, dir) },
+                                        onChapterSwipe = { vol, chIdx, dir -> viewModel.onChapterSwipe(vol, chIdx, dir) },
+                                        isDownloaded = uiState.downloadedVolumeIds.contains(volume.id),
+                                        isChapterDownloaded = { idx -> chapterDownloaded(volume, idx, uiState) },
                                         viewMode = viewMode,
                                     )
                                 }
@@ -698,10 +535,10 @@ fun SeriesDetailScreen(
                                             onOpenChapter = { idx -> openChapter(currentDetail, volume, idx, onOpenReader) },
                                             initiallyExpanded = volume.id == targetVolumeId,
                                             targetPageIndex = if (volume.id == targetVolumeId) targetPageIndex else null,
-                                            onVolumeSwipe = onVolumeSwipe,
-                                            onChapterSwipe = onChapterSwipe,
-                                            isDownloaded = volumeFullyDownloaded(volume),
-                                            isChapterDownloaded = { chapterDownloaded(volume, it) },
+                                            onVolumeSwipe = { vol, dir -> viewModel.onVolumeSwipe(vol, dir) },
+                                            onChapterSwipe = { vol, chIdx, dir -> viewModel.onChapterSwipe(vol, chIdx, dir) },
+                                            isDownloaded = uiState.downloadedVolumeIds.contains(volume.id),
+                                            isChapterDownloaded = { idx -> chapterDownloaded(volume, idx, uiState) },
                                             viewMode = viewMode,
                                         )
                                     }
@@ -1062,6 +899,18 @@ private fun applyRelatedFilter(
 ): List<RelatedGroup> {
     if (filter == RelatedFilter.All) return groups
     return groups.filter { it.type == filter }
+}
+
+private fun chapterDownloaded(
+    volume: Volume,
+    pageIdx: Int,
+    state: SeriesDetailState,
+): Boolean {
+    if (state.detail?.series?.format == Format.Pdf) {
+        return state.downloadedVolumeIds.contains(volume.id)
+    }
+    val id = volume.bookId ?: return false
+    return state.downloadedChapters[id]?.contains(pageIdx) == true
 }
 
 private fun webUrl(

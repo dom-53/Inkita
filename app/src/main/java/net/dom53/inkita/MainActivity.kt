@@ -1,27 +1,41 @@
 package net.dom53.inkita
 
 import android.app.Activity
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.Window
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.WindowCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -29,6 +43,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import kotlinx.coroutines.launch
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.startup.StartupManager
 import net.dom53.inkita.core.storage.AppConfig
@@ -87,6 +102,27 @@ fun InkitaApp(
     readerRepository: net.dom53.inkita.domain.repository.ReaderRepository,
     cacheManager: CacheManager,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val notifPromptShown by appPreferences.notificationsPromptShownFlow.collectAsState(initial = false)
+    val notificationsEnabled =
+        NotificationManagerCompat.from(context).areNotificationsEnabled()
+    val showNotifDialog = remember { mutableStateOf(false) }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
+            // Regardless of result, don't ask again.
+            scope.launch { appPreferences.setNotificationsPromptShown(true) }
+            showNotifDialog.value = false
+        }
+
+    LaunchedEffect(notifPromptShown, notificationsEnabled) {
+        if (!notifPromptShown && !notificationsEnabled) {
+            showNotifDialog.value = true
+        } else if (!notifPromptShown && notificationsEnabled) {
+            appPreferences.setNotificationsPromptShown(true)
+        }
+    }
+
     val appTheme by appPreferences.appThemeFlow.collectAsState(initial = AppTheme.System)
     val darkTheme =
         when (appTheme) {
@@ -101,10 +137,46 @@ fun InkitaApp(
     val currentRoute = backStackEntry?.destination?.route
     val mainRoutes = MainScreen.items.map { it.route }
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", username = "", apiKey = "", token = "", refreshToken = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
     )
 
     InkitaTheme(darkTheme = darkTheme, dynamicColor = false) {
+        if (showNotifDialog.value && !notifPromptShown && !notificationsEnabled) {
+            AlertDialog(
+                onDismissRequest = {
+                    showNotifDialog.value = false
+                    scope.launch { appPreferences.setNotificationsPromptShown(true) }
+                },
+                title = { Text(text = context.getString(R.string.notifications_prompt_title)) },
+                text = { Text(context.getString(R.string.notifications_prompt_body)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showNotifDialog.value = false
+                            scope.launch { appPreferences.setNotificationsPromptShown(true) }
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                val intent =
+                                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                    }
+                                context.startActivity(intent)
+                            }
+                        },
+                    ) { Text(context.getString(R.string.notifications_prompt_accept)) }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showNotifDialog.value = false
+                            scope.launch { appPreferences.setNotificationsPromptShown(true) }
+                        },
+                    ) { Text(context.getString(R.string.notifications_prompt_dismiss)) }
+                },
+            )
+        }
+
         val surfaceColor = MaterialTheme.colorScheme.surface
         SideEffect {
             val window: Window? = (view.context as? Activity)?.window

@@ -5,7 +5,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
 /**
- * Minimal wrapper around EncryptedSharedPreferences for sensitive values (token, refresh token, API key).
+ * Minimal wrapper around EncryptedSharedPreferences for sensitive values (API key).
  * Falls back to empty strings on errors to avoid crashes.
  */
 class SecureStorage(
@@ -26,27 +26,20 @@ class SecureStorage(
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
 
-    fun getToken(): String = safeGet(KEY_TOKEN)
-
-    fun getRefreshToken(): String = safeGet(KEY_REFRESH_TOKEN)
-
     fun getApiKey(): String = safeGet(KEY_API_KEY)
-
-    fun setTokens(
-        token: String,
-        refreshToken: String,
-    ) {
-        prefs
-            .edit()
-            .putString(KEY_TOKEN, token)
-            .putString(KEY_REFRESH_TOKEN, refreshToken)
-            .apply()
-    }
 
     fun setApiKey(apiKey: String) {
         prefs
             .edit()
             .putString(KEY_API_KEY, apiKey)
+            .apply()
+    }
+
+    fun clearLegacyTokens() {
+        prefs
+            .edit()
+            .remove(KEY_TOKEN)
+            .remove(KEY_REFRESH_TOKEN)
             .apply()
     }
 
@@ -60,8 +53,8 @@ class SecureStorage(
     private fun safeGet(key: String): String = runCatching { prefs.getString(key, "") ?: "" }.getOrDefault("")
 
     companion object {
+        private const val KEY_API_KEY = "api_key"
         private const val KEY_TOKEN = "token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
-        private const val KEY_API_KEY = "api_key"
     }
 }

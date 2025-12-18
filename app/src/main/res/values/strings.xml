@@ -24,7 +24,7 @@
     <string name="general_page">Page</string> <!-- Todo: Plural -->
     <string name="general_prev">Previous</string>
     <string name="general_next">Next</string>
-    <string name="general_server_or_token_not_set">Server or token not set.</string>
+    <string name="general_server_or_api_key_not_set">Server or API key not set.</string>
     <string name="general_today">Today</string>
     <string name="general_yesterday">Yesterday</string>
     <string name="general_unknown_date">Unknown date</string>

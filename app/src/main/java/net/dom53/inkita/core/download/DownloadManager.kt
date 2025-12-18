@@ -5,7 +5,6 @@ import android.net.Uri
 import android.os.Environment
 import androidx.work.Constraints
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import kotlinx.coroutines.flow.first
 import net.dom53.inkita.core.network.NetworkMonitor
@@ -142,7 +141,7 @@ class DownloadManager(
             .Request(uri)
             .setTitle(title ?: fileName)
             .setDescription("Inkita PDF")
-            .addRequestHeader("Authorization", "Bearer ${config.token}")
+            .addRequestHeader("x-api-key", config.apiKey)
             .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalFilesDir(
                 appContext,
@@ -321,7 +320,6 @@ class DownloadManager(
                 .setInputData(workData)
                 .addTag(TAG_DOWNLOAD)
                 .setConstraints(buildConstraints())
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
 
         workManager.enqueue(request)
