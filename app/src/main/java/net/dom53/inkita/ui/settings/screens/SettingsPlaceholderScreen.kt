@@ -29,7 +29,7 @@ fun SettingsPlaceholderScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         IconButton(onClick = onBack) {
-            Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+            Icon(Icons.Filled.ArrowBack, contentDescription = stringResource(R.string.general_back))
         }
         Text(stringResource(titleRes), style = MaterialTheme.typography.headlineSmall)
         Text(stringResource(R.string.will_be_implemented), style = MaterialTheme.typography.bodyMedium)

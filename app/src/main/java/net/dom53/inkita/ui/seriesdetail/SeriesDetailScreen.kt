@@ -314,28 +314,28 @@ fun SeriesDetailScreen(
                                 }
                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                     DropdownMenuItem(
-                                        text = { Text("Download all") },
+                                        text = { Text(stringResource(R.string.series_download_all)) },
                                         onClick = {
                                             menuOpen = false
                                             viewModel.downloadAllVolumes()
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Download missing") },
+                                        text = { Text(stringResource(R.string.series_download_missing)) },
                                         onClick = {
                                             menuOpen = false
                                             viewModel.downloadMissingVolumes()
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Clear downloads") },
+                                        text = { Text(stringResource(R.string.series_clear_downloads)) },
                                         onClick = {
                                             menuOpen = false
                                             viewModel.clearDownloads()
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Download queue") },
+                                        text = { Text(stringResource(R.string.series_open_download_queue)) },
                                         onClick = {
                                             menuOpen = false
                                             onOpenDownloads?.invoke()

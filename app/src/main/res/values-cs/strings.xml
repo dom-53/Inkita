@@ -14,8 +14,6 @@
     <string name="general_reading_status_completed">Dokončeno</string>
     <string name="general_reading_status_in_progress">Rozčteno</string>
     <string name="general_reading_status_unread">Nepřečteno</string>
-    <string name="general_username">Uživatelské jméno</string>
-    <string name="general_password">Heslo</string>
     <string name="general_option_soon">Možnosti vzhledu brzy přibudou</string>
     <string name="general_nav_option_soon">Možnosti navigace brzy přibudou</string>
     <string name="general_decrease">Snížit</string>
@@ -102,8 +100,6 @@
     <string name="general_weekly">Týdně</string>
     <!-- Languages -->
     <string name="general_language_system">Systém</string>
-    <string name="general_language_english">Angličtina</string>
-    <string name="general_language_czech">Čeština</string>
     <string name="general_language_label">Jazyk</string>
     <string name="general_language_en">Angličtina</string>
     <string name="general_language_cs">Čeština</string>
@@ -250,7 +246,6 @@
     <string name="settings_kavita_http_warning_title">Použít HTTP?</string>
     <string name="settings_kavita_http_warning_body">HTTP není šifrované. Používejte ho jen v důvěryhodné lokální síti. Pokračovat?</string>
     <string name="settings_kavita_http_warning_confirm">Pokračovat s HTTP</string>
-    <string name="settings_kavita_http_warning_cancel">Zrušit</string>
     <!--  About Inkita  -->
     <string name="settings_about_osl">Licence s otevřeným zdrojem</string>
     <string name="settings_about_osl_3rd">Knihovny třetích stran</string>
@@ -282,18 +277,13 @@
     <string name="stats_failed_stat_load">Nepodařilo se načíst statistiky.</string>
     <string name="stats_reading_sum">Souhrn čtení</string>
     <string name="stats_activity_last_30d">Aktivita (posledních 30 dní)</string>
-    <string name="stats_pages_per_yer">Stránky za rok</string>
-    <string name="stats_words_per_yer">Slova za rok</string>
-    <string name="stats_source_kavita_api_description">
-        Data pocházejí z endpointu /api/Stats služby Kavita. Lze je rozšířit o další grafy (den v týdnu, formáty, typy publikací atd.).
-    </string>
+    <string name="stats_pages_per_year">Stránky za rok</string>
+    <string name="stats_words_per_year">Slova za rok</string>
     <!-- Updates -->
     <string name="update_notification_title">Je dostupná aktualizace: %1$s</string>
     <string name="update_notification_text">Klepnutím stáhneš nejnovější verzi.</string>
     <string name="update_checking_title">Kontroluji aktualizace…</string>
     <string name="update_checking_text">Hledám novější verzi Inkita.</string>
-    <string name="update_up_to_date_title">Inkita je aktuální</string>
-    <string name="update_up_to_date_text">Nenašla se novější verze.</string>
     <string name="notifications_prompt_title">Povolit oznámení</string>
     <string name="notifications_prompt_body">Povol prosím oznámení, abychom tě mohli informovat o aktualizacích a stahování.</string>
     <string name="notifications_prompt_accept">Povolit</string>

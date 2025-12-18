@@ -125,9 +125,9 @@ fun SettingsGeneralScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                Text("Offline mode", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_general_offline_mode_title), style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Force the app to behave as offline (skip network calls/work) even if connectivity is available.",
+                    stringResource(R.string.settings_general_offline_mode_subtitle),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

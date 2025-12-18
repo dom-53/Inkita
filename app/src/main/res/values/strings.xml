@@ -15,8 +15,6 @@
     <string name="general_reading_status_completed">Completed</string>
     <string name="general_reading_status_in_progress">In progress</string>
     <string name="general_reading_status_unread">Unread</string>
-    <string name="general_username">Username</string>
-    <string name="general_password">Password</string>
     <string name="general_option_soon">Theme options coming soon</string>
     <string name="general_nav_option_soon">Navigation options coming soon</string>
     <string name="general_decrease">Decrease</string>
@@ -96,10 +94,11 @@
     <string name="general_words">Words</string>
     <string name="general_time">Time</string>
     <string name="general_weekly">Weekly</string>
+    <string name="general_queue">Queue</string>
+    <string name="general_downloaded">Downloaded</string>
+    <string name="general_unknown_error">unknown error</string>
     <!-- Languages -->
     <string name="general_language_system">System</string>
-    <string name="general_language_english">English</string>
-    <string name="general_language_czech">Czech</string>
     <string name="general_language_label">Language</string>
     <string name="general_language_en">English</string>
     <string name="general_language_cs">Czech</string>
@@ -246,6 +245,8 @@
     <string name="settings_kavita_http_warning_body">HTTP is unencrypted. Use it only on trusted local networks. Continue anyway?</string>
     <string name="settings_kavita_http_warning_confirm">Continue with HTTP</string>
     <string name="settings_kavita_http_warning_cancel">Cancel</string>
+    <string name="settings_kavita_saved_toast">Configuration saved. Please restart the app.</string>
+    <string name="settings_kavita_save_failed">Save failed: %1$s</string>
     <!-- About Inkita  -->
     <string name="settings_about_version">Version</string>
     <string name="settings_about_build_time">Build time</string>
@@ -277,18 +278,95 @@
     <string name="stats_failed_stat_load">Failed to load statistics.</string>
     <string name="stats_reading_sum">Reading summary</string>
     <string name="stats_activity_last_30d">Activity (last 30 days)</string>
-    <string name="stats_pages_per_yer">Pages per year</string>
-    <string name="stats_words_per_yer">Words per year</string>
-    <string name="stats_source_kavita_api_description">Data comes from Kavita’s /api/Stats endpoint. Can be expanded with additional charts (day of week, formats, publication types, etc.).</string>
+    <string name="stats_pages_per_year">Pages per year</string>
+    <string name="stats_words_per_year">Words per year</string>
     <!-- Update -->
     <string name="update_notification_title">Update available: %1$s</string>
     <string name="update_notification_text">Tap to download the latest version.</string>
     <string name="update_checking_title">Checking for updates…</string>
     <string name="update_checking_text">Looking for a newer Inkita build.</string>
-    <string name="update_up_to_date_title">Inkita is up to date</string>
-    <string name="update_up_to_date_text">No newer version found.</string>
     <string name="notifications_prompt_title">Enable notifications</string>
     <string name="notifications_prompt_body">Please allow notifications so we can alert you about updates and downloads.</string>
     <string name="notifications_prompt_accept">Enable</string>
     <string name="notifications_prompt_dismiss">Not now</string>
+    <!-- Series detail actions -->
+    <string name="series_download_all">Download all</string>
+    <string name="series_download_missing">Download missing</string>
+    <string name="series_clear_downloads">Clear downloads</string>
+    <string name="series_open_download_queue">Download queue</string>
+    <!-- Advanced settings -->
+    <string name="advanced_clear_cache">Clear cache</string>
+    <string name="advanced_downloaded_pages">Downloaded pages</string>
+    <string name="advanced_cache_stats_series">Series: %1$d</string>
+    <string name="advanced_cache_stats_tabs">Tab refs: %1$d</string>
+    <string name="advanced_cache_stats_browse">Browse refs: %1$d</string>
+    <string name="advanced_cache_stats_details">Details: %1$d</string>
+    <string name="advanced_cache_stats_volumes">Volumes: %1$d</string>
+    <string name="advanced_cache_stats_chapters">Chapters: %1$d</string>
+    <string name="advanced_cache_stats_db_size">DB size: %1$s</string>
+    <string name="advanced_cache_stats_thumbnails">Thumbnails: %1$s</string>
+    <string name="advanced_cache_stats_last_library">Last library refresh: %1$s</string>
+    <string name="advanced_cache_stats_last_browse">Last browse refresh: %1$s</string>
+    <string name="advanced_cache_clear_downloaded_pages">Downloaded pages</string>
+    <!-- Appearance settings -->
+    <string name="settings_appearance_title">Appearance</string>
+    <!-- Downloads queue -->
+    <string name="download_screen_title">Downloads</string>
+    <string name="download_clear_completed">Clear completed</string>
+    <string name="download_type_volume">Volume</string>
+    <string name="download_item_title">Series %1$s · %2$s</string>
+    <string name="download_item_chapter_pages">Chapter %1$s pages %2$s..%3$s</string>
+    <string name="download_item_state">State: %1$s</string>
+    <string name="download_item_created">Created: %1$s</string>
+    <string name="download_item_updated">Updated: %1$s</string>
+    <string name="download_item_progress">Progress: %1$d/%2$d (%3$d%%)</string>
+    <string name="download_item_bytes">Bytes: %1$s / %2$s (%3$d%%)</string>
+    <string name="download_item_error">Error: %1$s</string>
+    <string name="download_action_pause">Pause</string>
+    <string name="download_action_resume">Resume</string>
+    <string name="download_action_retry">Retry</string>
+    <string name="download_action_clear">Clear</string>
+    <string name="download_completed_title">Series %1$s · Chapter %2$s · Page %3$s</string>
+    <string name="download_completed_status">Status: %1$s</string>
+    <string name="download_completed_updated">Updated: %1$s</string>
+    <string name="download_completed_size">Size: %1$s</string>
+    <string name="download_completed_open">Open</string>
+    <string name="download_completed_delete">Delete</string>
+    <!-- Download settings -->
+    <string name="settings_downloads_title">Downloads</string>
+    <string name="settings_downloads_allow_metered_title">Allow metered data</string>
+    <string name="settings_downloads_allow_metered_subtitle">Permit downloads on mobile data. When off, downloads require Wi‑Fi.</string>
+    <string name="settings_downloads_allow_low_battery_title">Allow when battery is low</string>
+    <string name="settings_downloads_allow_low_battery_subtitle">When off, downloads wait until battery is not low.</string>
+    <string name="settings_downloads_prefer_offline_title">Prefer offline pages</string>
+    <string name="settings_downloads_prefer_offline_subtitle">When available, reader will use downloaded pages even when online.</string>
+    <string name="settings_downloads_delete_after_section">Delete after reading</string>
+    <string name="settings_downloads_delete_after_mark_title">Delete when marked as read</string>
+    <string name="settings_downloads_delete_after_mark_subtitle">Automatically remove downloads after you mark items as read.</string>
+    <string name="settings_downloads_keep_recent_title">Keep recent downloaded pages</string>
+    <string name="settings_downloads_keep_recent_subtitle">How many recently read downloaded pages stay on device before older ones are removed.</string>
+    <string name="settings_downloads_auto_retry_title">Automatic retries</string>
+    <string name="settings_downloads_auto_retry_subtitle">Retry failed downloads automatically.</string>
+    <string name="settings_downloads_max_retry_title">Max retry attempts</string>
+    <string name="settings_downloads_max_retry_subtitle">Total attempts per task before it fails.</string>
+    <string name="settings_downloads_limits_note">These limits are applied to download and prefetch workers.</string>
+    <string name="settings_downloads_clear_downloaded">Clear downloaded pages</string>
+    <string name="settings_downloads_clear_downloaded_confirm_title">Clear downloaded pages</string>
+    <string name="settings_downloads_clear_downloaded_confirm_text">Remove all downloaded HTML pages and assets from device storage?</string>
+    <string name="settings_downloads_clear_downloaded_toast">Downloaded pages cleared</string>
+    <string name="settings_downloads_clear">Clear</string>
+    <string name="settings_downloads_cancel">Cancel</string>
+    <string name="settings_downloads_max_concurrent_title">Max concurrent downloads</string>
+    <string name="settings_downloads_max_concurrent_subtitle">Limit how many page downloads run in parallel (1-6).</string>
+    <string name="settings_downloads_selection_placeholder">Select</string>
+    <string name="settings_downloads_delete_after_option">After %1$s read</string>
+    <!-- General settings -->
+    <string name="settings_general_offline_mode_title">Offline mode</string>
+    <string name="settings_general_offline_mode_subtitle">Force the app to behave as offline (skip network calls/work) even if connectivity is available.</string>
+    <!-- History -->
+    <string name="history_error_http">HTTP %1$d</string>
+    <string name="history_no_cover">No cover</string>
+    <string name="history_entries_count">Entries: %1$d</string>
+    <string name="history_chapter_range">Ch. %1$s–%2$s</string>
+    <string name="history_chapter_single">Ch. %1$s</string>
 </resources>

@@ -575,7 +575,7 @@ fun SettingsAdvancedScreen(
                             selected = clearTarget == ClearTarget.Thumbnails,
                         ) { clearTarget = ClearTarget.Thumbnails }
                         ClearOptionRow(
-                            label = "Downloaded pages",
+                            label = stringResource(R.string.advanced_cache_clear_downloaded_pages),
                             selected = clearTarget == ClearTarget.DownloadedPages,
                         ) { clearTarget = ClearTarget.DownloadedPages }
                     }
@@ -623,16 +623,16 @@ fun SettingsAdvancedScreen(
                     val stats = cacheManager.getCacheStats()
                     val body =
                         buildString {
-                            appendLine("Series: ${stats.seriesCount}")
-                            appendLine("Tab refs: ${stats.tabRefs}")
-                            appendLine("Browse refs: ${stats.browseRefs}")
-                            appendLine("Details: ${stats.detailsCount}")
-                            appendLine("Volumes: ${stats.volumesCount}")
-                            appendLine("Chapters: ${stats.chaptersCount}")
-                            appendLine("DB size: ${bytesToMb(stats.dbBytes)}")
-                            appendLine("Thumbnails: ${bytesToMb(stats.thumbnailsBytes)}")
-                            appendLine("Last library refresh: ${formatTs(stats.lastLibraryRefresh)}")
-                            appendLine("Last browse refresh: ${formatTs(stats.lastBrowseRefresh)}")
+                            appendLine(context.getString(R.string.advanced_cache_stats_series, stats.seriesCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_tabs, stats.tabRefs))
+                            appendLine(context.getString(R.string.advanced_cache_stats_browse, stats.browseRefs))
+                            appendLine(context.getString(R.string.advanced_cache_stats_details, stats.detailsCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_volumes, stats.volumesCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_chapters, stats.chaptersCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_db_size, bytesToMb(stats.dbBytes)))
+                            appendLine(context.getString(R.string.advanced_cache_stats_thumbnails, bytesToMb(stats.thumbnailsBytes)))
+                            appendLine(context.getString(R.string.advanced_cache_stats_last_library, formatTs(stats.lastLibraryRefresh)))
+                            appendLine(context.getString(R.string.advanced_cache_stats_last_browse, formatTs(stats.lastBrowseRefresh)))
                         }
                     statsDialog = body
                 }
