@@ -52,9 +52,9 @@ fun SettingsAppearanceScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         IconButton(onClick = onBack) {
-            Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+            Icon(Icons.Filled.ArrowBack, contentDescription = stringResource(R.string.general_back))
         }
-        Text("Appearance", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.settings_appearance_title), style = MaterialTheme.typography.headlineSmall)
 
         ThemeOptionRow(
             label = stringResource(R.string.settings_appearance_by_system),

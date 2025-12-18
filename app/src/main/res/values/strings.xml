@@ -304,6 +304,8 @@
     <string name="advanced_cache_stats_last_library">Last library refresh: %1$s</string>
     <string name="advanced_cache_stats_last_browse">Last browse refresh: %1$s</string>
     <string name="advanced_cache_clear_downloaded_pages">Downloaded pages</string>
+    <!-- Appearance settings -->
+    <string name="settings_appearance_title">Appearance</string>
     <!-- Downloads queue -->
     <string name="download_screen_title">Downloads</string>
     <string name="download_clear_completed">Clear completed</string>
