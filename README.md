@@ -90,6 +90,9 @@ Contributions are welcome (bugfixes, UX polish, docs). Please:
 - Before opening an issue, check if it already exists.
 - Before opening a PR, run `./gradlew detekt spotlessApply`.
 
+## Help Translate
+- Contribute translations on [POEditor](https://poeditor.com/projects/view?id=815516)
+
 ---
 
 ## Support
