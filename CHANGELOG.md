@@ -17,6 +17,7 @@ All notable changes to this project will be documented here.
 - Browse: Enabled Coil memory/disk cache for thumbnails to reduce re-downloads when returning or scrolling.
 - Network: Custom Coil `ImageLoader` now respects the max-parallel thumbnails setting via OkHttp dispatcher limits.
 - Browse: Guarded paging requests to avoid duplicate page loads during fast scrolling.
+- Browse: Search field now includes a clear (X) button that resets the query and reloads results.
 
 ## v0.2.0-beta.1
 

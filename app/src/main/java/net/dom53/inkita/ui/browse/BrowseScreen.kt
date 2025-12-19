@@ -35,6 +35,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FilterList
@@ -46,6 +47,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -190,6 +192,21 @@ fun BrowseScreen(
                                 placeholder = { Text(stringResource(R.string.general_search)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                trailingIcon = {
+                                    if (uiState.searchInput.text.isNotBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                viewModel.updateSearch(TextFieldValue(""))
+                                                viewModel.applySearchAndReload()
+                                            },
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Close,
+                                                contentDescription = stringResource(R.string.general_clear),
+                                            )
+                                        }
+                                    }
+                                },
                                 keyboardActions =
                                     KeyboardActions(
                                         onSearch = {
