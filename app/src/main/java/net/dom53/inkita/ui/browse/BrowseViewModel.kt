@@ -123,15 +123,16 @@ class BrowseViewModel(
             val queryKey = currentQueryKey(page = 1)
             val pageSize = appPreferences.browsePageSizeFlow.first()
 
+            var cachedPage: List<Series> = emptyList()
             if (cacheEnabled) {
-                val cached = runCatching { seriesRepository.getCachedBrowsePage(queryKey, 1) }.getOrNull().orEmpty()
-                if (cached.isNotEmpty()) {
+                cachedPage = runCatching { seriesRepository.getCachedBrowsePage(queryKey, 1) }.getOrNull().orEmpty()
+                if (cachedPage.isNotEmpty()) {
                     _state.update {
                         it.copy(
-                            series = cached,
+                            series = cachedPage,
                             currentPage = 1,
                             canLoadMore = true,
-                            isLoading = true, // still fetch fresh
+                            isLoading = true, // still fetch fresh unless cache is valid
                             isLoadingMore = false,
                             error = null,
                         )
@@ -140,9 +141,16 @@ class BrowseViewModel(
             }
 
             val ttlMillis = ttlMinutes * 60_000L
-            if (cacheEnabled && ttlMinutes > 0 && lastRefresh > 0 && (now - lastRefresh) < ttlMillis) {
+            if (cacheEnabled && cachedPage.isNotEmpty() && ttlMinutes > 0 && lastRefresh > 0 && (now - lastRefresh) < ttlMillis) {
                 showFreshCacheNotification(ttlMinutes - ((now - lastRefresh) / 60_000L).toInt())
-                _state.update { it.copy(isLoading = false, error = null, canLoadMore = false, isLoadingMore = false) }
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        error = null,
+                        canLoadMore = true,
+                        isLoadingMore = false,
+                    )
+                }
                 return@launch
             }
 
