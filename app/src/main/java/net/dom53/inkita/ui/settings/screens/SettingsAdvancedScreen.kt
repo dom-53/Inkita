@@ -21,6 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,6 +53,7 @@ import net.dom53.inkita.data.repository.CollectionsRepositoryImpl
 import net.dom53.inkita.data.repository.DownloadRepositoryImpl
 import net.dom53.inkita.domain.model.Collection
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 @Suppress("LongMethod")
 @Composable
@@ -85,6 +87,8 @@ fun SettingsAdvancedScreen(
     var exportingShare by remember { mutableStateOf(false) }
     var exportingSave by remember { mutableStateOf(false) }
     var verboseLogging by remember { mutableStateOf(false) }
+    var browsePageSize by remember { mutableStateOf(25) }
+    var maxThumbnailsParallel by remember { mutableStateOf(4) }
     val collectionsRepo = remember { CollectionsRepositoryImpl(context, appPreferences) }
     val downloadRepo =
         remember {
@@ -140,6 +144,12 @@ fun SettingsAdvancedScreen(
     }
     LaunchedEffect(Unit) {
         appPreferences.verboseLoggingFlow.collectLatest { verboseLogging = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.browsePageSizeFlow.collectLatest { browsePageSize = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.maxThumbnailsParallelFlow.collectLatest { maxThumbnailsParallel = it }
     }
     LaunchedEffect(Unit) {
         val cached = runCatching { appPreferences.loadCachedCollections() }.getOrDefault(emptyList())
@@ -300,6 +310,73 @@ fun SettingsAdvancedScreen(
                     scope.launch { appPreferences.setBrowseCacheEnabled(checked) }
                 },
                 enabled = globalCacheEnabled,
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_browse_page_size_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_browse_page_size_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Slider(
+                value = browsePageSize.toFloat(),
+                onValueChange = { value ->
+                    val stepped = (value / 5f).toInt() * 5
+                    browsePageSize = stepped.coerceIn(10, 50)
+                },
+                onValueChangeFinished = {
+                    scope.launch { appPreferences.setBrowsePageSize(browsePageSize) }
+                },
+                valueRange = 10f..50f,
+                steps = 8,
+                modifier = Modifier.weight(1f),
+            )
+            Text(browsePageSize.toString(), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_browse_thumb_parallel_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_browse_thumb_parallel_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Slider(
+                value = maxThumbnailsParallel.toFloat(),
+                onValueChange = { value ->
+                    maxThumbnailsParallel = value.roundToInt().coerceIn(2, 6)
+                },
+                onValueChangeFinished = {
+                    scope.launch { appPreferences.setMaxThumbnailsParallel(maxThumbnailsParallel) }
+                },
+                valueRange = 2f..6f,
+                steps = 3,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                maxThumbnailsParallel.toString(),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(start = 8.dp),
             )
         }
 

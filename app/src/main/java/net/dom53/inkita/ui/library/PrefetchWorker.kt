@@ -166,8 +166,9 @@ class PrefetchWorker(
 
         var page = 1
         val collected = mutableListOf<Series>()
+        val pageSize = 25
         while (true) {
-            val pageData = fetchSeriesPage(tabIndex, page, collections, seriesRepo, collectionsRepo)
+            val pageData = fetchSeriesPage(tabIndex, page, collections, seriesRepo, collectionsRepo, pageSize)
             if (pageData.isEmpty()) break
             val filtered = pageData.filter { it.format in allowedFormats }
             collected += filtered
@@ -188,7 +189,7 @@ class PrefetchWorker(
         collections: List<net.dom53.inkita.domain.model.Collection>,
         seriesRepo: SeriesRepositoryImpl,
         collectionsRepo: CollectionsRepositoryImpl,
-        pageSize: Int = 50,
+        pageSize: Int = 25,
     ): List<Series> {
         return when (selectedTabIndex) {
             0 -> {

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkMonitor
@@ -33,6 +34,8 @@ import net.dom53.inkita.domain.usecase.ReadStatusFilter
 import net.dom53.inkita.domain.usecase.SpecialFilter
 import net.dom53.inkita.domain.usecase.buildQueries
 import java.io.IOException
+import java.util.LinkedHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 data class BrowseUiState(
     val isLoading: Boolean = true,
@@ -66,6 +69,7 @@ class BrowseViewModel(
     private val cacheFreshNotificationId = 3001
     private val networkMonitor = NetworkMonitor.getInstance(appPreferences.appContext, appPreferences)
     private var lastOfflineError = false
+    private val pagingInFlight = AtomicBoolean(false)
 
     init {
         reloadFirstPage()
@@ -117,6 +121,7 @@ class BrowseViewModel(
             val lastRefresh = appPreferences.lastBrowseRefreshFlow.first()
             val now = System.currentTimeMillis()
             val queryKey = currentQueryKey(page = 1)
+            val pageSize = appPreferences.browsePageSizeFlow.first()
 
             if (cacheEnabled) {
                 val cached = runCatching { seriesRepository.getCachedBrowsePage(queryKey, 1) }.getOrNull().orEmpty()
@@ -142,11 +147,27 @@ class BrowseViewModel(
             }
 
             val page =
-                runCatching { fetchPage(page = 1, cacheKey = if (cacheEnabled) queryKey else null) }
-                    .onFailure { e ->
-                        lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
-                        _state.update { st -> st.copy(isLoading = false, error = e.message ?: "Failed to load series") }
-                    }.getOrNull() ?: return@launch
+                runCatching {
+                    fetchPageProgressive(
+                        page = 1,
+                        pageSize = appPreferences.browsePageSizeFlow.first(),
+                        cacheKey = if (cacheEnabled) queryKey else null,
+                    ) { progress ->
+                        _state.update {
+                            it.copy(
+                                series = progress,
+                                currentPage = 1,
+                                canLoadMore = true,
+                                isLoading = true,
+                                isLoadingMore = false,
+                                error = null,
+                            )
+                        }
+                    }
+                }.onFailure { e ->
+                    lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
+                    _state.update { st -> st.copy(isLoading = false, error = e.message ?: "Failed to load series") }
+                }.getOrNull() ?: return@launch
 
             lastOfflineError = false
             _state.update {
@@ -167,37 +188,61 @@ class BrowseViewModel(
     fun loadNextPage() {
         val current = _state.value
         if (current.isLoading || current.isLoadingMore || !current.canLoadMore) return
+        if (!pagingInFlight.compareAndSet(false, true)) return
         viewModelScope.launch {
-            _state.update { it.copy(isLoadingMore = true, error = null) }
-            val nextPageNumber = current.currentPage + 1
-            val cacheEnabled = browseCacheAllowed()
-            val queryKey = currentQueryKey(page = nextPageNumber)
-            val nextPage =
-                runCatching { fetchPage(page = nextPageNumber, cacheKey = if (cacheEnabled) queryKey else null) }
-                    .onFailure { e ->
+            try {
+                _state.update { it.copy(isLoadingMore = true, error = null) }
+                val nextPageNumber = current.currentPage + 1
+                val cacheEnabled = browseCacheAllowed()
+                val queryKey = currentQueryKey(page = nextPageNumber)
+                val nextPage =
+                    runCatching {
+                        val pageSize = appPreferences.browsePageSizeFlow.first()
+                        val base = _state.value.series
+                        val baseIds = base.map { it.id }.toHashSet()
+                        fetchPageProgressive(
+                            page = nextPageNumber,
+                            pageSize = pageSize,
+                            cacheKey = if (cacheEnabled) queryKey else null,
+                        ) { progress ->
+                            val combined = base + progress.filter { it.id !in baseIds }
+                            _state.update { st ->
+                                st.copy(
+                                    series = combined,
+                                    isLoadingMore = true,
+                                    error = null,
+                                )
+                            }
+                        }
+                    }.onFailure { e ->
                         lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
                         _state.update { st -> st.copy(isLoadingMore = false, error = e.message ?: "Failed to load page") }
                     }.getOrNull() ?: return@launch
 
-            lastOfflineError = false
-            _state.update {
-                it.copy(
-                    series = (it.series + nextPage).distinctBy { s -> s.id },
-                    currentPage = nextPageNumber,
-                    canLoadMore = nextPage.isNotEmpty(),
-                    isLoadingMore = false,
-                )
-            }
-            if (cacheEnabled) {
-                runCatching { appPreferences.setLastBrowseRefresh(System.currentTimeMillis()) }
+                lastOfflineError = false
+                _state.update {
+                    it.copy(
+                        series = (it.series + nextPage).distinctBy { s -> s.id },
+                        currentPage = nextPageNumber,
+                        canLoadMore = nextPage.isNotEmpty(),
+                        isLoadingMore = false,
+                    )
+                }
+                if (cacheEnabled) {
+                    runCatching { appPreferences.setLastBrowseRefresh(System.currentTimeMillis()) }
+                }
+            } finally {
+                pagingInFlight.set(false)
             }
         }
     }
 
-    private suspend fun fetchPage(
+    @Suppress("NestedBlockDepth")
+    private suspend fun fetchPageProgressive(
         page: Int,
-        pageSize: Int = 50,
+        pageSize: Int,
         cacheKey: String? = null,
+        onProgress: (List<Series>) -> Unit,
     ): List<Series> {
         val queries =
             buildQueries(
@@ -206,10 +251,28 @@ class BrowseViewModel(
                 page = page,
                 pageSize = pageSize,
             )
-        val results =
-            queries
-                .flatMap { seriesRepository.getSeries(it) }
-                .distinctBy { it.id }
+        val ordered = LinkedHashMap<Int, Series>()
+        val emitChunkSize = 3
+        for (query in queries) {
+            val items = seriesRepository.getSeries(query, prefetchThumbnails = false)
+            var pendingEmits = 0
+            for (item in items) {
+                if (!ordered.containsKey(item.id)) {
+                    ordered[item.id] = item
+                    pendingEmits++
+                    if (pendingEmits >= emitChunkSize) {
+                        onProgress(ordered.values.toList())
+                        pendingEmits = 0
+                        yield()
+                    }
+                }
+            }
+            if (pendingEmits > 0) {
+                onProgress(ordered.values.toList())
+                yield()
+            }
+        }
+        val results = ordered.values.toList()
         if (cacheKey != null) {
             seriesRepository.cacheBrowsePage(cacheKey, page, results)
         }

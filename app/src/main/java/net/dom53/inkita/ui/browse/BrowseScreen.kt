@@ -3,6 +3,11 @@ package net.dom53.inkita.ui.browse
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,9 +16,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -33,7 +40,6 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.ImageNotSupported
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -53,6 +59,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -60,10 +68,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import net.dom53.inkita.R
@@ -117,6 +128,7 @@ fun BrowseScreen(
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
     )
+    val browsePageSize by appPreferences.browsePageSizeFlow.collectAsState(initial = 25)
 
     LaunchedEffect(gridState) {
         snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
@@ -147,17 +159,12 @@ fun BrowseScreen(
     // back handling solved via confirmValueChange in sheet state
 
     when {
-        uiState.isLoading -> {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        }
         uiState.error != null -> {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("${stringResource(R.string.general_error)}: ${uiState.error}")
             }
         }
-        uiState.series.isEmpty() -> {
+        uiState.series.isEmpty() && !uiState.isLoading -> {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(stringResource(R.string.general_no_results))
             }
@@ -194,14 +201,22 @@ fun BrowseScreen(
                         }
                     }
 
-                    SeriesGrid(
-                        seriesList = uiState.series,
-                        config = config,
-                        isLoadingMore = uiState.isLoadingMore,
-                        gridState = gridState,
-                        onSeriesClick = { onOpenSeries(it.id) },
-                        onLoadMore = { viewModel.loadNextPage() },
-                    )
+                    if (uiState.series.isEmpty() && uiState.isLoading) {
+                        PlaceholderSeriesGrid(
+                            placeholderCount = browsePageSize,
+                            gridState = gridState,
+                        )
+                    } else {
+                        SeriesGrid(
+                            seriesList = uiState.series,
+                            config = config,
+                            isLoadingMore = uiState.isLoadingMore,
+                            loadingPlaceholderCount = browsePageSize,
+                            gridState = gridState,
+                            onSeriesClick = { onOpenSeries(it.id) },
+                            onLoadMore = { viewModel.loadNextPage() },
+                        )
+                    }
                 }
 
                 FloatingActionButton(
@@ -509,14 +524,70 @@ fun BrowseScreen(
 }
 
 @Composable
+private fun PlaceholderSeriesGrid(
+    placeholderCount: Int,
+    gridState: LazyGridState,
+) {
+    val shimmerProgress = rememberShimmerProgress()
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.fillMaxSize(),
+        state = gridState,
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(placeholderCount) {
+            PlaceholderSeriesTile(shimmerProgress = shimmerProgress)
+        }
+    }
+}
+
+@Composable
+private fun PlaceholderSeriesTile(shimmerProgress: Float) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        ShimmerBox(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(8.dp)),
+            progress = shimmerProgress,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        ShimmerBox(
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.9f)
+                    .clip(RoundedCornerShape(4.dp)),
+            height = 12.dp,
+            progress = shimmerProgress,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        ShimmerBox(
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.6f)
+                    .clip(RoundedCornerShape(4.dp)),
+            height = 10.dp,
+            progress = shimmerProgress,
+        )
+    }
+}
+
+@Composable
 private fun SeriesGrid(
     seriesList: List<Series>,
     config: AppConfig,
     isLoadingMore: Boolean,
+    loadingPlaceholderCount: Int,
     gridState: LazyGridState,
     onLoadMore: () -> Unit,
     onSeriesClick: (Series) -> Unit,
 ) {
+    val shimmerProgress = rememberShimmerProgress()
     LaunchedEffect(gridState) {
         snapshotFlow {
             val info = gridState.layoutInfo
@@ -549,6 +620,18 @@ private fun SeriesGrid(
                         .clickable { onSeriesClick(series) },
             ) {
                 val imageData = series.localThumbPath?.let { java.io.File(it) } ?: seriesCoverUrl(config, series.id)
+                val imageRequest =
+                    remember(imageData) {
+                        imageData?.let {
+                            ImageRequest
+                                .Builder(context)
+                                .data(it)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .networkCachePolicy(CachePolicy.ENABLED)
+                                .build()
+                        }
+                    }
                 Box(
                     modifier =
                         Modifier
@@ -559,21 +642,17 @@ private fun SeriesGrid(
                     contentAlignment = Alignment.Center,
                 ) {
                     SubcomposeAsyncImage(
-                        model = imageData,
+                        model = imageRequest,
                         contentDescription = series.name,
                         modifier = Modifier.matchParentSize(),
                         contentScale = ContentScale.Crop,
                     ) {
                         when (painter.state) {
                             is coil.compose.AsyncImagePainter.State.Loading -> {
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxSize(),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(26.dp))
-                                }
+                                ShimmerBox(
+                                    modifier = Modifier.matchParentSize(),
+                                    progress = shimmerProgress,
+                                )
                             }
                             is coil.compose.AsyncImagePainter.State.Error -> {
                                 Icon(
@@ -613,19 +692,52 @@ private fun SeriesGrid(
         }
 
         if (isLoadingMore) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
+            items(loadingPlaceholderCount, key = { "loading_$it" }) {
+                PlaceholderSeriesTile(shimmerProgress = shimmerProgress)
             }
         }
     }
+}
+
+@Composable
+private fun ShimmerBox(
+    modifier: Modifier,
+    progress: Float,
+    height: Dp? = null,
+) {
+    val base = MaterialTheme.colorScheme.surfaceVariant
+    val highlight = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+    val brush =
+        Brush.linearGradient(
+            colors = listOf(base, highlight, base),
+            start = Offset(x = -600f + (1200f * progress), y = 0f),
+            end = Offset(x = 0f + (1200f * progress), y = 300f),
+        )
+    val baseModifier =
+        if (height != null) {
+            modifier.height(height)
+        } else {
+            modifier
+        }
+    Box(
+        modifier = baseModifier.background(brush),
+    )
+}
+
+@Composable
+private fun rememberShimmerProgress(): Float {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    return transition
+        .animateFloat(
+            initialValue = -1f,
+            targetValue = 1f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation = tween(durationMillis = 1700),
+                    repeatMode = RepeatMode.Restart,
+                ),
+            label = "shimmer_progress",
+        ).value
 }
 
 private fun seriesCoverUrl(

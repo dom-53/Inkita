@@ -134,6 +134,8 @@
     <string name="settings_cache_prefetch_collections_empty">Žádné kolekce nejsou k dispozici.</string>
     <string name="settings_cache_prefetch_details_title">Předběžné načítání detailu</string>
     <string name="settings_cache_prefetch_details_subtitle">"Uložit detaily sérií (volumy/kapitoly) do cache automaticky při startu. "</string>
+    <string name="settings_browse_page_size_title">Velikost stránky pro Procházet</string>
+    <string name="settings_browse_page_size_subtitle">Kolik položek se načte na stránku při procházení/hledání. Pro pomalé připojení použij menší hodnotu.</string>
     <string name="settings_cache_clear_details">Pouze detail / volumes / kapitoly</string>
     <string name="settings_cache_clear_thumbnails">Pouze náhledy obrázků</string>
     <string name="settings_cache_cleared_toast">Mezipameť vyčištěna</string>

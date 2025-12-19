@@ -6,7 +6,10 @@ import net.dom53.inkita.domain.model.filter.SeriesQuery
 import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
 
 interface SeriesRepository {
-    suspend fun getSeries(query: SeriesQuery): List<Series>
+    suspend fun getSeries(
+        query: SeriesQuery,
+        prefetchThumbnails: Boolean = true,
+    ): List<Series>
 
     suspend fun getSeriesDetail(seriesId: Int): SeriesDetail
 
