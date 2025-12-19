@@ -381,4 +381,5 @@
     <string name="notifications_prompt_body">Povol prosím oznámení, abychom tě mohli informovat o aktualizacích a stahování.</string>
     <string name="notifications_prompt_accept">Povolit</string>
     <string name="notifications_prompt_dismiss">Teď ne</string>
+    <string name="settings_about_kavita_version">Testováno s Kavita</string>
 </resources>

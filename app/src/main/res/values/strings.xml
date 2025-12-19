@@ -289,6 +289,7 @@
     <string name="notifications_prompt_body">Please allow notifications so we can alert you about updates and downloads.</string>
     <string name="notifications_prompt_accept">Enable</string>
     <string name="notifications_prompt_dismiss">Not now</string>
+    <string name="settings_about_kavita_version">Tested with Kavita</string>
     <!-- Series detail actions -->
     <string name="series_download_all">Download all</string>
     <string name="series_download_missing">Download missing</string>

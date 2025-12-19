@@ -90,6 +90,7 @@ fun SettingsAboutScreen(onBack: () -> Unit) {
                 formatter.format(Date(pkg.lastUpdateTime))
             }.getOrDefault("--")
         }
+    val kavitaTarget = "nightly-0.8.8.15"
     val scope = rememberCoroutineScope()
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var pendingDownloadId by remember { mutableStateOf<Long?>(null) }
@@ -279,6 +280,7 @@ fun SettingsAboutScreen(onBack: () -> Unit) {
         }
         Text(stringResource(R.string.settings_about_version) + ": $versionName")
         Text(stringResource(R.string.settings_about_build_time) + ": $buildTime")
+        Text(stringResource(R.string.settings_about_kavita_version) + ": $kavitaTarget")
 
         ListItem(
             headlineContent = { Text(stringResource(R.string.settings_about_check_updates)) },
