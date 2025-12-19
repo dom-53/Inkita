@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 object LoggingManager {
     private const val MAX_FILE_SIZE_BYTES: Long = 1_000_000 // ~1MB
     private const val MAX_FILES = 5
+    private const val MAX_FILE_AGE_MS: Long = 12L * 24 * 60 * 60 * 1000 // 12 days
     private const val FILE_PREFIX = "inkita-log"
     private val timestampFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
 
@@ -150,6 +151,7 @@ object LoggingManager {
                 }
                 FileOutputStream(file, true).bufferedWriter().use { it.write(payload) }
                 rotateIfNeeded(file, dir)
+                pruneOldFiles()
             } catch (e: Exception) {
                 // Fallback to logcat only to avoid crash loops.
                 if (errorsEnabled) Log.e("LoggingManager", "Failed to write log file", e)
@@ -187,12 +189,18 @@ object LoggingManager {
 
     private fun pruneOldFiles() {
         val dir = logDir ?: return
+        val now = System.currentTimeMillis()
         val files =
             dir.listFiles { f -> f.name.startsWith(FILE_PREFIX) && f.extension == "txt" }
                 ?.sortedBy { it.lastModified() }
                 ?: return
-        if (files.size <= MAX_FILES) return
-        val toDelete = files.take(files.size - MAX_FILES)
+        files.filter { now - it.lastModified() > MAX_FILE_AGE_MS }.forEach { runCatching { it.delete() } }
+        val remaining =
+            dir.listFiles { f -> f.name.startsWith(FILE_PREFIX) && f.extension == "txt" }
+                ?.sortedBy { it.lastModified() }
+                ?: return
+        if (remaining.size <= MAX_FILES) return
+        val toDelete = remaining.take(remaining.size - MAX_FILES)
         toDelete.forEach { runCatching { it.delete() } }
     }
 
