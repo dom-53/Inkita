@@ -7,10 +7,15 @@ All notable changes to this project will be documented here.
 ### Added
 - Localization: Declared supported locales (EN, CS) via `locale-config` and AppCompat auto locale storage so per-app language works from system settings and the in-app picker.
 - Logging: Added rotating on-device log files with export/save/clear controls, a verbose logging toggle, sanitization of hosts/IPs/API keys, config snapshot in exported zips, and automatic pruning (12 days, 5 files).
+- Browse: Added shimmer placeholders for grid tiles and thumbnails while covers load.
+- Settings: Added “Max thumbnails in parallel” in Advanced to limit concurrent thumbnail downloads.
 
 ### Changed
 - UI: Switched theme base to `Theme.AppCompat.DayNight.NoActionBar` (required for per-app language support with Compose).
 - Localization: Language picker now applies the chosen locale through `AppCompatDelegate` and aligns with the system “App language” setting; Czech strings completed and cleaned up.
+- Browse: Progressive grid loading with placeholders sized to the browse page size; images load on-demand through Coil.
+- Browse: Enabled Coil memory/disk cache for thumbnails to reduce re-downloads when returning or scrolling.
+- Network: Custom Coil `ImageLoader` now respects the max-parallel thumbnails setting via OkHttp dispatcher limits.
 
 ## v0.2.0-beta.1
 
