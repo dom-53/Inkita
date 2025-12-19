@@ -68,6 +68,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.SubcomposeAsyncImage
@@ -527,8 +528,7 @@ private fun PlaceholderSeriesGrid(
     placeholderCount: Int,
     gridState: LazyGridState,
 ) {
-    val placeholderColor = MaterialTheme.colorScheme.surfaceVariant
-    val textColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+    val shimmerProgress = rememberShimmerProgress()
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.fillMaxSize(),
@@ -538,37 +538,44 @@ private fun PlaceholderSeriesGrid(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(placeholderCount) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(2f / 3f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(placeholderColor),
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth(0.9f)
-                            .height(12.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(textColor),
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth(0.6f)
-                            .height(10.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(textColor),
-                )
-            }
+            PlaceholderSeriesTile(shimmerProgress = shimmerProgress)
         }
+    }
+}
+
+@Composable
+private fun PlaceholderSeriesTile(
+    shimmerProgress: Float,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        ShimmerBox(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(8.dp)),
+            progress = shimmerProgress,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        ShimmerBox(
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.9f)
+                    .clip(RoundedCornerShape(4.dp)),
+            height = 12.dp,
+            progress = shimmerProgress,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        ShimmerBox(
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.6f)
+                    .clip(RoundedCornerShape(4.dp)),
+            height = 10.dp,
+            progress = shimmerProgress,
+        )
     }
 }
 
@@ -582,6 +589,7 @@ private fun SeriesGrid(
     onLoadMore: () -> Unit,
     onSeriesClick: (Series) -> Unit,
 ) {
+    val shimmerProgress = rememberShimmerProgress()
     LaunchedEffect(gridState) {
         snapshotFlow {
             val info = gridState.layoutInfo
@@ -615,14 +623,16 @@ private fun SeriesGrid(
             ) {
                 val imageData = series.localThumbPath?.let { java.io.File(it) } ?: seriesCoverUrl(config, series.id)
                 val imageRequest =
-                    imageData?.let {
-                        ImageRequest
-                            .Builder(context)
-                            .data(it)
-                            .diskCachePolicy(CachePolicy.ENABLED)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .networkCachePolicy(CachePolicy.ENABLED)
-                            .build()
+                    remember(imageData) {
+                        imageData?.let {
+                            ImageRequest
+                                .Builder(context)
+                                .data(it)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .networkCachePolicy(CachePolicy.ENABLED)
+                                .build()
+                        }
                     }
                 Box(
                     modifier =
@@ -643,6 +653,7 @@ private fun SeriesGrid(
                             is coil.compose.AsyncImagePainter.State.Loading -> {
                                 ShimmerBox(
                                     modifier = Modifier.matchParentSize(),
+                                    progress = shimmerProgress,
                                 )
                             }
                             is coil.compose.AsyncImagePainter.State.Error -> {
@@ -684,47 +695,41 @@ private fun SeriesGrid(
 
         if (isLoadingMore) {
             items(loadingPlaceholderCount, key = { "loading_$it" }) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(2f / 3f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth(0.9f)
-                                .height(12.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth(0.6f)
-                                .height(10.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
-                    )
-                }
+                PlaceholderSeriesTile(shimmerProgress = shimmerProgress)
             }
         }
     }
 }
 
 @Composable
-private fun ShimmerBox(modifier: Modifier) {
+private fun ShimmerBox(
+    modifier: Modifier,
+    progress: Float,
+    height: Dp? = null,
+) {
     val base = MaterialTheme.colorScheme.surfaceVariant
     val highlight = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+    val brush =
+        Brush.linearGradient(
+            colors = listOf(base, highlight, base),
+            start = Offset(x = -600f + (1200f * progress), y = 0f),
+            end = Offset(x = 0f + (1200f * progress), y = 300f),
+        )
+    val baseModifier =
+        if (height != null) {
+            modifier.height(height)
+        } else {
+            modifier
+        }
+    Box(
+        modifier = baseModifier.background(brush),
+    )
+}
+
+@Composable
+private fun rememberShimmerProgress(): Float {
     val transition = rememberInfiniteTransition(label = "shimmer")
-    val progress by transition.animateFloat(
+    return transition.animateFloat(
         initialValue = -1f,
         targetValue = 1f,
         animationSpec =
@@ -733,16 +738,7 @@ private fun ShimmerBox(modifier: Modifier) {
                 repeatMode = RepeatMode.Restart,
             ),
         label = "shimmer_progress",
-    )
-    val brush =
-        Brush.linearGradient(
-            colors = listOf(base, highlight, base),
-            start = Offset(x = -600f + (1200f * progress), y = 0f),
-            end = Offset(x = 0f + (1200f * progress), y = 300f),
-        )
-    Box(
-        modifier = modifier.background(brush),
-    )
+    ).value
 }
 
 private fun seriesCoverUrl(
