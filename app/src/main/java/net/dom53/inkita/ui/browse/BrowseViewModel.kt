@@ -164,11 +164,10 @@ class BrowseViewModel(
                             )
                         }
                     }
-                }
-                    .onFailure { e ->
-                        lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
-                        _state.update { st -> st.copy(isLoading = false, error = e.message ?: "Failed to load series") }
-                    }.getOrNull() ?: return@launch
+                }.onFailure { e ->
+                    lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
+                    _state.update { st -> st.copy(isLoading = false, error = e.message ?: "Failed to load series") }
+                }.getOrNull() ?: return@launch
 
             lastOfflineError = false
             _state.update {
@@ -215,11 +214,10 @@ class BrowseViewModel(
                                 )
                             }
                         }
-                    }
-                        .onFailure { e ->
-                            lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
-                            _state.update { st -> st.copy(isLoadingMore = false, error = e.message ?: "Failed to load page") }
-                        }.getOrNull() ?: return@launch
+                    }.onFailure { e ->
+                        lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
+                        _state.update { st -> st.copy(isLoadingMore = false, error = e.message ?: "Failed to load page") }
+                    }.getOrNull() ?: return@launch
 
                 lastOfflineError = false
                 _state.update {
@@ -239,6 +237,7 @@ class BrowseViewModel(
         }
     }
 
+    @Suppress("NestedBlockDepth")
     private suspend fun fetchPageProgressive(
         page: Int,
         pageSize: Int,

@@ -228,10 +228,12 @@ fun InkitaApp(
                         maxRequests = (maxThumbnailsParallel * 8).coerceIn(16, 32)
                     }
                 val okHttpClient =
-                    OkHttpClient.Builder()
+                    OkHttpClient
+                        .Builder()
                         .dispatcher(dispatcher)
                         .build()
-                ImageLoader.Builder(context)
+                ImageLoader
+                    .Builder(context)
                     .okHttpClient(okHttpClient)
                     .build()
             }

@@ -16,6 +16,7 @@ All notable changes to this project will be documented here.
 - Browse: Progressive grid loading with placeholders sized to the browse page size; images load on-demand through Coil.
 - Browse: Enabled Coil memory/disk cache for thumbnails to reduce re-downloads when returning or scrolling.
 - Network: Custom Coil `ImageLoader` now respects the max-parallel thumbnails setting via OkHttp dispatcher limits.
+- Browse: Guarded paging requests to avoid duplicate page loads during fast scrolling.
 
 ## v0.2.0-beta.1
 
