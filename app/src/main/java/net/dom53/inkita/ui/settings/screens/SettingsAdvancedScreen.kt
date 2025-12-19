@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -85,6 +86,7 @@ fun SettingsAdvancedScreen(
     var exportingShare by remember { mutableStateOf(false) }
     var exportingSave by remember { mutableStateOf(false) }
     var verboseLogging by remember { mutableStateOf(false) }
+    var browsePageSize by remember { mutableStateOf(25) }
     val collectionsRepo = remember { CollectionsRepositoryImpl(context, appPreferences) }
     val downloadRepo =
         remember {
@@ -140,6 +142,9 @@ fun SettingsAdvancedScreen(
     }
     LaunchedEffect(Unit) {
         appPreferences.verboseLoggingFlow.collectLatest { verboseLogging = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.browsePageSizeFlow.collectLatest { browsePageSize = it }
     }
     LaunchedEffect(Unit) {
         val cached = runCatching { appPreferences.loadCachedCollections() }.getOrDefault(emptyList())
@@ -301,6 +306,38 @@ fun SettingsAdvancedScreen(
                 },
                 enabled = globalCacheEnabled,
             )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_browse_page_size_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_browse_page_size_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Slider(
+                value = browsePageSize.toFloat(),
+                onValueChange = { value ->
+                    val stepped = (value / 5f).toInt() * 5
+                    browsePageSize = stepped.coerceIn(10, 50)
+                },
+                onValueChangeFinished = {
+                    scope.launch { appPreferences.setBrowsePageSize(browsePageSize) }
+                },
+                valueRange = 10f..50f,
+                steps = 8,
+                modifier = Modifier.weight(1f),
+            )
+            Text(browsePageSize.toString(), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
         }
 
         Divider()

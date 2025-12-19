@@ -117,6 +117,7 @@ class BrowseViewModel(
             val lastRefresh = appPreferences.lastBrowseRefreshFlow.first()
             val now = System.currentTimeMillis()
             val queryKey = currentQueryKey(page = 1)
+            val pageSize = appPreferences.browsePageSizeFlow.first()
 
             if (cacheEnabled) {
                 val cached = runCatching { seriesRepository.getCachedBrowsePage(queryKey, 1) }.getOrNull().orEmpty()
@@ -142,7 +143,7 @@ class BrowseViewModel(
             }
 
             val page =
-                runCatching { fetchPage(page = 1, cacheKey = if (cacheEnabled) queryKey else null) }
+                runCatching { fetchPage(page = 1, pageSize = appPreferences.browsePageSizeFlow.first(), cacheKey = if (cacheEnabled) queryKey else null) }
                     .onFailure { e ->
                         lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
                         _state.update { st -> st.copy(isLoading = false, error = e.message ?: "Failed to load series") }
@@ -173,7 +174,10 @@ class BrowseViewModel(
             val cacheEnabled = browseCacheAllowed()
             val queryKey = currentQueryKey(page = nextPageNumber)
             val nextPage =
-                runCatching { fetchPage(page = nextPageNumber, cacheKey = if (cacheEnabled) queryKey else null) }
+                runCatching {
+                    val pageSize = appPreferences.browsePageSizeFlow.first()
+                    fetchPage(page = nextPageNumber, pageSize = pageSize, cacheKey = if (cacheEnabled) queryKey else null)
+                }
                     .onFailure { e ->
                         lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
                         _state.update { st -> st.copy(isLoadingMore = false, error = e.message ?: "Failed to load page") }
@@ -196,7 +200,7 @@ class BrowseViewModel(
 
     private suspend fun fetchPage(
         page: Int,
-        pageSize: Int = 50,
+        pageSize: Int,
         cacheKey: String? = null,
     ): List<Series> {
         val queries =

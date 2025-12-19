@@ -8,5 +8,5 @@ data class SeriesQuery(
     val sortField: KavitaSortField = KavitaSortField.SortName,
     val sortDescending: Boolean = false,
     val page: Int = 1,
-    val pageSize: Int = 50,
+    val pageSize: Int = 25,
 )
