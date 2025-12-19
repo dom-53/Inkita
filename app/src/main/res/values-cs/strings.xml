@@ -327,6 +327,17 @@
     <string name="advanced_cache_stats_thumbnails">Náhledy: %1$s</string>
     <string name="advanced_cache_stats_last_library">Poslední obnovení Knihovny: %1$s</string>
     <string name="advanced_cache_stats_last_browse">Poslední obnovení Procházet: %1$s</string>
+    <string name="advanced_logs_title">Logy</string>
+    <string name="advanced_logs_export">Sdílet logy</string>
+    <string name="advanced_logs_clear">Smazat logy</string>
+    <string name="advanced_logs_share_chooser">Sdílet logy</string>
+    <string name="advanced_logs_none">Žádné logy k exportu</string>
+    <string name="advanced_logs_export_failed">Export se nezdařil</string>
+    <string name="advanced_logs_cleared">Logy smazány</string>
+    <string name="advanced_logs_save">Uložit logy</string>
+    <string name="advanced_logs_saved">Uloženo do %1$s</string>
+    <string name="advanced_logs_verbose_title">Podrobné logování</string>
+    <string name="advanced_logs_verbose_subtitle">Zapisuje detailní diagnostické logy pro debug. Nezapínej, pokud řešíš velikost úložiště.</string>
     <!--  About Inkita  -->
     <string name="settings_about_osl">Licence s otevřeným zdrojem</string>
     <string name="settings_about_osl_3rd">Knihovny třetích stran</string>

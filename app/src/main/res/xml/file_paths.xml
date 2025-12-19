@@ -2,4 +2,5 @@
 <paths>
     <external-files-path name="downloads" path="Download/InkitaUpdates/" />
     <external-files-path name="pdfs" path="Download/Inkita/pdfs/" />
+    <cache-path name="logs" path="." />
 </paths>

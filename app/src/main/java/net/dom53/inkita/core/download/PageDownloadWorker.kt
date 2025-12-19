@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
+import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.notification.AppNotificationManager
 import net.dom53.inkita.core.storage.AppPreferences
@@ -41,7 +42,11 @@ class PageDownloadWorker(
     private val appPreferences = AppPreferences(appContext)
     private val db = InkitaDatabase.getInstance(appContext)
     private val downloadDao = db.downloadDao()
-    private val httpClient = OkHttpClient()
+    private val httpClient =
+        OkHttpClient
+            .Builder()
+            .addInterceptor(NetworkLoggingInterceptor)
+            .build()
     private var currentTaskId: Long = -1L
 
     /**

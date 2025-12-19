@@ -35,6 +35,9 @@ object UpdateChecker {
                     ongoing = true,
                 )
             val info = fetchUpdateInfo(context)
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("UpdateChecker", "Update info=${info?.versionName ?: "none"}")
+            }
             val pending =
                 info?.let { update ->
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(update.url))
@@ -47,7 +50,15 @@ object UpdateChecker {
                 }
 
             if (showingProgress) AppNotificationManager.cancel(NOTIFICATION_ID)
-            if (info == null || pending == null) return
+            if (info == null || pending == null) {
+                if (LoggingManager.isDebugEnabled()) {
+                    LoggingManager.d("UpdateChecker", "No update available")
+                }
+                return
+            }
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("UpdateChecker", "Update found version=${info.versionName}")
+            }
             AppNotificationManager.showInfo(
                 id = NOTIFICATION_ID,
                 channel = AppNotificationManager.CHANNEL_GENERAL,

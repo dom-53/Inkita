@@ -93,6 +93,11 @@ Contributions are welcome (bugfixes, UX polish, docs). Please:
 ## Help Translate
 - Contribute translations on [POEditor](https://poeditor.com/join/project/XLBygoGhOX)
 
+## Logs / Debug
+- You can export or save anonymized logs from **Settings → Advanced → Logs**; saved zips are written to `Documents/Inkita/logs`.
+- Sensitive data (host/IP/API key) is anonymized in log files and exports.
+- For bug reports: enable **Verbose logging**, reproduce the issue, then attach the exported ZIP to your issue/report.
+
 ---
 
 ## Support

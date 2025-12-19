@@ -92,6 +92,7 @@ class AppPreferences(
         private val KEY_OFFLINE_MODE = booleanPreferencesKey("offline_mode")
         private val KEY_DELETE_AFTER_MARK_READ = booleanPreferencesKey("delete_after_mark_read")
         private val KEY_DELETE_AFTER_READ_DEPTH = intPreferencesKey("delete_after_read_depth")
+        private val KEY_VERBOSE_LOGGING = booleanPreferencesKey("verbose_logging")
 
         private const val REFRESH_CACHE_DEFAULT = 720
 
@@ -178,6 +179,8 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_DELETE_AFTER_MARK_READ] ?: false }
     val deleteAfterReadDepthFlow: Flow<Int> =
         context.dataStore.data.map { prefs -> (prefs[KEY_DELETE_AFTER_READ_DEPTH] ?: 1).coerceIn(1, 5) }
+    val verboseLoggingFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_VERBOSE_LOGGING] ?: false }
 
     val prefetchCollectionsAllFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_COLLECTIONS_ALL] ?: true }
@@ -431,6 +434,12 @@ class AppPreferences(
     suspend fun setPreferOfflinePages(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[KEY_PREFER_OFFLINE_PAGES] = enabled
+        }
+    }
+
+    suspend fun setVerboseLogging(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_VERBOSE_LOGGING] = enabled
         }
     }
 

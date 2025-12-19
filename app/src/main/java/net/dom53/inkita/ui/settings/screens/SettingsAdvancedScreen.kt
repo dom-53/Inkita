@@ -1,5 +1,8 @@
 package net.dom53.inkita.ui.settings.screens
 
+import android.content.Intent
+import android.os.Environment
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,13 +36,16 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.download.DownloadManager
+import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.repository.CollectionsRepositoryImpl
@@ -76,6 +82,9 @@ fun SettingsAdvancedScreen(
     val context = LocalContext.current
     var cacheSizeBytes by remember { mutableStateOf(0L) }
     var statsDialog by remember { mutableStateOf<String?>(null) }
+    var exportingShare by remember { mutableStateOf(false) }
+    var exportingSave by remember { mutableStateOf(false) }
+    var verboseLogging by remember { mutableStateOf(false) }
     val collectionsRepo = remember { CollectionsRepositoryImpl(context, appPreferences) }
     val downloadRepo =
         remember {
@@ -128,6 +137,9 @@ fun SettingsAdvancedScreen(
     }
     LaunchedEffect(Unit) {
         appPreferences.prefetchCollectionIdsFlow.collectLatest { ids -> selectedCollectionIds = ids.toSet() }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.verboseLoggingFlow.collectLatest { verboseLogging = it }
     }
     LaunchedEffect(Unit) {
         val cached = runCatching { appPreferences.loadCachedCollections() }.getOrDefault(emptyList())
@@ -642,6 +654,141 @@ fun SettingsAdvancedScreen(
             Text(stringResource(R.string.settings_cache_stats_button))
         }
 
+        Divider()
+
+        Text(
+            text = stringResource(R.string.advanced_logs_title),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.advanced_logs_verbose_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.advanced_logs_verbose_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = verboseLogging,
+                onCheckedChange = { checked ->
+                    verboseLogging = checked
+                    scope.launch { appPreferences.setVerboseLogging(checked) }
+                },
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        if (exportingShare) return@OutlinedButton
+                        exportingShare = true
+                        scope.launch {
+                            val snapshot = withContext(Dispatchers.IO) { buildConfigSnapshot(context, appPreferences) }
+                            val zip =
+                                withContext(Dispatchers.IO) {
+                                    LoggingManager.exportLogsForShare(
+                                        context,
+                                        extras = mapOf("config.txt" to snapshot),
+                                    )
+                                }
+                            exportingShare = false
+                            if (zip == null) {
+                                Toast.makeText(context, R.string.advanced_logs_none, Toast.LENGTH_SHORT).show()
+                                return@launch
+                            }
+                            runCatching {
+                                val uri =
+                                    FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.provider",
+                                        zip,
+                                    )
+                                val shareIntent =
+                                    Intent(Intent.ACTION_SEND).apply {
+                                        type = "application/zip"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                context.startActivity(
+                                    Intent.createChooser(
+                                        shareIntent,
+                                        context.getString(R.string.advanced_logs_share_chooser),
+                                    ),
+                                )
+                            }.onFailure {
+                                Toast
+                                    .makeText(context, R.string.advanced_logs_export_failed, Toast.LENGTH_SHORT)
+                                    .show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(),
+                    enabled = !exportingShare,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(text = stringResource(R.string.advanced_logs_export))
+                }
+                OutlinedButton(
+                    onClick = {
+                        if (exportingSave) return@OutlinedButton
+                        exportingSave = true
+                        scope.launch {
+                            val snapshot = withContext(Dispatchers.IO) { buildConfigSnapshot(context, appPreferences) }
+                            val saved =
+                                withContext(Dispatchers.IO) {
+                                    LoggingManager.saveLogsToDocuments(
+                                        context,
+                                        extras = mapOf("config.txt" to snapshot),
+                                    )
+                                }
+                            exportingSave = false
+                            if (saved == null) {
+                                Toast.makeText(context, R.string.advanced_logs_export_failed, Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.getString(R.string.advanced_logs_saved, saved.absolutePath),
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(),
+                    enabled = !exportingSave,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(text = stringResource(R.string.advanced_logs_save))
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start,
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        LoggingManager.clearLogs()
+                        Toast.makeText(context, R.string.advanced_logs_cleared, Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(text = stringResource(R.string.advanced_logs_clear))
+                }
+            }
+        }
+
         statsDialog?.let { body ->
             AlertDialog(
                 onDismissRequest = { statsDialog = null },
@@ -701,4 +848,69 @@ private fun formatTs(ts: Long): String {
     if (ts <= 0) return "--"
     val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
     return sdf.format(java.util.Date(ts))
+}
+
+@Suppress("MaxLineLength")
+private suspend fun buildConfigSnapshot(
+    context: android.content.Context,
+    prefs: net.dom53.inkita.core.storage.AppPreferences,
+): String {
+    val pkgInfo =
+        runCatching {
+            val pm = context.packageManager
+            val pkg = pm.getPackageInfo(context.packageName, 0)
+            pkg
+        }.getOrNull()
+    val versionName = pkgInfo?.versionName ?: net.dom53.inkita.BuildConfig.VERSION_NAME
+    val versionCode =
+        pkgInfo?.longVersionCode ?: net.dom53.inkita.BuildConfig.VERSION_CODE
+            .toLong()
+    val sdk = android.os.Build.VERSION.SDK_INT
+    val cfg = prefs.configFlow.first()
+    val hostMasked =
+        if (cfg.serverUrl.isBlank()) {
+            "unset"
+        } else {
+            val visible = cfg.serverUrl.take(4)
+            "$visible***"
+        }
+    val lang = prefs.appLanguageFlow.first()
+    val theme = prefs.appThemeFlow.first()
+    val offline = prefs.offlineModeFlow.first()
+    val cacheGlobal = prefs.cacheEnabledFlow.first()
+    val cacheLib = prefs.libraryCacheEnabledFlow.first()
+    val cacheBrowse = prefs.browseCacheEnabledFlow.first()
+    val cacheTtl = prefs.cacheRefreshTtlMinutesFlow.first()
+    val prefetchInProgress = prefs.prefetchInProgressFlow.first()
+    val prefetchWant = prefs.prefetchWantFlow.first()
+    val prefetchColl = prefs.prefetchCollectionsFlow.first()
+    val prefetchDetails = prefs.prefetchDetailsFlow.first()
+    val prefetchMetered = prefs.prefetchAllowMeteredFlow.first()
+    val prefetchLowBatt = prefs.prefetchAllowLowBatteryFlow.first()
+    val prefetchAll = prefs.prefetchCollectionsAllFlow.first()
+    val prefetchIds = prefs.prefetchCollectionIdsFlow.first()
+    val downloadConcurrent = prefs.downloadMaxConcurrentFlow.first()
+    val downloadRetry = prefs.downloadRetryEnabledFlow.first()
+    val downloadRetryMax = prefs.downloadRetryMaxAttemptsFlow.first()
+    val preferOfflinePages = prefs.preferOfflinePagesFlow.first()
+    val deleteAfter = prefs.deleteAfterMarkReadFlow.first()
+    val deleteDepth = prefs.deleteAfterReadDepthFlow.first()
+    val verbose = prefs.verboseLoggingFlow.first()
+
+    return buildString {
+        appendLine("App: ${context.packageName}")
+        appendLine("Version: $versionName ($versionCode) SDK=$sdk")
+        appendLine("ServerHost: $hostMasked")
+        appendLine("Language: $lang")
+        appendLine("Theme: $theme")
+        appendLine("OfflineMode: $offline")
+        appendLine("CacheEnabled: $cacheGlobal lib=$cacheLib browse=$cacheBrowse ttlMin=$cacheTtl")
+        appendLine(
+            "Prefetch: inProgress=$prefetchInProgress want=$prefetchWant collections=$prefetchColl details=$prefetchDetails meter=$prefetchMetered lowBatt=$prefetchLowBatt all=$prefetchAll ids=$prefetchIds",
+        )
+        appendLine(
+            "Downloads: concurrent=$downloadConcurrent autoRetry=$downloadRetry maxRetry=$downloadRetryMax preferOffline=$preferOfflinePages deleteAfter=$deleteAfter depth=$deleteDepth",
+        )
+        appendLine("VerboseLogging: $verbose")
+    }
 }

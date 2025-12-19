@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.logging.LoggingManager
+import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.SeriesDao
 import net.dom53.inkita.data.local.db.entity.CachedBrowseRefEntity
@@ -30,7 +31,12 @@ class CacheManagerImpl(
     private val thumbnailsDir: File?,
     private val dbFile: File? = null,
 ) : CacheManager {
-    private val httpClient by lazy { OkHttpClient() }
+    private val httpClient by lazy {
+        OkHttpClient
+            .Builder()
+            .addInterceptor(NetworkLoggingInterceptor)
+            .build()
+    }
 
     companion object {
         const val MAX_DIM = 512

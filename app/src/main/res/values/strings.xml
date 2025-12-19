@@ -308,6 +308,17 @@
     <string name="advanced_cache_stats_last_library">Last library refresh: %1$s</string>
     <string name="advanced_cache_stats_last_browse">Last browse refresh: %1$s</string>
     <string name="advanced_cache_clear_downloaded_pages">Downloaded pages</string>
+    <string name="advanced_logs_title">Logs</string>
+    <string name="advanced_logs_export">Share logs</string>
+    <string name="advanced_logs_save">Save logs</string>
+    <string name="advanced_logs_clear">Clear logs</string>
+    <string name="advanced_logs_share_chooser">Share logs</string>
+    <string name="advanced_logs_none">No logs to export</string>
+    <string name="advanced_logs_export_failed">Export failed</string>
+    <string name="advanced_logs_cleared">Logs cleared</string>
+    <string name="advanced_logs_saved">Saved to %1$s</string>
+    <string name="advanced_logs_verbose_title">Verbose logging</string>
+    <string name="advanced_logs_verbose_subtitle">Write detailed diagnostic logs to share for debugging. Do not enable if you are concerned about disk usage.</string>
     <!-- Appearance settings -->
     <string name="settings_appearance_title">Appearance</string>
     <!-- Downloads queue -->
