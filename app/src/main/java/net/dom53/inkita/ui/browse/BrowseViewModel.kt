@@ -35,6 +35,7 @@ import net.dom53.inkita.domain.usecase.SpecialFilter
 import net.dom53.inkita.domain.usecase.buildQueries
 import java.io.IOException
 import java.util.LinkedHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 data class BrowseUiState(
     val isLoading: Boolean = true,
@@ -68,6 +69,7 @@ class BrowseViewModel(
     private val cacheFreshNotificationId = 3001
     private val networkMonitor = NetworkMonitor.getInstance(appPreferences.appContext, appPreferences)
     private var lastOfflineError = false
+    private val pagingInFlight = AtomicBoolean(false)
 
     init {
         reloadFirstPage()
@@ -187,47 +189,52 @@ class BrowseViewModel(
     fun loadNextPage() {
         val current = _state.value
         if (current.isLoading || current.isLoadingMore || !current.canLoadMore) return
+        if (!pagingInFlight.compareAndSet(false, true)) return
         viewModelScope.launch {
-            _state.update { it.copy(isLoadingMore = true, error = null) }
-            val nextPageNumber = current.currentPage + 1
-            val cacheEnabled = browseCacheAllowed()
-            val queryKey = currentQueryKey(page = nextPageNumber)
-            val nextPage =
-                runCatching {
-                    val pageSize = appPreferences.browsePageSizeFlow.first()
-                    val base = _state.value.series
-                    val baseIds = base.map { it.id }.toHashSet()
-                    fetchPageProgressive(
-                        page = nextPageNumber,
-                        pageSize = pageSize,
-                        cacheKey = if (cacheEnabled) queryKey else null,
-                    ) { progress ->
-                        val combined = base + progress.filter { it.id !in baseIds }
-                        _state.update { st ->
-                            st.copy(
-                                series = combined,
-                                isLoadingMore = true,
-                                error = null,
-                            )
+            try {
+                _state.update { it.copy(isLoadingMore = true, error = null) }
+                val nextPageNumber = current.currentPage + 1
+                val cacheEnabled = browseCacheAllowed()
+                val queryKey = currentQueryKey(page = nextPageNumber)
+                val nextPage =
+                    runCatching {
+                        val pageSize = appPreferences.browsePageSizeFlow.first()
+                        val base = _state.value.series
+                        val baseIds = base.map { it.id }.toHashSet()
+                        fetchPageProgressive(
+                            page = nextPageNumber,
+                            pageSize = pageSize,
+                            cacheKey = if (cacheEnabled) queryKey else null,
+                        ) { progress ->
+                            val combined = base + progress.filter { it.id !in baseIds }
+                            _state.update { st ->
+                                st.copy(
+                                    series = combined,
+                                    isLoadingMore = true,
+                                    error = null,
+                                )
+                            }
                         }
                     }
-                }
-                    .onFailure { e ->
-                        lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
-                        _state.update { st -> st.copy(isLoadingMore = false, error = e.message ?: "Failed to load page") }
-                    }.getOrNull() ?: return@launch
+                        .onFailure { e ->
+                            lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
+                            _state.update { st -> st.copy(isLoadingMore = false, error = e.message ?: "Failed to load page") }
+                        }.getOrNull() ?: return@launch
 
-            lastOfflineError = false
-            _state.update {
-                it.copy(
-                    series = (it.series + nextPage).distinctBy { s -> s.id },
-                    currentPage = nextPageNumber,
-                    canLoadMore = nextPage.isNotEmpty(),
-                    isLoadingMore = false,
-                )
-            }
-            if (cacheEnabled) {
-                runCatching { appPreferences.setLastBrowseRefresh(System.currentTimeMillis()) }
+                lastOfflineError = false
+                _state.update {
+                    it.copy(
+                        series = (it.series + nextPage).distinctBy { s -> s.id },
+                        currentPage = nextPageNumber,
+                        canLoadMore = nextPage.isNotEmpty(),
+                        isLoadingMore = false,
+                    )
+                }
+                if (cacheEnabled) {
+                    runCatching { appPreferences.setLastBrowseRefresh(System.currentTimeMillis()) }
+                }
+            } finally {
+                pagingInFlight.set(false)
             }
         }
     }
