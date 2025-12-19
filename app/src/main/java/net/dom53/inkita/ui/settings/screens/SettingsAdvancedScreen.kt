@@ -853,6 +853,15 @@ private suspend fun buildConfigSnapshot(
     context: android.content.Context,
     prefs: net.dom53.inkita.core.storage.AppPreferences,
 ): String {
+    val pkgInfo =
+        runCatching {
+            val pm = context.packageManager
+            val pkg = pm.getPackageInfo(context.packageName, 0)
+            pkg
+        }.getOrNull()
+    val versionName = pkgInfo?.versionName ?: net.dom53.inkita.BuildConfig.VERSION_NAME
+    val versionCode = pkgInfo?.longVersionCode ?: net.dom53.inkita.BuildConfig.VERSION_CODE.toLong()
+    val sdk = android.os.Build.VERSION.SDK_INT
     val cfg = prefs.configFlow.first()
     val hostMasked =
         if (cfg.serverUrl.isBlank()) {
@@ -886,6 +895,7 @@ private suspend fun buildConfigSnapshot(
 
     return buildString {
         appendLine("App: ${context.packageName}")
+        appendLine("Version: $versionName ($versionCode) SDK=$sdk")
         appendLine("ServerHost: $hostMasked")
         appendLine("Language: $lang")
         appendLine("Theme: $theme")
