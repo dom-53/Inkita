@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkMonitor
@@ -33,6 +34,7 @@ import net.dom53.inkita.domain.usecase.ReadStatusFilter
 import net.dom53.inkita.domain.usecase.SpecialFilter
 import net.dom53.inkita.domain.usecase.buildQueries
 import java.io.IOException
+import java.util.LinkedHashMap
 
 data class BrowseUiState(
     val isLoading: Boolean = true,
@@ -143,7 +145,24 @@ class BrowseViewModel(
             }
 
             val page =
-                runCatching { fetchPage(page = 1, pageSize = appPreferences.browsePageSizeFlow.first(), cacheKey = if (cacheEnabled) queryKey else null) }
+                runCatching {
+                    fetchPageProgressive(
+                        page = 1,
+                        pageSize = appPreferences.browsePageSizeFlow.first(),
+                        cacheKey = if (cacheEnabled) queryKey else null,
+                    ) { progress ->
+                        _state.update {
+                            it.copy(
+                                series = progress,
+                                currentPage = 1,
+                                canLoadMore = true,
+                                isLoading = true,
+                                isLoadingMore = false,
+                                error = null,
+                            )
+                        }
+                    }
+                }
                     .onFailure { e ->
                         lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
                         _state.update { st -> st.copy(isLoading = false, error = e.message ?: "Failed to load series") }
@@ -176,7 +195,22 @@ class BrowseViewModel(
             val nextPage =
                 runCatching {
                     val pageSize = appPreferences.browsePageSizeFlow.first()
-                    fetchPage(page = nextPageNumber, pageSize = pageSize, cacheKey = if (cacheEnabled) queryKey else null)
+                    val base = _state.value.series
+                    val baseIds = base.map { it.id }.toHashSet()
+                    fetchPageProgressive(
+                        page = nextPageNumber,
+                        pageSize = pageSize,
+                        cacheKey = if (cacheEnabled) queryKey else null,
+                    ) { progress ->
+                        val combined = base + progress.filter { it.id !in baseIds }
+                        _state.update { st ->
+                            st.copy(
+                                series = combined,
+                                isLoadingMore = true,
+                                error = null,
+                            )
+                        }
+                    }
                 }
                     .onFailure { e ->
                         lastOfflineError = e is IOException || (e.message?.contains("offline", ignoreCase = true) == true)
@@ -198,10 +232,11 @@ class BrowseViewModel(
         }
     }
 
-    private suspend fun fetchPage(
+    private suspend fun fetchPageProgressive(
         page: Int,
         pageSize: Int,
         cacheKey: String? = null,
+        onProgress: (List<Series>) -> Unit,
     ): List<Series> {
         val queries =
             buildQueries(
@@ -210,10 +245,28 @@ class BrowseViewModel(
                 page = page,
                 pageSize = pageSize,
             )
-        val results =
-            queries
-                .flatMap { seriesRepository.getSeries(it) }
-                .distinctBy { it.id }
+        val ordered = LinkedHashMap<Int, Series>()
+        val emitChunkSize = 3
+        for (query in queries) {
+            val items = seriesRepository.getSeries(query, prefetchThumbnails = false)
+            var pendingEmits = 0
+            for (item in items) {
+                if (!ordered.containsKey(item.id)) {
+                    ordered[item.id] = item
+                    pendingEmits++
+                    if (pendingEmits >= emitChunkSize) {
+                        onProgress(ordered.values.toList())
+                        pendingEmits = 0
+                        yield()
+                    }
+                }
+            }
+            if (pendingEmits > 0) {
+                onProgress(ordered.values.toList())
+                yield()
+            }
+        }
+        val results = ordered.values.toList()
         if (cacheKey != null) {
             seriesRepository.cacheBrowsePage(cacheKey, page, results)
         }

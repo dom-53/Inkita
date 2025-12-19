@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -117,6 +119,7 @@ fun BrowseScreen(
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
     )
+    val browsePageSize by appPreferences.browsePageSizeFlow.collectAsState(initial = 25)
 
     LaunchedEffect(gridState) {
         snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
@@ -147,17 +150,12 @@ fun BrowseScreen(
     // back handling solved via confirmValueChange in sheet state
 
     when {
-        uiState.isLoading -> {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        }
         uiState.error != null -> {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("${stringResource(R.string.general_error)}: ${uiState.error}")
             }
         }
-        uiState.series.isEmpty() -> {
+        uiState.series.isEmpty() && !uiState.isLoading -> {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(stringResource(R.string.general_no_results))
             }
@@ -194,14 +192,22 @@ fun BrowseScreen(
                         }
                     }
 
-                    SeriesGrid(
-                        seriesList = uiState.series,
-                        config = config,
-                        isLoadingMore = uiState.isLoadingMore,
-                        gridState = gridState,
-                        onSeriesClick = { onOpenSeries(it.id) },
-                        onLoadMore = { viewModel.loadNextPage() },
-                    )
+                    if (uiState.series.isEmpty() && uiState.isLoading) {
+                        PlaceholderSeriesGrid(
+                            placeholderCount = browsePageSize,
+                            gridState = gridState,
+                        )
+                    } else {
+                        SeriesGrid(
+                            seriesList = uiState.series,
+                            config = config,
+                            isLoadingMore = uiState.isLoadingMore,
+                            loadingPlaceholderCount = browsePageSize,
+                            gridState = gridState,
+                            onSeriesClick = { onOpenSeries(it.id) },
+                            onLoadMore = { viewModel.loadNextPage() },
+                        )
+                    }
                 }
 
                 FloatingActionButton(
@@ -509,10 +515,61 @@ fun BrowseScreen(
 }
 
 @Composable
+private fun PlaceholderSeriesGrid(
+    placeholderCount: Int,
+    gridState: LazyGridState,
+) {
+    val placeholderColor = MaterialTheme.colorScheme.surfaceVariant
+    val textColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.fillMaxSize(),
+        state = gridState,
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(placeholderCount) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(2f / 3f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(placeholderColor),
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth(0.9f)
+                            .height(12.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(textColor),
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth(0.6f)
+                            .height(10.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(textColor),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SeriesGrid(
     seriesList: List<Series>,
     config: AppConfig,
     isLoadingMore: Boolean,
+    loadingPlaceholderCount: Int,
     gridState: LazyGridState,
     onLoadMore: () -> Unit,
     onSeriesClick: (Series) -> Unit,
@@ -613,15 +670,36 @@ private fun SeriesGrid(
         }
 
         if (isLoadingMore) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center,
+            items(loadingPlaceholderCount, key = { "loading_$it" }) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    CircularProgressIndicator()
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth(0.9f)
+                                .height(12.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth(0.6f)
+                                .height(10.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
+                    )
                 }
             }
         }

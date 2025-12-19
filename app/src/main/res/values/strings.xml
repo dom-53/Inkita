@@ -129,6 +129,8 @@
     <string name="settings_cache_prefetch_details_subtitle">Cache series details (volumes/chapters) automatically at startup.</string>
     <string name="settings_browse_page_size_title">Browse page size</string>
     <string name="settings_browse_page_size_subtitle">How many items to load per page when browsing/searching. Use lower values on slow connections.</string>
+    <string name="settings_browse_thumb_parallel_title">Max thumbnails in parallel</string>
+    <string name="settings_browse_thumb_parallel_subtitle">Limit parallel thumbnail downloads to reduce network spikes.</string>
     <string name="settings_prefetch_allow_metered_title">Allow on cellular</string>
     <string name="settings_prefetch_allow_metered_subtitle">Enable prefetch on metered networks (mobile data).</string>
     <string name="settings_prefetch_allow_low_battery_title">Allow on low battery</string>

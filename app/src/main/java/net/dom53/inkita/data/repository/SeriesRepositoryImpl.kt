@@ -27,7 +27,10 @@ class SeriesRepositoryImpl(
     private val appPreferences: AppPreferences,
     private val cacheManager: CacheManager,
 ) : SeriesRepository {
-    override suspend fun getSeries(query: SeriesQuery): List<Series> {
+    override suspend fun getSeries(
+        query: SeriesQuery,
+        prefetchThumbnails: Boolean,
+    ): List<Series> {
         val config = appPreferences.configFlow.first()
 
         if (!config.isConfigured) {
@@ -63,7 +66,11 @@ class SeriesRepositoryImpl(
 
         val body = response.body() ?: emptyList()
         val domain = body.map { it.toDomain() }
-        return cacheManager.enrichThumbnails(domain)
+        return if (prefetchThumbnails) {
+            cacheManager.enrichThumbnails(domain)
+        } else {
+            domain
+        }
     }
 
     override suspend fun getSeriesDetail(seriesId: Int): SeriesDetail {
