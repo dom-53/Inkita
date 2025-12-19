@@ -72,6 +72,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.graphics.Brush
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import net.dom53.inkita.R
@@ -612,6 +614,16 @@ private fun SeriesGrid(
                         .clickable { onSeriesClick(series) },
             ) {
                 val imageData = series.localThumbPath?.let { java.io.File(it) } ?: seriesCoverUrl(config, series.id)
+                val imageRequest =
+                    imageData?.let {
+                        ImageRequest
+                            .Builder(context)
+                            .data(it)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .networkCachePolicy(CachePolicy.ENABLED)
+                            .build()
+                    }
                 Box(
                     modifier =
                         Modifier
@@ -622,7 +634,7 @@ private fun SeriesGrid(
                     contentAlignment = Alignment.Center,
                 ) {
                     SubcomposeAsyncImage(
-                        model = imageData,
+                        model = imageRequest,
                         contentDescription = series.name,
                         modifier = Modifier.matchParentSize(),
                         contentScale = ContentScale.Crop,
