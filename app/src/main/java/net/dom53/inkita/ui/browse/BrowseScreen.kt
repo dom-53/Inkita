@@ -3,6 +3,11 @@ package net.dom53.inkita.ui.browse
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,7 +40,6 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.ImageNotSupported
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -52,6 +56,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
@@ -64,6 +69,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.graphics.Brush
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -623,14 +629,9 @@ private fun SeriesGrid(
                     ) {
                         when (painter.state) {
                             is coil.compose.AsyncImagePainter.State.Loading -> {
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxSize(),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(26.dp))
-                                }
+                                ShimmerBox(
+                                    modifier = Modifier.matchParentSize(),
+                                )
                             }
                             is coil.compose.AsyncImagePainter.State.Error -> {
                                 Icon(
@@ -704,6 +705,34 @@ private fun SeriesGrid(
             }
         }
     }
+}
+
+@Composable
+private fun ShimmerBox(
+    modifier: Modifier,
+) {
+    val base = MaterialTheme.colorScheme.surfaceVariant
+    val highlight = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val progress by transition.animateFloat(
+        initialValue = -1f,
+        targetValue = 1f,
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 1700),
+                repeatMode = RepeatMode.Restart,
+            ),
+        label = "shimmer_progress",
+    )
+    val brush =
+        Brush.linearGradient(
+            colors = listOf(base, highlight, base),
+            start = Offset(x = -600f + (1200f * progress), y = 0f),
+            end = Offset(x = 0f + (1200f * progress), y = 300f),
+        )
+    Box(
+        modifier = modifier.background(brush),
+    )
 }
 
 private fun seriesCoverUrl(
