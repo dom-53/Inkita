@@ -544,9 +544,7 @@ private fun PlaceholderSeriesGrid(
 }
 
 @Composable
-private fun PlaceholderSeriesTile(
-    shimmerProgress: Float,
-) {
+private fun PlaceholderSeriesTile(shimmerProgress: Float) {
     Column(
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -729,16 +727,17 @@ private fun ShimmerBox(
 @Composable
 private fun rememberShimmerProgress(): Float {
     val transition = rememberInfiniteTransition(label = "shimmer")
-    return transition.animateFloat(
-        initialValue = -1f,
-        targetValue = 1f,
-        animationSpec =
-            infiniteRepeatable(
-                animation = tween(durationMillis = 1700),
-                repeatMode = RepeatMode.Restart,
-            ),
-        label = "shimmer_progress",
-    ).value
+    return transition
+        .animateFloat(
+            initialValue = -1f,
+            targetValue = 1f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation = tween(durationMillis = 1700),
+                    repeatMode = RepeatMode.Restart,
+                ),
+            label = "shimmer_progress",
+        ).value
 }
 
 private fun seriesCoverUrl(
