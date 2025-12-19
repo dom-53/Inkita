@@ -7,8 +7,8 @@ import androidx.work.Constraints
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import kotlinx.coroutines.flow.first
-import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.logging.LoggingManager
+import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.entity.DownloadTaskEntity
@@ -287,13 +287,17 @@ class DownloadManager(
      * Save the task as pending and trigger scheduling.
      * This does not enqueue WorkManager immediately (handled by maybeEnqueuePending).
      */
+    @Suppress("MaxLineLength")
     private suspend fun enqueueTask(task: DownloadTaskEntity) {
         // Ulož jako pending bez WorkManager requestu, limit zpracujeme níže
         val now = System.currentTimeMillis()
         val pending = task.copy(workId = null, state = DownloadTaskEntity.STATE_PENDING, updatedAt = now)
         val newId = downloadDao.upsertTask(pending)
         if (LoggingManager.isDebugEnabled()) {
-            LoggingManager.d("DownloadManager", "Queue task id=${if (pending.id == 0L) newId else pending.id} type=${pending.type} series=${pending.seriesId} chapter=${pending.chapterId} pages=${pending.pageStart}-${pending.pageEnd}")
+            LoggingManager.d(
+                "DownloadManager",
+                "Queue task id=${if (pending.id == 0L) newId else pending.id} type=${pending.type} series=${pending.seriesId} chapter=${pending.chapterId} pages=${pending.pageStart}-${pending.pageEnd}",
+            )
         }
         if (pending.id == 0L) {
             // Pokud bylo vloženo nové ID, uložíme ho zpět (kvůli dedupu/observingu)

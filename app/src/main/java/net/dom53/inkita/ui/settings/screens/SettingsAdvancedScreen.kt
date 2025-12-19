@@ -1,5 +1,8 @@
 package net.dom53.inkita.ui.settings.screens
 
+import android.content.Intent
+import android.os.Environment
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,9 +37,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import android.content.Intent
-import android.os.Environment
-import android.widget.Toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -756,11 +756,12 @@ fun SettingsAdvancedScreen(
                             if (saved == null) {
                                 Toast.makeText(context, R.string.advanced_logs_export_failed, Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.advanced_logs_saved, saved.absolutePath),
-                                    Toast.LENGTH_LONG,
-                                ).show()
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.getString(R.string.advanced_logs_saved, saved.absolutePath),
+                                        Toast.LENGTH_LONG,
+                                    ).show()
                             }
                         }
                     },
@@ -849,6 +850,7 @@ private fun formatTs(ts: Long): String {
     return sdf.format(java.util.Date(ts))
 }
 
+@Suppress("MaxLineLength")
 private suspend fun buildConfigSnapshot(
     context: android.content.Context,
     prefs: net.dom53.inkita.core.storage.AppPreferences,
@@ -860,7 +862,9 @@ private suspend fun buildConfigSnapshot(
             pkg
         }.getOrNull()
     val versionName = pkgInfo?.versionName ?: net.dom53.inkita.BuildConfig.VERSION_NAME
-    val versionCode = pkgInfo?.longVersionCode ?: net.dom53.inkita.BuildConfig.VERSION_CODE.toLong()
+    val versionCode =
+        pkgInfo?.longVersionCode ?: net.dom53.inkita.BuildConfig.VERSION_CODE
+            .toLong()
     val sdk = android.os.Build.VERSION.SDK_INT
     val cfg = prefs.configFlow.first()
     val hostMasked =

@@ -87,11 +87,12 @@ object StartupManager {
         preferences.configFlow
             .onEach { config ->
                 val host =
-                    kotlin.runCatching {
-                        val raw = config.serverUrl
-                        val parsed = java.net.URI(if (raw.startsWith("http")) raw else "https://$raw")
-                        parsed.host ?: raw
-                    }.getOrDefault("")
+                    kotlin
+                        .runCatching {
+                            val raw = config.serverUrl
+                            val parsed = java.net.URI(if (raw.startsWith("http")) raw else "https://$raw")
+                            parsed.host ?: raw
+                        }.getOrDefault("")
                 LoggingManager.updateHostMask(host)
             }.launchIn(logScope)
         preferences.verboseLoggingFlow

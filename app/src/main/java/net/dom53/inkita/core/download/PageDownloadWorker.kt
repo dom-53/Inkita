@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
+import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.notification.AppNotificationManager
 import net.dom53.inkita.core.storage.AppPreferences
@@ -21,7 +22,6 @@ import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import okio.buffer
 import okio.sink
 import retrofit2.HttpException

@@ -2,10 +2,10 @@ package net.dom53.inkita.core.network
 
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.data.api.KavitaApi
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
-import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.converter.scalars.ScalarsConverterFactory
@@ -65,5 +65,4 @@ object KavitaApiFactory {
         val retrofit = baseRetrofitBuilder(baseUrl, client).build()
         return retrofit.create(KavitaApi::class.java)
     }
-
 }

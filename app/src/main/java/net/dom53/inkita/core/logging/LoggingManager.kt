@@ -3,6 +3,10 @@ package net.dom53.inkita.core.logging
 import android.content.Context
 import android.os.Environment
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -10,10 +14,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 /**
  * Logging wrapper that writes to logcat and to rotating log files for debugging.
@@ -141,14 +141,20 @@ object LoggingManager {
             try {
                 val file = currentFile(dir)
                 val ts = timestampFormat.format(Date())
-                val payload = buildString {
-                    append(ts).append(" ").append(level).append("/").append(tag).append(": ")
-                    append(scrub(msg))
-                    if (tr != null) {
-                        append("\n").append(Log.getStackTraceString(tr))
+                val payload =
+                    buildString {
+                        append(ts)
+                            .append(" ")
+                            .append(level)
+                            .append("/")
+                            .append(tag)
+                            .append(": ")
+                        append(scrub(msg))
+                        if (tr != null) {
+                            append("\n").append(Log.getStackTraceString(tr))
+                        }
+                        append("\n")
                     }
-                    append("\n")
-                }
                 FileOutputStream(file, true).bufferedWriter().use { it.write(payload) }
                 rotateIfNeeded(file, dir)
                 pruneOldFiles()
@@ -161,16 +167,21 @@ object LoggingManager {
 
     private fun currentFile(dir: File): File {
         val existing =
-            dir.listFiles { file -> file.name.startsWith(FILE_PREFIX) && file.extension == "txt" }
+            dir
+                .listFiles { file -> file.name.startsWith(FILE_PREFIX) && file.extension == "txt" }
                 ?.maxByOrNull { it.lastModified() }
         return existing ?: File(dir, "$FILE_PREFIX-1.txt")
     }
 
-    private fun rotateIfNeeded(file: File, dir: File) {
+    private fun rotateIfNeeded(
+        file: File,
+        dir: File,
+    ) {
         if (file.length() <= MAX_FILE_SIZE_BYTES) return
         // Shift older files
         val files =
-            dir.listFiles { f -> f.name.startsWith(FILE_PREFIX) && f.extension == "txt" }
+            dir
+                .listFiles { f -> f.name.startsWith(FILE_PREFIX) && f.extension == "txt" }
                 ?.sortedByDescending { it.nameWithoutExtension }
                 ?: emptyList()
         files.forEach { f ->
@@ -191,12 +202,14 @@ object LoggingManager {
         val dir = logDir ?: return
         val now = System.currentTimeMillis()
         val files =
-            dir.listFiles { f -> f.name.startsWith(FILE_PREFIX) && f.extension == "txt" }
+            dir
+                .listFiles { f -> f.name.startsWith(FILE_PREFIX) && f.extension == "txt" }
                 ?.sortedBy { it.lastModified() }
                 ?: return
         files.filter { now - it.lastModified() > MAX_FILE_AGE_MS }.forEach { runCatching { it.delete() } }
         val remaining =
-            dir.listFiles { f -> f.name.startsWith(FILE_PREFIX) && f.extension == "txt" }
+            dir
+                .listFiles { f -> f.name.startsWith(FILE_PREFIX) && f.extension == "txt" }
                 ?.sortedBy { it.lastModified() }
                 ?: return
         if (remaining.size <= MAX_FILES) return
@@ -248,8 +261,8 @@ object LoggingManager {
         files: List<File>,
         extras: Map<String, String>,
         target: File,
-    ): File? {
-        return runCatching {
+    ): File? =
+        runCatching {
             ZipOutputStream(FileOutputStream(target)).use { zos ->
                 files.forEach { f ->
                     zos.putNextEntry(ZipEntry(f.name))
@@ -265,5 +278,4 @@ object LoggingManager {
             }
             target
         }.getOrNull()
-    }
 }
