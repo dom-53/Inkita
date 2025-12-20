@@ -22,6 +22,8 @@ All notable changes to this project will be documented here.
 - Browse: Guarded paging requests to avoid duplicate page loads during fast scrolling.
 - Browse: Search field now includes a clear (X) button that resets the query and reloads results.
 - Browse: Fresh cache no longer blocks loading additional pages; pagination continues beyond the first cached page.
+- Reader: Refactored to use a shared BaseReader interface with separate EPUB/PDF renderers.
+- Reader: Split into BaseReaderScreen with dedicated EPUB/PDF screens for easier per-format customization.
 
 ## v0.2.0-beta.1
 
