@@ -6,5 +6,5 @@ import net.dom53.inkita.domain.model.Library
 fun LibraryDto.toDomain(): Library =
     Library(
         id = id,
-        name = name,
+        name = name.orEmpty(),
     )

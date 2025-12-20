@@ -54,17 +54,17 @@ fun SeriesDto.toDomain(): Series {
     val readState = computeReadState(pagesRead, pages)
     return Series(
         id = id,
-        name = name,
-        summary = summary,
+        name = name.orEmpty(),
+        summary = null,
         libraryId = libraryId,
         format = Format.fromId(format),
         pages = pages,
         pagesRead = pagesRead,
         readState = readState,
-        minHoursToRead = minHoursToRead,
-        maxHoursToRead = maxHoursToRead,
-        avgHoursToRead = avgHoursToRead,
-        localThumbPath = localThumbPath,
+        minHoursToRead = minHoursToRead?.toDouble(),
+        maxHoursToRead = maxHoursToRead?.toDouble(),
+        avgHoursToRead = avgHoursToRead?.toDouble(),
+        localThumbPath = null,
     )
 }
 

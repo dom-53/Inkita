@@ -65,9 +65,10 @@ import net.dom53.inkita.ui.download.DownloadQueueScreen
 import net.dom53.inkita.ui.download.DownloadQueueViewModelFactory
 import net.dom53.inkita.ui.history.HistoryScreen
 import net.dom53.inkita.ui.library.LibraryScreen
+import net.dom53.inkita.ui.library.LibraryV2Screen
 import net.dom53.inkita.ui.navigation.MainScreen
 import net.dom53.inkita.ui.reader.ReaderScreen
-import net.dom53.inkita.ui.seriesdetail.SeriesDetailScreen
+import net.dom53.inkita.ui.seriesdetail.SeriesDetailScreenV2
 import net.dom53.inkita.ui.settings.SettingsScreen
 import net.dom53.inkita.ui.theme.InkitaTheme
 import net.dom53.inkita.ui.updates.UpdatesScreen
@@ -286,18 +287,28 @@ fun InkitaApp(
                     startDestination = MainScreen.Library.route,
                     modifier = Modifier.padding(innerPadding),
                 ) {
-                    composable(MainScreen.Library.route) {
-                        LibraryScreen(
-                            seriesRepository = seriesRepository,
-                            collectionsRepository = collectionsRepository,
-                            appPreferences = appPreferences,
-                            cacheManager = cacheManager,
-                            onOpenSeries = { seriesId ->
-                                navController.navigate("series/$seriesId")
-                            },
-                        )
-                    }
-                    composable(MainScreen.Updates.route) { UpdatesScreen() }
+                composable(MainScreen.Library.route) {
+                    LibraryScreen(
+                        seriesRepository = seriesRepository,
+                        collectionsRepository = collectionsRepository,
+                        appPreferences = appPreferences,
+                        cacheManager = cacheManager,
+                        onOpenSeries = { seriesId ->
+                            navController.navigate("series/$seriesId")
+                        },
+                    )
+                }
+                composable(MainScreen.LibraryV2.route) {
+                    LibraryV2Screen(
+                        libraryRepository = libraryRepository,
+                        seriesRepository = seriesRepository,
+                        appPreferences = appPreferences,
+                        onOpenSeries = { seriesId ->
+                            navController.navigate("series/$seriesId")
+                        },
+                    )
+                }
+                composable(MainScreen.Updates.route) { UpdatesScreen() }
                     composable(MainScreen.History.route) {
                         HistoryScreen(
                             appPreferences = appPreferences,
@@ -337,26 +348,11 @@ fun InkitaApp(
                                     "reader_return",
                                     null,
                                 ).collectAsState(initial = null)
-                        SeriesDetailScreen(
-                            seriesId = seriesId,
-                            seriesRepository = seriesRepository,
-                            appPreferences = appPreferences,
-                            collectionsRepository = collectionsRepository,
-                            readerRepository = readerRepository,
-                            readerReturn = readerReturn.value,
-                            onConsumeReaderReturn = { entry.savedStateHandle["reader_return"] = null },
-                            onBack = { navController.popBackStack() },
-                            onOpenSeries = { targetId ->
-                                navController.navigate("series/$targetId")
-                            },
-                            onOpenDownloads = {
-                                navController.navigate(MainScreen.Downloads.route)
-                            },
-                            onOpenReader = { chapterId, page, sId, vId, fmt ->
-                                navController.navigate("reader/$chapterId?page=${page ?: 0}&sid=$sId&vid=$vId&fmt=${fmt ?: 0}")
-                            },
-                        )
-                    }
+                    SeriesDetailScreenV2(
+                        seriesId = seriesId,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
                     composable("settings/about") {
                         net.dom53.inkita.ui.settings.screens.SettingsAboutScreen(
                             onBack = { navController.popBackStack() },

@@ -8,6 +8,7 @@ import net.dom53.inkita.data.api.dto.FilterV2Dto
 import net.dom53.inkita.data.api.dto.LanguageDto
 import net.dom53.inkita.data.api.dto.LibraryDto
 import net.dom53.inkita.data.api.dto.NamedDto
+import net.dom53.inkita.data.api.dto.RecentlyAddedItemDto
 import net.dom53.inkita.data.api.dto.SeriesDto
 import okhttp3.ResponseBody
 import retrofit2.Response
@@ -115,6 +116,26 @@ interface KavitaApi {
 
     @GET("api/library/libraries")
     suspend fun getLibrariesFilter(): Response<List<LibraryDto>>
+
+    @POST("api/Series/on-deck")
+    suspend fun getOnDeckSeries(
+        @Query("libraryId") libraryId: Int = 0,
+        @Query("PageNumber") pageNumber: Int,
+        @Query("PageSize") pageSize: Int,
+    ): Response<List<SeriesDto>>
+
+    @POST("api/Series/recently-updated-series")
+    suspend fun getRecentlyUpdatedSeries(
+        @Query("PageNumber") pageNumber: Int,
+        @Query("PageSize") pageSize: Int,
+    ): Response<List<RecentlyAddedItemDto>>
+
+    @POST("api/Series/recently-added-v2")
+    suspend fun getRecentlyAddedSeries(
+        @Body filter: FilterV2Dto,
+        @Query("PageNumber") pageNumber: Int,
+        @Query("PageSize") pageSize: Int,
+    ): Response<List<SeriesDto>>
 
     @GET("api/Filter")
     suspend fun getFilters(): Response<List<FilterDefinitionDto>>

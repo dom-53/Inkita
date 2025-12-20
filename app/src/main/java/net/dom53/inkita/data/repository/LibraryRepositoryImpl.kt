@@ -31,7 +31,7 @@ class LibraryRepositoryImpl(
                 apiKey = config.apiKey,
             )
 
-        val response = api.getLibraries()
+        val response = api.getLibrariesFilter()
 
         if (!response.isSuccessful) {
             throw Exception("HTTP ${response.code()} ${response.message()}")

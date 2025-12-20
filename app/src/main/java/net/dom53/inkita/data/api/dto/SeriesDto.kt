@@ -1,19 +1,36 @@
 package net.dom53.inkita.data.api.dto
 
-/**
- * Zjednodušené DTO pro sérii.
- * Pokud openapi obsahuje víc polí, můžeš je doplnit.
- */
 data class SeriesDto(
     val id: Int,
-    val name: String,
-    val summary: String?,
-    val libraryId: Int?,
-    val format: Int?,
+    val name: String? = null,
+    val originalName: String? = null,
+    val localizedName: String? = null,
+    val sortName: String? = null,
     val pages: Int? = null,
+    val coverImageLocked: Boolean? = null,
+    val lastChapterAdded: String? = null,
+    val lastChapterAddedUtc: String? = null,
+    val userRating: Float? = null,
+    val hasUserRated: Boolean? = null,
+    val totalReads: Int? = null,
     val pagesRead: Int? = null,
-    val minHoursToRead: Double? = null,
-    val maxHoursToRead: Double? = null,
-    val avgHoursToRead: Double? = null,
-    val localThumbPath: String? = null,
+    val latestReadDate: String? = null,
+    val format: Int? = null,
+    val created: String? = null,
+    val sortNameLocked: Boolean? = null,
+    val localizedNameLocked: Boolean? = null,
+    val wordCount: Long? = null,
+    val libraryId: Int? = null,
+    val libraryName: String? = null,
+    val minHoursToRead: Int? = null,
+    val maxHoursToRead: Int? = null,
+    val avgHoursToRead: Float? = null,
+    val folderPath: String? = null,
+    val lowestFolderPath: String? = null,
+    val lastFolderScanned: String? = null,
+    val dontMatch: Boolean? = null,
+    val isBlacklisted: Boolean? = null,
+    val coverImage: String? = null,
+    val primaryColor: String? = null,
+    val secondaryColor: String? = null,
 )
