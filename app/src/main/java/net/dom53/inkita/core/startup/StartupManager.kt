@@ -22,11 +22,13 @@ import net.dom53.inkita.data.repository.AuthRepositoryImpl
 import net.dom53.inkita.data.repository.CollectionsRepositoryImpl
 import net.dom53.inkita.data.repository.LibraryRepositoryImpl
 import net.dom53.inkita.data.repository.ReaderRepositoryImpl
+import net.dom53.inkita.data.repository.ReadingListRepositoryImpl
 import net.dom53.inkita.data.repository.SeriesRepositoryImpl
 import net.dom53.inkita.domain.repository.AuthRepository
 import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
 import net.dom53.inkita.domain.repository.ReaderRepository
+import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
 import java.io.File
 
@@ -40,6 +42,7 @@ object StartupManager {
         val libraryRepository: LibraryRepository,
         val seriesRepository: SeriesRepository,
         val collectionsRepository: CollectionsRepository,
+        val readingListRepository: ReadingListRepository,
         val authRepository: AuthRepository,
         val readerRepository: ReaderRepository,
     )
@@ -74,6 +77,7 @@ object StartupManager {
         val libraryRepository: LibraryRepository = LibraryRepositoryImpl(appContext, preferences)
         val seriesRepository: SeriesRepository = SeriesRepositoryImpl(appContext, preferences, cacheManager)
         val collectionsRepository: CollectionsRepository = CollectionsRepositoryImpl(appContext, preferences)
+        val readingListRepository: ReadingListRepository = ReadingListRepositoryImpl(appContext, preferences)
         val authRepository: AuthRepository = AuthRepositoryImpl(preferences)
         val networkMonitor = NetworkMonitor.getInstance(appContext, preferences)
         val isDebuggable = (appContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
@@ -128,6 +132,7 @@ object StartupManager {
                 libraryRepository = libraryRepository,
                 seriesRepository = seriesRepository,
                 collectionsRepository = collectionsRepository,
+                readingListRepository = readingListRepository,
                 authRepository = authRepository,
                 readerRepository = readerRepository,
             )

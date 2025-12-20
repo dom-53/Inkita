@@ -8,7 +8,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import net.dom53.inkita.domain.model.Library
+import net.dom53.inkita.domain.model.Collection
+import net.dom53.inkita.domain.model.ReadingList
+import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
+import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
 
 data class HomeSeriesItem(
@@ -19,6 +23,8 @@ data class HomeSeriesItem(
 enum class LibraryV2Section {
     Home,
     WantToRead,
+    Collections,
+    ReadingList,
 }
 
 data class LibraryV2UiState(
@@ -33,12 +39,25 @@ data class LibraryV2UiState(
     val wantToRead: List<net.dom53.inkita.domain.model.Series> = emptyList(),
     val isWantToReadLoading: Boolean = false,
     val wantToReadError: String? = null,
+    val collections: List<Collection> = emptyList(),
+    val isCollectionsLoading: Boolean = false,
+    val collectionsError: String? = null,
+    val selectedCollectionId: Int? = null,
+    val selectedCollectionName: String? = null,
+    val collectionSeries: List<net.dom53.inkita.domain.model.Series> = emptyList(),
+    val isCollectionSeriesLoading: Boolean = false,
+    val collectionSeriesError: String? = null,
+    val readingLists: List<ReadingList> = emptyList(),
+    val isReadingListsLoading: Boolean = false,
+    val readingListsError: String? = null,
     val selectedSection: LibraryV2Section = LibraryV2Section.Home,
 )
 
 class LibraryV2ViewModel(
     private val libraryRepository: LibraryRepository,
     private val seriesRepository: SeriesRepository,
+    private val collectionsRepository: CollectionsRepository,
+    private val readingListRepository: ReadingListRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(LibraryV2UiState())
     val state: StateFlow<LibraryV2UiState> = _state
@@ -53,6 +72,42 @@ class LibraryV2ViewModel(
         if (section == LibraryV2Section.WantToRead) {
             ensureWantToRead()
         }
+        if (section == LibraryV2Section.Collections) {
+            ensureCollections()
+        }
+        if (section == LibraryV2Section.ReadingList) {
+            ensureReadingLists()
+        }
+    }
+
+    fun selectCollection(collection: Collection?) {
+        if (collection == null) {
+            _state.update {
+                it.copy(
+                    selectedCollectionId = null,
+                    selectedCollectionName = null,
+                    collectionSeries = emptyList(),
+                    collectionSeriesError = null,
+                )
+            }
+            return
+        }
+
+        if (_state.value.selectedCollectionId == collection.id &&
+            _state.value.collectionSeries.isNotEmpty()
+        ) {
+            return
+        }
+
+        _state.update {
+            it.copy(
+                selectedCollectionId = collection.id,
+                selectedCollectionName = collection.name,
+                collectionSeries = emptyList(),
+                collectionSeriesError = null,
+            )
+        }
+        loadCollectionSeries(collection.id)
     }
 
     private fun loadLibraries() {
@@ -128,15 +183,68 @@ class LibraryV2ViewModel(
         }
     }
 
+    private fun ensureCollections() {
+        val current = _state.value
+        if (current.isCollectionsLoading || current.collections.isNotEmpty()) return
+        viewModelScope.launch {
+            _state.update { it.copy(isCollectionsLoading = true, collectionsError = null) }
+            val result = runCatching { collectionsRepository.getCollectionsAll(ownedOnly = false) }
+            _state.update {
+                it.copy(
+                    collections = result.getOrDefault(emptyList()),
+                    isCollectionsLoading = false,
+                    collectionsError = result.exceptionOrNull()?.message,
+                )
+            }
+        }
+    }
+
+    private fun ensureReadingLists() {
+        val current = _state.value
+        if (current.isReadingListsLoading || current.readingLists.isNotEmpty()) return
+        viewModelScope.launch {
+            _state.update { it.copy(isReadingListsLoading = true, readingListsError = null) }
+            val result = runCatching { readingListRepository.getReadingLists(includePromoted = true, sortByLastModified = false) }
+            _state.update {
+                it.copy(
+                    readingLists = result.getOrDefault(emptyList()),
+                    isReadingListsLoading = false,
+                    readingListsError = result.exceptionOrNull()?.message,
+                )
+            }
+        }
+    }
+
+    private fun loadCollectionSeries(collectionId: Int) {
+        viewModelScope.launch {
+            _state.update { it.copy(isCollectionSeriesLoading = true, collectionSeriesError = null) }
+            val result = runCatching { seriesRepository.getSeriesForCollection(collectionId, 1, 50) }
+            _state.update {
+                it.copy(
+                    collectionSeries = result.getOrDefault(emptyList()),
+                    isCollectionSeriesLoading = false,
+                    collectionSeriesError = result.exceptionOrNull()?.message,
+                )
+            }
+        }
+    }
+
     companion object {
         fun provideFactory(
             libraryRepository: LibraryRepository,
             seriesRepository: SeriesRepository,
+            collectionsRepository: CollectionsRepository,
+            readingListRepository: ReadingListRepository,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return LibraryV2ViewModel(libraryRepository, seriesRepository) as T
+                    return LibraryV2ViewModel(
+                        libraryRepository,
+                        seriesRepository,
+                        collectionsRepository,
+                        readingListRepository,
+                    ) as T
                 }
             }
     }

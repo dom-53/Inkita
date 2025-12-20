@@ -35,6 +35,12 @@ interface SeriesRepository {
         pageSize: Int,
     ): List<Series>
 
+    suspend fun getSeriesForCollection(
+        collectionId: Int,
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<Series>
+
     /**
      Cached series stored locally (best-effort).
      */

@@ -104,6 +104,7 @@ class MainActivity : AppCompatActivity() {
                 authRepository = components.authRepository,
                 seriesRepository = components.seriesRepository,
                 collectionsRepository = components.collectionsRepository,
+                readingListRepository = components.readingListRepository,
                 readerRepository = components.readerRepository,
                 cacheManager = components.cacheManager,
             )
@@ -137,6 +138,7 @@ fun InkitaApp(
     authRepository: AuthRepository,
     seriesRepository: SeriesRepository,
     collectionsRepository: CollectionsRepository,
+    readingListRepository: net.dom53.inkita.domain.repository.ReadingListRepository,
     readerRepository: net.dom53.inkita.domain.repository.ReaderRepository,
     cacheManager: CacheManager,
 ) {
@@ -181,7 +183,7 @@ fun InkitaApp(
     val currentRoute = backStackEntry?.destination?.route
     val mainRoutes = MainScreen.items.map { it.route }
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
 
     InkitaTheme(darkTheme = darkTheme, dynamicColor = false) {
@@ -302,6 +304,8 @@ fun InkitaApp(
                     LibraryV2Screen(
                         libraryRepository = libraryRepository,
                         seriesRepository = seriesRepository,
+                        collectionsRepository = collectionsRepository,
+                        readingListRepository = readingListRepository,
                         appPreferences = appPreferences,
                         onOpenSeries = { seriesId ->
                             navController.navigate("series/$seriesId")

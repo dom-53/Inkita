@@ -9,6 +9,7 @@ import net.dom53.inkita.data.api.dto.LanguageDto
 import net.dom53.inkita.data.api.dto.LibraryDto
 import net.dom53.inkita.data.api.dto.NamedDto
 import net.dom53.inkita.data.api.dto.RecentlyAddedItemDto
+import net.dom53.inkita.data.api.dto.ReadingListDto
 import net.dom53.inkita.data.api.dto.SeriesDto
 import okhttp3.ResponseBody
 import retrofit2.Response
@@ -26,6 +27,19 @@ interface KavitaApi {
     suspend fun getCollections(): Response<List<CollectionDto>>
 
     @GET("api/Collection")
+    suspend fun getCollectionsAll(
+        @Query("ownedOnly") ownedOnly: Boolean = false,
+    ): Response<List<AppUserCollectionDto>>
+
+    @POST("api/ReadingList/lists")
+    suspend fun getReadingLists(
+        @Query("includePromoted") includePromoted: Boolean = true,
+        @Query("sortByLastModified") sortByLastModified: Boolean = false,
+        @Query("PageNumber") pageNumber: Int = 1,
+        @Query("PageSize") pageSize: Int = 50,
+    ): Response<List<ReadingListDto>>
+
+    @GET("api/Collection")
     suspend fun getOwnedCollections(
         @Query("ownedOnly") ownedOnly: Boolean = true,
     ): Response<List<CollectionDto>>
@@ -41,6 +55,14 @@ interface KavitaApi {
         @Body filter: FilterV2Dto,
         @Query("PageNumber") pageNumber: Int,
         @Query("PageSize") pageSize: Int,
+    ): Response<List<SeriesDto>>
+
+    @POST("api/Series/all-v2")
+    suspend fun getAllSeriesV2(
+        @Body filter: FilterV2Dto,
+        @Query("PageNumber") pageNumber: Int,
+        @Query("PageSize") pageSize: Int,
+        @Query("context") context: Int,
     ): Response<List<SeriesDto>>
 
     @GET("api/Series/series-by-collection")

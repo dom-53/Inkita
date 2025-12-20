@@ -24,6 +24,7 @@ enum class ReaderThemeMode { Light, Dark, DarkHighContrast, Sepia, SepiaHighCont
 data class AppConfig(
     val serverUrl: String,
     val apiKey: String,
+    val imageApiKey: String,
     val userId: Int,
 ) {
     val isConfigured: Boolean
@@ -109,6 +110,12 @@ class AppPreferences(
                 apiKey =
                     secureStorage.getApiKey().ifBlank {
                         prefs[KEY_API_KEY] ?: ""
+                    },
+                imageApiKey =
+                    secureStorage.getImageApiKey().ifBlank {
+                        secureStorage.getApiKey().ifBlank {
+                            prefs[KEY_API_KEY] ?: ""
+                        }
                     },
                 userId = prefs[KEY_USER_ID]?.toIntOrNull() ?: 0,
             )
@@ -206,6 +213,7 @@ class AppPreferences(
     suspend fun updateKavitaConfig(
         serverUrl: String,
         apiKey: String,
+        imageApiKey: String,
         userId: Int = 0,
     ) {
         context.dataStore.edit { prefs ->
@@ -214,6 +222,7 @@ class AppPreferences(
             prefs[KEY_USER_ID] = userId.toString()
         }
         secureStorage.setApiKey(apiKey)
+        secureStorage.setImageApiKey(imageApiKey)
     }
 
     suspend fun clearAuth(clearServer: Boolean = false) {

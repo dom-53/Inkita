@@ -28,10 +28,19 @@ class SecureStorage(
 
     fun getApiKey(): String = safeGet(KEY_API_KEY)
 
+    fun getImageApiKey(): String = safeGet(KEY_IMAGE_API_KEY)
+
     fun setApiKey(apiKey: String) {
         prefs
             .edit()
             .putString(KEY_API_KEY, apiKey)
+            .apply()
+    }
+
+    fun setImageApiKey(apiKey: String) {
+        prefs
+            .edit()
+            .putString(KEY_IMAGE_API_KEY, apiKey)
             .apply()
     }
 
@@ -54,6 +63,7 @@ class SecureStorage(
 
     companion object {
         private const val KEY_API_KEY = "api_key"
+        private const val KEY_IMAGE_API_KEY = "image_api_key"
         private const val KEY_TOKEN = "token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
     }

@@ -128,7 +128,7 @@ fun BrowseScreen(
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
     val browsePageSize by appPreferences.browsePageSizeFlow.collectAsState(initial = 25)
     val disableBrowseThumbnails by appPreferences.disableBrowseThumbnailsFlow.collectAsState(initial = false)

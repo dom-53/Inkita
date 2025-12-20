@@ -176,6 +176,7 @@
     <string name="history_no_history">No history yet.</string>
     <!-- ibrary Screen-->
     <string name="library_empty_want_to_read">You have no titles marked as \'want to read\'.</string>
+    <string name="library_empty_reading_list">No reading lists found.</string>
     <!-- Reader screen-->
     <string name="reader_title">Reader</string>
     <string name="reader_no_previous_chapter">No previous chapter</string>
@@ -243,6 +244,7 @@
     <string name="settings_kavita_server">Kavita server URL</string>
     <string name="settings_kavita_use_https">Use HTTPS</string>
     <string name="settings_kavita_api_key">API key</string>
+    <string name="settings_kavita_image_api_key">Images API key</string>
     <string name="settings_kavita_status_in">Status: configured (API key saved)</string>
     <string name="settings_kavita_status_out">Status: not configured</string>
     <string name="settings_kavita_button_login">Save</string>

@@ -4,6 +4,7 @@ interface AuthRepository {
     suspend fun configure(
         serverUrl: String,
         apiKey: String,
+        imageApiKey: String,
         userId: Int = 0,
     )
 }

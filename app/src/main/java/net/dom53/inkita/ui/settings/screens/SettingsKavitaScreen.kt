@@ -53,11 +53,15 @@ fun SettingsKavitaScreen(
     var serverUrl by remember { mutableStateOf("") }
     var apiKeyInput by remember { mutableStateOf("") }
     var storedApiKey by remember { mutableStateOf("") }
+    var imageApiKeyInput by remember { mutableStateOf("") }
+    var storedImageApiKey by remember { mutableStateOf("") }
     var isConfigured by remember { mutableStateOf(false) }
     var isEditingApiKey by remember { mutableStateOf(false) }
+    var isEditingImageApiKey by remember { mutableStateOf(false) }
     var showHttpWarning by remember { mutableStateOf(false) }
     var pendingUrl by remember { mutableStateOf("") }
     var pendingApiKey by remember { mutableStateOf("") }
+    var pendingImageApiKey by remember { mutableStateOf("") }
     var warningFromSave by remember { mutableStateOf(false) }
     var useHttps by remember { mutableStateOf(true) }
 
@@ -73,12 +77,16 @@ fun SettingsKavitaScreen(
             serverUrl = normalized
             useHttps = !config.serverUrl.startsWith("http://", ignoreCase = true)
             storedApiKey = config.apiKey
+            storedImageApiKey = config.imageApiKey
             isConfigured = config.isConfigured
             isEditingApiKey = false
             apiKeyInput = ""
+            isEditingImageApiKey = false
+            imageApiKeyInput = ""
             showHttpWarning = false
             pendingUrl = ""
             pendingApiKey = ""
+            pendingImageApiKey = ""
             warningFromSave = false
         }
     }
@@ -153,6 +161,35 @@ fun SettingsKavitaScreen(
                             }
                         },
             )
+            OutlinedTextField(
+                value =
+                    if (!isEditingImageApiKey && isConfigured && storedImageApiKey.isNotBlank()) {
+                        "********"
+                    } else {
+                        imageApiKeyInput
+                    },
+                onValueChange = { new ->
+                    imageApiKeyInput = new
+                    isEditingImageApiKey = true
+                },
+                label = { Text(stringResource(R.string.settings_kavita_image_api_key)) },
+                visualTransformation =
+                    if (isConfigured && !isEditingImageApiKey && storedImageApiKey.isNotBlank()) {
+                        PasswordVisualTransformation()
+                    } else {
+                        VisualTransformation.None
+                    },
+                singleLine = true,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { focus ->
+                            if (focus.isFocused && !isEditingImageApiKey) {
+                                imageApiKeyInput = ""
+                                isEditingImageApiKey = true
+                            }
+                        },
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -198,6 +235,13 @@ fun SettingsKavitaScreen(
                                     isConfigured && storedApiKey.isNotBlank() -> storedApiKey
                                     else -> ""
                                 }
+                            val candidateImageKey =
+                                when {
+                                    imageApiKeyInput.isNotBlank() -> imageApiKeyInput.trim()
+                                    isConfigured && storedImageApiKey.isNotBlank() -> storedImageApiKey
+                                    candidateKey.isNotBlank() -> candidateKey
+                                    else -> ""
+                                }
 
                             if (serverUrl.isBlank() || candidateKey.isBlank()) {
                                 snackbarHostState.showSnackbar(
@@ -216,6 +260,7 @@ fun SettingsKavitaScreen(
                             if (!useHttps) {
                                 pendingUrl = builtUrl
                                 pendingApiKey = candidateKey
+                                pendingImageApiKey = candidateImageKey
                                 warningFromSave = true
                                 showHttpWarning = true
                                 return@launch
@@ -224,12 +269,16 @@ fun SettingsKavitaScreen(
                             authRepository.configure(
                                 serverUrl = builtUrl,
                                 apiKey = candidateKey,
+                                imageApiKey = candidateImageKey,
                             )
 
                             storedApiKey = candidateKey
+                            storedImageApiKey = candidateImageKey
                             serverUrl = host
                             apiKeyInput = ""
                             isEditingApiKey = false
+                            imageApiKeyInput = ""
+                            isEditingImageApiKey = false
                             snackbarHostState.showSnackbar(context.getString(R.string.settings_kavita_saved_toast))
                         } catch (e: Exception) {
                             snackbarHostState.showSnackbar(
@@ -266,11 +315,15 @@ fun SettingsKavitaScreen(
                                     authRepository.configure(
                                         serverUrl = pendingUrl,
                                         apiKey = pendingApiKey,
+                                        imageApiKey = pendingImageApiKey.ifBlank { pendingApiKey },
                                     )
                                     storedApiKey = pendingApiKey
+                                    storedImageApiKey = pendingImageApiKey.ifBlank { pendingApiKey }
                                     serverUrl = host
                                     apiKeyInput = ""
                                     isEditingApiKey = false
+                                    imageApiKeyInput = ""
+                                    isEditingImageApiKey = false
                                     showHttpWarning = false
                                     warningFromSave = false
                                     snackbarHostState.showSnackbar(context.getString(R.string.settings_kavita_saved_toast))

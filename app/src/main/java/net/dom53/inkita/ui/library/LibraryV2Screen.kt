@@ -55,34 +55,49 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.activity.compose.BackHandler
+import net.dom53.inkita.R
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
+import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
+import net.dom53.inkita.ui.common.collectionCoverUrl
+import net.dom53.inkita.ui.common.readingListCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
 
 @Composable
 fun LibraryV2Screen(
     libraryRepository: LibraryRepository,
     seriesRepository: SeriesRepository,
+    collectionsRepository: CollectionsRepository,
+    readingListRepository: ReadingListRepository,
     appPreferences: AppPreferences,
     onOpenSeries: (Int) -> Unit,
 ) {
     val viewModel: LibraryV2ViewModel =
         viewModel(
-            factory = LibraryV2ViewModel.provideFactory(libraryRepository, seriesRepository),
+            factory =
+                LibraryV2ViewModel.provideFactory(
+                    libraryRepository,
+                    seriesRepository,
+                    collectionsRepository,
+                    readingListRepository,
+                ),
         )
     val uiState by viewModel.state.collectAsState()
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
-    val showDrawerDebug = true
+    val showDrawerDebug = false
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var drawerWidthPx by remember { mutableStateOf(0) }
@@ -105,7 +120,7 @@ fun LibraryV2Screen(
                     Modifier
                         .fillMaxWidth(0.75f)
                         .fillMaxHeight()
-                        .background(if (showDrawerDebug) Color.Red else Color.Transparent)
+                        .background(if (showDrawerDebug) Color.Red else Color(0xFF121212))
                         .onSizeChanged { drawerWidthPx = it.width }
                         .alpha(drawerAlpha)
                         .padding(16.dp)
@@ -131,8 +146,24 @@ fun LibraryV2Screen(
                         scope.launch { drawerState.close() }
                     },
                 )
-                DrawerItem(icon = Icons.Filled.CollectionsBookmark, label = "Collections")
-                DrawerItem(icon = Icons.Filled.MenuBook, label = "Reading List")
+                DrawerItem(
+                    icon = Icons.Filled.CollectionsBookmark,
+                    label = "Collections",
+                    selected = uiState.selectedSection == LibraryV2Section.Collections,
+                    onClick = {
+                        viewModel.selectSection(LibraryV2Section.Collections)
+                        scope.launch { drawerState.close() }
+                    },
+                )
+                DrawerItem(
+                    icon = Icons.Filled.MenuBook,
+                    label = "Reading List",
+                    selected = uiState.selectedSection == LibraryV2Section.ReadingList,
+                    onClick = {
+                        viewModel.selectSection(LibraryV2Section.ReadingList)
+                        scope.launch { drawerState.close() }
+                    },
+                )
                 DrawerItem(icon = Icons.Filled.Bookmarks, label = "Bookmarks")
                 DrawerItem(icon = Icons.Filled.LibraryBooks, label = "All Series")
                 DrawerItem(icon = Icons.Filled.People, label = "Browse People")
@@ -159,6 +190,9 @@ fun LibraryV2Screen(
             }
         },
     ) {
+        if (uiState.selectedSection == LibraryV2Section.Collections && uiState.selectedCollectionId != null) {
+            BackHandler { viewModel.selectCollection(null) }
+        }
         Column(
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -237,6 +271,36 @@ fun LibraryV2Screen(
                         error = uiState.wantToReadError,
                         config = config,
                         onOpenSeries = onOpenSeries,
+                    )
+                }
+
+                LibraryV2Section.Collections -> {
+                    if (uiState.selectedCollectionId != null) {
+                        CollectionSeriesGrid(
+                            title = uiState.selectedCollectionName ?: "Collection",
+                            items = uiState.collectionSeries,
+                            isLoading = uiState.isCollectionSeriesLoading,
+                            error = uiState.collectionSeriesError,
+                            config = config,
+                            onBack = { viewModel.selectCollection(null) },
+                            onOpenSeries = onOpenSeries,
+                        )
+                    } else {
+                        CollectionsGrid(
+                            items = uiState.collections,
+                            isLoading = uiState.isCollectionsLoading,
+                            error = uiState.collectionsError,
+                            config = config,
+                            onSelect = { collection -> viewModel.selectCollection(collection) },
+                        )
+                    }
+                }
+                LibraryV2Section.ReadingList -> {
+                    ReadingListGrid(
+                        items = uiState.readingLists,
+                        isLoading = uiState.isReadingListsLoading,
+                        error = uiState.readingListsError,
+                        config = config,
                     )
                 }
             }
@@ -376,6 +440,18 @@ private fun WantToReadGrid(
                 }
             }
 
+            items.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.library_empty_reading_list),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
             else -> {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
@@ -426,6 +502,239 @@ private fun WantToReadCard(
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = series.name.ifBlank { "Series ${series.id}" },
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun CollectionsGrid(
+    items: List<net.dom53.inkita.domain.model.Collection>,
+    isLoading: Boolean,
+    error: String?,
+    config: AppConfig,
+    onSelect: (net.dom53.inkita.domain.model.Collection) -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            isLoading && items.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            error != null && items.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(text = error, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            items.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.library_empty_reading_list),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
+            else -> {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    gridItems(items, key = { it.id }) { collection ->
+                        CollectionCard(
+                            collection = collection,
+                            config = config,
+                            onSelect = onSelect,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollectionCard(
+    collection: net.dom53.inkita.domain.model.Collection,
+    config: AppConfig,
+    onSelect: (net.dom53.inkita.domain.model.Collection) -> Unit,
+) {
+    val imageUrl = collectionCoverUrl(config, collection.id)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable { onSelect(collection) },
+    ) {
+        AsyncImage(
+            model =
+                ImageRequest
+                    .Builder(LocalContext.current)
+                    .data(imageUrl)
+                    .crossfade(true)
+                    .build(),
+            contentDescription = null,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = collection.name.ifBlank { "Collection ${collection.id}" },
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun CollectionSeriesGrid(
+    title: String,
+    items: List<net.dom53.inkita.domain.model.Series>,
+    isLoading: Boolean,
+    error: String?,
+    config: AppConfig,
+    onBack: () -> Unit,
+    onOpenSeries: (Int) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Back",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { onBack() },
+            )
+        }
+        WantToReadGrid(
+            items = items,
+            isLoading = isLoading,
+            error = error,
+            config = config,
+            onOpenSeries = onOpenSeries,
+        )
+    }
+}
+
+@Composable
+private fun ReadingListGrid(
+    items: List<net.dom53.inkita.domain.model.ReadingList>,
+    isLoading: Boolean,
+    error: String?,
+    config: AppConfig,
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            isLoading && items.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            error != null && items.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(text = error, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            items.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.library_empty_reading_list),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
+            else -> {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    gridItems(items, key = { it.id }) { readingList ->
+                        ReadingListCard(
+                            readingList = readingList,
+                            config = config,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReadingListCard(
+    readingList: net.dom53.inkita.domain.model.ReadingList,
+    config: AppConfig,
+) {
+    val context = LocalContext.current
+    val imageUrl = readingListCoverUrl(config, readingList.id)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable {
+                    android.widget.Toast
+                        .makeText(context, "Not implemented yet", android.widget.Toast.LENGTH_SHORT)
+                        .show()
+                },
+    ) {
+        AsyncImage(
+            model =
+                ImageRequest
+                    .Builder(LocalContext.current)
+                    .data(imageUrl)
+                    .crossfade(true)
+                    .build(),
+            contentDescription = null,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = readingList.title.ifBlank { "Reading List ${readingList.id}" },
             style = MaterialTheme.typography.bodySmall,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
