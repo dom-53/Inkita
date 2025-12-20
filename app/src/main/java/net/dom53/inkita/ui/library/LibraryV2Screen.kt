@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.LocalLibrary
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
@@ -49,6 +51,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,21 +60,26 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.aspectRatio
 import net.dom53.inkita.R
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
+import net.dom53.inkita.domain.repository.PersonRepository
 import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
 import net.dom53.inkita.ui.common.collectionCoverUrl
+import net.dom53.inkita.ui.common.personCoverUrl
 import net.dom53.inkita.ui.common.readingListCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
 
@@ -80,6 +89,7 @@ fun LibraryV2Screen(
     seriesRepository: SeriesRepository,
     collectionsRepository: CollectionsRepository,
     readingListRepository: ReadingListRepository,
+    personRepository: PersonRepository,
     appPreferences: AppPreferences,
     onOpenSeries: (Int) -> Unit,
 ) {
@@ -91,9 +101,11 @@ fun LibraryV2Screen(
                     seriesRepository,
                     collectionsRepository,
                     readingListRepository,
+                    personRepository,
                 ),
         )
     val uiState by viewModel.state.collectAsState()
+    val context = LocalContext.current
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
@@ -164,9 +176,41 @@ fun LibraryV2Screen(
                         scope.launch { drawerState.close() }
                     },
                 )
-                DrawerItem(icon = Icons.Filled.Bookmarks, label = "Bookmarks")
-                DrawerItem(icon = Icons.Filled.LibraryBooks, label = "All Series")
-                DrawerItem(icon = Icons.Filled.People, label = "Browse People")
+                DrawerItem(
+                    icon = Icons.Filled.Bookmarks,
+                    label = "Bookmarks",
+                    onClick = {
+                        android.widget.Toast
+                            .makeText(
+                                context,
+                                "Not implemented yet",
+                                android.widget.Toast.LENGTH_SHORT,
+                            )
+                            .show()
+                    },
+                )
+                DrawerItem(
+                    icon = Icons.Filled.LibraryBooks,
+                    label = "All Series",
+                    onClick = {
+                        android.widget.Toast
+                            .makeText(
+                                context,
+                                "Not implemented yet",
+                                android.widget.Toast.LENGTH_SHORT,
+                            )
+                            .show()
+                    },
+                )
+                DrawerItem(
+                    icon = Icons.Filled.People,
+                    label = "Browse People",
+                    selected = uiState.selectedSection == LibraryV2Section.BrowsePeople,
+                    onClick = {
+                        viewModel.selectSection(LibraryV2Section.BrowsePeople)
+                        scope.launch { drawerState.close() }
+                    },
+                )
                 HorizontalDivider()
                 when {
                     uiState.isLoading -> {
@@ -301,6 +345,17 @@ fun LibraryV2Screen(
                         isLoading = uiState.isReadingListsLoading,
                         error = uiState.readingListsError,
                         config = config,
+                    )
+                }
+
+                LibraryV2Section.BrowsePeople -> {
+                    PeopleGrid(
+                        items = uiState.people,
+                        isLoading = uiState.isPeopleLoading,
+                        isLoadingMore = uiState.isPeopleLoadingMore,
+                        error = uiState.peopleError,
+                        config = config,
+                        onLoadMore = { viewModel.loadMorePeople() },
                     )
                 }
             }
@@ -738,6 +793,162 @@ private fun ReadingListCard(
             style = MaterialTheme.typography.bodySmall,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun PeopleGrid(
+    items: List<net.dom53.inkita.domain.model.Person>,
+    isLoading: Boolean,
+    isLoadingMore: Boolean,
+    error: String?,
+    config: AppConfig,
+    onLoadMore: () -> Unit,
+) {
+    val context = LocalContext.current
+    val gridState = rememberLazyGridState()
+    LaunchedEffect(gridState) {
+        snapshotFlow {
+            val info = gridState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val total = info.totalItemsCount
+            lastVisible to total
+        }.collect { (lastVisible, total) ->
+            if (total > 0 && lastVisible >= total - 6) {
+                onLoadMore()
+            }
+        }
+    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            isLoading && items.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            error != null && items.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(text = error, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            items.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "No people found.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
+            else -> {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.fillMaxSize(),
+                    state = gridState,
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    gridItems(items, key = { it.id ?: 0 }) { person ->
+                        PersonCard(
+                            person = person,
+                            config = config,
+                            onClick = {
+                                android.widget.Toast
+                                    .makeText(context, "Not implemented yet", android.widget.Toast.LENGTH_SHORT)
+                                    .show()
+                            },
+                        )
+                    }
+                    if (isLoadingMore) {
+                        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PersonCard(
+    person: net.dom53.inkita.domain.model.Person,
+    config: AppConfig,
+    onClick: () -> Unit,
+) {
+    val imageUrl = person.id?.let { personCoverUrl(config, it) }
+    val imageModifier =
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable { onClick() },
+    ) {
+        if (imageUrl == null) {
+            PersonPlaceholder(modifier = imageModifier)
+        } else {
+            SubcomposeAsyncImage(
+                model =
+                    ImageRequest
+                        .Builder(LocalContext.current)
+                        .data(imageUrl)
+                        .crossfade(true)
+                        .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = imageModifier,
+                loading = { PersonPlaceholder(modifier = imageModifier) },
+                error = { PersonPlaceholder(modifier = imageModifier) },
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = person.name?.ifBlank { null } ?: "Person ${person.id ?: 0}",
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun PersonPlaceholder(
+    modifier: Modifier,
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Person,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(48.dp),
         )
     }
 }

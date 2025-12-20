@@ -1,6 +1,8 @@
 package net.dom53.inkita.data.api
 
 import net.dom53.inkita.data.api.dto.AppUserCollectionDto
+import net.dom53.inkita.data.api.dto.BrowsePersonDto
+import net.dom53.inkita.data.api.dto.BrowsePersonFilterDto
 import net.dom53.inkita.data.api.dto.CollectionDto
 import net.dom53.inkita.data.api.dto.DecodeFilterRequest
 import net.dom53.inkita.data.api.dto.FilterDefinitionDto
@@ -38,6 +40,13 @@ interface KavitaApi {
         @Query("PageNumber") pageNumber: Int = 1,
         @Query("PageSize") pageSize: Int = 50,
     ): Response<List<ReadingListDto>>
+
+    @POST("api/Person/all")
+    suspend fun getBrowsePeople(
+        @Body filter: BrowsePersonFilterDto,
+        @Query("PageNumber") pageNumber: Int,
+        @Query("PageSize") pageSize: Int,
+    ): Response<List<BrowsePersonDto>>
 
     @GET("api/Collection")
     suspend fun getOwnedCollections(

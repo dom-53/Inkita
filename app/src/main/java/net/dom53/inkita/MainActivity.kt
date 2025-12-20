@@ -105,6 +105,7 @@ class MainActivity : AppCompatActivity() {
                 seriesRepository = components.seriesRepository,
                 collectionsRepository = components.collectionsRepository,
                 readingListRepository = components.readingListRepository,
+                personRepository = components.personRepository,
                 readerRepository = components.readerRepository,
                 cacheManager = components.cacheManager,
             )
@@ -139,6 +140,7 @@ fun InkitaApp(
     seriesRepository: SeriesRepository,
     collectionsRepository: CollectionsRepository,
     readingListRepository: net.dom53.inkita.domain.repository.ReadingListRepository,
+    personRepository: net.dom53.inkita.domain.repository.PersonRepository,
     readerRepository: net.dom53.inkita.domain.repository.ReaderRepository,
     cacheManager: CacheManager,
 ) {
@@ -306,6 +308,7 @@ fun InkitaApp(
                         seriesRepository = seriesRepository,
                         collectionsRepository = collectionsRepository,
                         readingListRepository = readingListRepository,
+                        personRepository = personRepository,
                         appPreferences = appPreferences,
                         onOpenSeries = { seriesId ->
                             navController.navigate("series/$seriesId")

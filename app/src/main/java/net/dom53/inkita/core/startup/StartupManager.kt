@@ -21,12 +21,14 @@ import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.repository.AuthRepositoryImpl
 import net.dom53.inkita.data.repository.CollectionsRepositoryImpl
 import net.dom53.inkita.data.repository.LibraryRepositoryImpl
+import net.dom53.inkita.data.repository.PersonRepositoryImpl
 import net.dom53.inkita.data.repository.ReaderRepositoryImpl
 import net.dom53.inkita.data.repository.ReadingListRepositoryImpl
 import net.dom53.inkita.data.repository.SeriesRepositoryImpl
 import net.dom53.inkita.domain.repository.AuthRepository
 import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
+import net.dom53.inkita.domain.repository.PersonRepository
 import net.dom53.inkita.domain.repository.ReaderRepository
 import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
@@ -43,6 +45,7 @@ object StartupManager {
         val seriesRepository: SeriesRepository,
         val collectionsRepository: CollectionsRepository,
         val readingListRepository: ReadingListRepository,
+        val personRepository: PersonRepository,
         val authRepository: AuthRepository,
         val readerRepository: ReaderRepository,
     )
@@ -78,6 +81,7 @@ object StartupManager {
         val seriesRepository: SeriesRepository = SeriesRepositoryImpl(appContext, preferences, cacheManager)
         val collectionsRepository: CollectionsRepository = CollectionsRepositoryImpl(appContext, preferences)
         val readingListRepository: ReadingListRepository = ReadingListRepositoryImpl(appContext, preferences)
+        val personRepository: PersonRepository = PersonRepositoryImpl(appContext, preferences)
         val authRepository: AuthRepository = AuthRepositoryImpl(preferences)
         val networkMonitor = NetworkMonitor.getInstance(appContext, preferences)
         val isDebuggable = (appContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
@@ -133,6 +137,7 @@ object StartupManager {
                 seriesRepository = seriesRepository,
                 collectionsRepository = collectionsRepository,
                 readingListRepository = readingListRepository,
+                personRepository = personRepository,
                 authRepository = authRepository,
                 readerRepository = readerRepository,
             )

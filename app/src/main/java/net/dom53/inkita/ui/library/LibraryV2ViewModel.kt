@@ -10,8 +10,10 @@ import kotlinx.coroutines.launch
 import net.dom53.inkita.domain.model.Library
 import net.dom53.inkita.domain.model.Collection
 import net.dom53.inkita.domain.model.ReadingList
+import net.dom53.inkita.domain.model.Person
 import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
+import net.dom53.inkita.domain.repository.PersonRepository
 import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
 
@@ -25,6 +27,7 @@ enum class LibraryV2Section {
     WantToRead,
     Collections,
     ReadingList,
+    BrowsePeople,
 }
 
 data class LibraryV2UiState(
@@ -50,6 +53,12 @@ data class LibraryV2UiState(
     val readingLists: List<ReadingList> = emptyList(),
     val isReadingListsLoading: Boolean = false,
     val readingListsError: String? = null,
+    val people: List<Person> = emptyList(),
+    val isPeopleLoading: Boolean = false,
+    val peopleError: String? = null,
+    val peoplePage: Int = 1,
+    val canLoadMorePeople: Boolean = true,
+    val isPeopleLoadingMore: Boolean = false,
     val selectedSection: LibraryV2Section = LibraryV2Section.Home,
 )
 
@@ -58,6 +67,7 @@ class LibraryV2ViewModel(
     private val seriesRepository: SeriesRepository,
     private val collectionsRepository: CollectionsRepository,
     private val readingListRepository: ReadingListRepository,
+    private val personRepository: PersonRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(LibraryV2UiState())
     val state: StateFlow<LibraryV2UiState> = _state
@@ -77,6 +87,9 @@ class LibraryV2ViewModel(
         }
         if (section == LibraryV2Section.ReadingList) {
             ensureReadingLists()
+        }
+        if (section == LibraryV2Section.BrowsePeople) {
+            ensurePeople()
         }
     }
 
@@ -215,6 +228,45 @@ class LibraryV2ViewModel(
         }
     }
 
+    private fun ensurePeople() {
+        val current = _state.value
+        if (current.isPeopleLoading || current.people.isNotEmpty()) return
+        viewModelScope.launch {
+            _state.update { it.copy(isPeopleLoading = true, peopleError = null) }
+            val result = runCatching { personRepository.getBrowsePeople(pageNumber = 1, pageSize = 50) }
+            val pageItems = result.getOrDefault(emptyList())
+            _state.update {
+                it.copy(
+                    people = pageItems,
+                    isPeopleLoading = false,
+                    peopleError = result.exceptionOrNull()?.message,
+                    peoplePage = 1,
+                    canLoadMorePeople = pageItems.size == 50,
+                )
+            }
+        }
+    }
+
+    fun loadMorePeople() {
+        val current = _state.value
+        if (current.isPeopleLoading || current.isPeopleLoadingMore || !current.canLoadMorePeople) return
+        viewModelScope.launch {
+            val nextPage = current.peoplePage + 1
+            _state.update { it.copy(isPeopleLoadingMore = true) }
+            val result = runCatching { personRepository.getBrowsePeople(pageNumber = nextPage, pageSize = 50) }
+            val pageItems = result.getOrDefault(emptyList())
+            _state.update {
+                it.copy(
+                    people = it.people + pageItems,
+                    isPeopleLoadingMore = false,
+                    peopleError = result.exceptionOrNull()?.message ?: it.peopleError,
+                    peoplePage = if (pageItems.isNotEmpty()) nextPage else it.peoplePage,
+                    canLoadMorePeople = pageItems.size == 50,
+                )
+            }
+        }
+    }
+
     private fun loadCollectionSeries(collectionId: Int) {
         viewModelScope.launch {
             _state.update { it.copy(isCollectionSeriesLoading = true, collectionSeriesError = null) }
@@ -235,6 +287,7 @@ class LibraryV2ViewModel(
             seriesRepository: SeriesRepository,
             collectionsRepository: CollectionsRepository,
             readingListRepository: ReadingListRepository,
+            personRepository: PersonRepository,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -244,6 +297,7 @@ class LibraryV2ViewModel(
                         seriesRepository,
                         collectionsRepository,
                         readingListRepository,
+                        personRepository,
                     ) as T
                 }
             }
