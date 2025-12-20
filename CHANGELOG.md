@@ -11,6 +11,7 @@ All notable changes to this project will be documented here.
 - Logging: Added rotating on-device log files with export/save/clear controls, a verbose logging toggle, sanitization of hosts/IPs/API keys, config snapshot in exported zips, and automatic pruning (12 days, 5 files).
 - Browse: Added shimmer placeholders for grid tiles and thumbnails while covers load.
 - Settings: Added “Max thumbnails in parallel” in Advanced to limit concurrent thumbnail downloads.
+- Settings: Added option to disable thumbnails in Browse for text-only results.
 
 ### Changed
 - UI: Switched theme base to `Theme.AppCompat.DayNight.NoActionBar` (required for per-app language support with Compose).
