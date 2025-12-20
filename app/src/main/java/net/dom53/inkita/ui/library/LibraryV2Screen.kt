@@ -14,8 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.items as rowItems
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -109,8 +113,24 @@ fun LibraryV2Screen(
             ) {
                 Text(text = "Menu", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(12.dp))
-                DrawerItem(icon = Icons.Filled.Home, label = "Home")
-                DrawerItem(icon = Icons.Filled.BookmarkAdd, label = "Want To Read")
+                DrawerItem(
+                    icon = Icons.Filled.Home,
+                    label = "Home",
+                    selected = uiState.selectedSection == LibraryV2Section.Home,
+                    onClick = {
+                        viewModel.selectSection(LibraryV2Section.Home)
+                        scope.launch { drawerState.close() }
+                    },
+                )
+                DrawerItem(
+                    icon = Icons.Filled.BookmarkAdd,
+                    label = "Want To Read",
+                    selected = uiState.selectedSection == LibraryV2Section.WantToRead,
+                    onClick = {
+                        viewModel.selectSection(LibraryV2Section.WantToRead)
+                        scope.launch { drawerState.close() }
+                    },
+                )
                 DrawerItem(icon = Icons.Filled.CollectionsBookmark, label = "Collections")
                 DrawerItem(icon = Icons.Filled.MenuBook, label = "Reading List")
                 DrawerItem(icon = Icons.Filled.Bookmarks, label = "Bookmarks")
@@ -149,61 +169,75 @@ fun LibraryV2Screen(
             ) {
                 Icon(Icons.Filled.Menu, contentDescription = null)
             }
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp)
-                        .verticalScroll(rememberScrollState()),
-            ) {
-                Text(
-                    text = "Home",
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                when {
-                    uiState.isHomeLoading &&
-                        uiState.onDeck.isEmpty() &&
-                        uiState.recentlyUpdated.isEmpty() &&
-                        uiState.recentlyAdded.isEmpty() -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator()
+            when (uiState.selectedSection) {
+                LibraryV2Section.Home -> {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp)
+                                .verticalScroll(rememberScrollState()),
+                    ) {
+                        Text(
+                            text = "Home",
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        when {
+                            uiState.isHomeLoading &&
+                                uiState.onDeck.isEmpty() &&
+                                uiState.recentlyUpdated.isEmpty() &&
+                                uiState.recentlyAdded.isEmpty() -> {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CircularProgressIndicator()
+                                }
+                            }
+
+                            uiState.homeError != null &&
+                                uiState.onDeck.isEmpty() &&
+                                uiState.recentlyUpdated.isEmpty() &&
+                                uiState.recentlyAdded.isEmpty() -> {
+                                Text(
+                                    text = uiState.homeError ?: "",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+
+                            else -> {
+                                HomeSection(
+                                    title = "On Deck",
+                                    items = uiState.onDeck,
+                                    config = config,
+                                    onOpenSeries = onOpenSeries,
+                                )
+                                HomeSection(
+                                    title = "Recently Updated Series",
+                                    items = uiState.recentlyUpdated,
+                                    config = config,
+                                    onOpenSeries = onOpenSeries,
+                                )
+                                HomeSection(
+                                    title = "Newly Added Series",
+                                    items = uiState.recentlyAdded,
+                                    config = config,
+                                    onOpenSeries = onOpenSeries,
+                                )
+                            }
                         }
                     }
+                }
 
-                    uiState.homeError != null &&
-                        uiState.onDeck.isEmpty() &&
-                        uiState.recentlyUpdated.isEmpty() &&
-                        uiState.recentlyAdded.isEmpty() -> {
-                        Text(
-                            text = uiState.homeError ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-
-                    else -> {
-                        HomeSection(
-                            title = "On Deck",
-                            items = uiState.onDeck,
-                            config = config,
-                            onOpenSeries = onOpenSeries,
-                        )
-                        HomeSection(
-                            title = "Recently Updated Series",
-                            items = uiState.recentlyUpdated,
-                            config = config,
-                            onOpenSeries = onOpenSeries,
-                        )
-                        HomeSection(
-                            title = "Newly Added Series",
-                            items = uiState.recentlyAdded,
-                            config = config,
-                            onOpenSeries = onOpenSeries,
-                        )
-                    }
+                LibraryV2Section.WantToRead -> {
+                    WantToReadGrid(
+                        items = uiState.wantToRead,
+                        isLoading = uiState.isWantToReadLoading,
+                        error = uiState.wantToReadError,
+                        config = config,
+                        onOpenSeries = onOpenSeries,
+                    )
                 }
             }
         }
@@ -211,17 +245,39 @@ fun LibraryV2Screen(
 }
 
 @Composable
-private fun DrawerItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) {
-    Row(
-        modifier =
+private fun DrawerItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    selected: Boolean = false,
+    onClick: (() -> Unit)? = null,
+) {
+    val rowModifier =
+        if (onClick != null) {
             Modifier
                 .fillMaxWidth()
+                .clickable { onClick() }
+        } else {
+            Modifier.fillMaxWidth()
+        }
+    Row(
+        modifier =
+            rowModifier
                 .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = null)
         Spacer(modifier = Modifier.width(12.dp))
-        Text(text = label, style = MaterialTheme.typography.bodyLarge)
+        val color =
+            if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = color,
+        )
     }
 }
 
@@ -243,7 +299,7 @@ private fun HomeSection(
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(items, key = { it.id }) { item ->
+            rowItems(items, key = { it.id }) { item ->
                 SeriesCard(
                     item = item,
                     config = config,
@@ -285,6 +341,91 @@ private fun SeriesCard(
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = item.title,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun WantToReadGrid(
+    items: List<net.dom53.inkita.domain.model.Series>,
+    isLoading: Boolean,
+    error: String?,
+    config: AppConfig,
+    onOpenSeries: (Int) -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            isLoading && items.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            error != null && items.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(text = error, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            else -> {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    gridItems(items, key = { it.id }) { series ->
+                        WantToReadCard(
+                            series = series,
+                            config = config,
+                            onOpenSeries = onOpenSeries,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WantToReadCard(
+    series: net.dom53.inkita.domain.model.Series,
+    config: AppConfig,
+    onOpenSeries: (Int) -> Unit,
+) {
+    val imageUrl = seriesCoverUrl(config, series.id)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable { onOpenSeries(series.id) },
+    ) {
+        AsyncImage(
+            model =
+                ImageRequest
+                    .Builder(LocalContext.current)
+                    .data(imageUrl)
+                    .crossfade(true)
+                    .build(),
+            contentDescription = null,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = series.name.ifBlank { "Series ${series.id}" },
             style = MaterialTheme.typography.bodySmall,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,

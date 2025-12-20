@@ -16,6 +16,11 @@ data class HomeSeriesItem(
     val title: String,
 )
 
+enum class LibraryV2Section {
+    Home,
+    WantToRead,
+}
+
 data class LibraryV2UiState(
     val libraries: List<Library> = emptyList(),
     val isLoading: Boolean = true,
@@ -25,6 +30,10 @@ data class LibraryV2UiState(
     val recentlyAdded: List<HomeSeriesItem> = emptyList(),
     val isHomeLoading: Boolean = true,
     val homeError: String? = null,
+    val wantToRead: List<net.dom53.inkita.domain.model.Series> = emptyList(),
+    val isWantToReadLoading: Boolean = false,
+    val wantToReadError: String? = null,
+    val selectedSection: LibraryV2Section = LibraryV2Section.Home,
 )
 
 class LibraryV2ViewModel(
@@ -37,6 +46,13 @@ class LibraryV2ViewModel(
     init {
         loadLibraries()
         loadHome()
+    }
+
+    fun selectSection(section: LibraryV2Section) {
+        _state.update { it.copy(selectedSection = section) }
+        if (section == LibraryV2Section.WantToRead) {
+            ensureWantToRead()
+        }
     }
 
     private fun loadLibraries() {
@@ -91,6 +107,22 @@ class LibraryV2ViewModel(
                     recentlyAdded = recentlyAdded,
                     isHomeLoading = false,
                     homeError = error?.message,
+                )
+            }
+        }
+    }
+
+    private fun ensureWantToRead() {
+        val current = _state.value
+        if (current.isWantToReadLoading || current.wantToRead.isNotEmpty()) return
+        viewModelScope.launch {
+            _state.update { it.copy(isWantToReadLoading = true, wantToReadError = null) }
+            val result = runCatching { seriesRepository.getWantToReadSeries(1, 50) }
+            _state.update {
+                it.copy(
+                    wantToRead = result.getOrDefault(emptyList()),
+                    isWantToReadLoading = false,
+                    wantToReadError = result.exceptionOrNull()?.message,
                 )
             }
         }

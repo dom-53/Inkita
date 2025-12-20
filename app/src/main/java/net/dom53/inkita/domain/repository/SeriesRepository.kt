@@ -30,6 +30,11 @@ interface SeriesRepository {
         pageSize: Int,
     ): List<Series>
 
+    suspend fun getWantToReadSeries(
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<Series>
+
     /**
      Cached series stored locally (best-effort).
      */
