@@ -24,6 +24,7 @@ All notable changes to this project will be documented here.
 - Browse: Fresh cache no longer blocks loading additional pages; pagination continues beyond the first cached page.
 - Reader: Refactored to use a shared BaseReader interface with separate EPUB/PDF renderers.
 - Reader: Split into BaseReaderScreen with dedicated EPUB/PDF screens for easier per-format customization.
+- Reader: Added domain BaseReader + EPUB/PDF reader implementations and per-format ViewModels.
 
 ## v0.2.0-beta.1
 

@@ -193,7 +193,7 @@ class SeriesDetailViewModel(
         val repo = readerRepository ?: return emptyMap()
         if (!allowNetwork) return emptyMap()
         val progressMap = mutableMapOf<Int, VolumeProgressUi>()
-        detail.volumes.forEach { vol ->
+        allVolumes(detail).forEach { vol ->
             val bookId = vol.bookId
             if (bookId != null) {
                 val progress = runCatching { repo.getProgress(bookId) }.getOrNull()
@@ -237,9 +237,10 @@ class SeriesDetailViewModel(
         progressMap: Map<Int, VolumeProgressUi>,
     ): Triple<Int, Int, Int>? {
         // Pick first volume with progress, otherwise first volume
+        val volumes = allVolumes(detail)
         val targetVolume =
-            detail.volumes.firstOrNull { progressMap[it.id]?.page != null }
-                ?: detail.volumes.firstOrNull()
+            volumes.firstOrNull { progressMap[it.id]?.page != null }
+                ?: volumes.firstOrNull()
         val volumeId = targetVolume?.id ?: return null
         val page = progressMap[volumeId]?.page ?: 0
         val chapterId = targetVolume.bookId ?: return Triple(volumeId, page, 0)
@@ -264,7 +265,7 @@ class SeriesDetailViewModel(
     ): Set<Int> {
         val seriesFormat = detail?.series?.format
         val isPdf = seriesFormat == Format.Pdf
-        val volumes = detail?.volumes.orEmpty()
+        val volumes = detail?.let { allVolumes(it) }.orEmpty()
         return volumes
             .mapNotNull { volume ->
                 val bookId = volume.bookId ?: return@mapNotNull null
@@ -279,6 +280,8 @@ class SeriesDetailViewModel(
                 volume.takeIf { isDownloaded }?.id
             }.toSet()
     }
+
+    private fun allVolumes(detail: SeriesDetail): List<Volume> = detail.volumes + detail.specials
 
     private fun ensureWantAndCollections() {
         val cfg = latestConfig ?: return

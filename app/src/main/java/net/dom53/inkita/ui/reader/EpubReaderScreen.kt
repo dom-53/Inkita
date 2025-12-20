@@ -2,8 +2,8 @@ package net.dom53.inkita.ui.reader
 
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import net.dom53.inkita.core.storage.AppPreferences
-import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.repository.ReaderRepository
 
 @Composable
@@ -16,7 +16,6 @@ fun EpubReaderScreen(
     volumeId: Int?,
     serverUrl: String?,
     apiKey: String? = null,
-    formatId: Int? = null,
     onBack: (chapterId: Int, page: Int, seriesId: Int?, volumeId: Int?) -> Unit = { _, _, _, _ -> },
     onNavigateToChapter: (Int, Int?, Int?, Int?) -> Unit = { _, _, _, _ -> },
     topBarContent: (@Composable (String, String, () -> Unit) -> Unit)? = null,
@@ -27,13 +26,22 @@ fun EpubReaderScreen(
     BaseReaderScreen(
         chapterId = chapterId,
         initialPage = initialPage,
-        readerRepository = readerRepository,
+        readerViewModel =
+            viewModel(
+                factory =
+                    EpubReaderViewModel.provideFactory(
+                        chapterId = chapterId,
+                        initialPage = initialPage ?: 0,
+                        readerRepository = readerRepository,
+                        seriesId = seriesId,
+                        volumeId = volumeId,
+                    ),
+            ),
         appPreferences = appPreferences,
         seriesId = seriesId,
         volumeId = volumeId,
         serverUrl = serverUrl,
         apiKey = apiKey,
-        formatId = formatId ?: Format.Epub.id,
         renderer = EpubReader,
         onBack = onBack,
         onNavigateToChapter = onNavigateToChapter,

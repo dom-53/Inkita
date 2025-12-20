@@ -18,6 +18,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -66,6 +67,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -79,7 +81,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -118,7 +119,6 @@ fun ReaderScreen(
             volumeId = volumeId,
             serverUrl = serverUrl,
             apiKey = apiKey,
-            formatId = formatId,
             onBack = onBack,
             onNavigateToChapter = onNavigateToChapter,
         )
@@ -132,7 +132,6 @@ fun ReaderScreen(
             volumeId = volumeId,
             serverUrl = serverUrl,
             apiKey = apiKey,
-            formatId = formatId,
             onBack = onBack,
             onNavigateToChapter = onNavigateToChapter,
         )
@@ -143,13 +142,12 @@ fun ReaderScreen(
 internal fun BaseReaderScreen(
     chapterId: Int,
     initialPage: Int?,
-    readerRepository: ReaderRepository,
+    readerViewModel: BaseReaderViewModel,
     appPreferences: AppPreferences,
     seriesId: Int?,
     volumeId: Int?,
     serverUrl: String?,
     apiKey: String? = null,
-    formatId: Int? = null,
     renderer: BaseReader,
     onBack: (chapterId: Int, page: Int, seriesId: Int?, volumeId: Int?) -> Unit = { _, _, _, _ -> },
     onNavigateToChapter: (Int, Int?, Int?, Int?) -> Unit = { _, _, _, _ -> },
@@ -158,26 +156,14 @@ internal fun BaseReaderScreen(
     settingsContent: (@Composable (ReaderSettingsState, ReaderSettingsCallbacks) -> Unit)? = null,
     overlayExtras: @Composable BoxScope.() -> Unit = {},
 ) {
-    val viewModel: ReaderViewModel =
-        viewModel(
-            factory =
-                ReaderViewModel.provideFactory(
-                    chapterId = chapterId,
-                    initialPage = initialPage ?: 0,
-                    readerRepository = readerRepository,
-                    seriesId = seriesId,
-                    volumeId = volumeId,
-                    format = Format.fromId(formatId),
-                ),
-        )
-    val uiState by viewModel.state.collectAsState()
+    val uiState by readerViewModel.state.collectAsState()
     val context = LocalContext.current
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-            viewModel.clearError()
+            readerViewModel.clearError()
         }
     }
 
@@ -236,14 +222,14 @@ internal fun BaseReaderScreen(
     val goPrevPage: () -> Unit = {
         val prev = (uiState.pageIndex - 1).coerceAtLeast(0)
         if (uiState.isPdf) {
-            viewModel.setPdfPageIndex(prev, uiState.pageCount)
+            (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(prev, uiState.pageCount)
         } else {
             scope.launch {
-                if (!NetworkUtils.isOnline(context) && !viewModel.isPageDownloaded(prev)) {
+                if (!NetworkUtils.isOnline(context) && !readerViewModel.isPageDownloaded(prev)) {
                     Toast.makeText(context, context.getString(R.string.reader_page_not_downloaded), Toast.LENGTH_SHORT).show()
                     return@launch
                 }
-                viewModel.loadPage(prev)
+                readerViewModel.loadPage(prev)
             }
         }
     }
@@ -255,14 +241,14 @@ internal fun BaseReaderScreen(
                 uiState.pageIndex + 1 // When page count is unknown (offline), allow attempting the next page.
             }
         if (uiState.isPdf) {
-            viewModel.setPdfPageIndex(next, uiState.pageCount)
+            (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(next, uiState.pageCount)
         } else {
             scope.launch {
-                if (!NetworkUtils.isOnline(context) && !viewModel.isPageDownloaded(next)) {
+                if (!NetworkUtils.isOnline(context) && !readerViewModel.isPageDownloaded(next)) {
                     Toast.makeText(context, context.getString(R.string.reader_page_not_downloaded), Toast.LENGTH_SHORT).show()
                     return@launch
                 }
-                viewModel.loadPage(next)
+                readerViewModel.loadPage(next)
             }
         }
     }
@@ -303,8 +289,10 @@ internal fun BaseReaderScreen(
                     onConsumePendingScroll = { pendingScrollY = null },
                     onConsumeScrollId = { pendingScrollId = null },
                     onWebViewReady = { webViewRef.value = it },
-                    onScrollIdle = { scrollId -> viewModel.markProgressAtCurrentPage(scrollId) },
-                    onPdfPageChanged = { idx, count -> viewModel.setPdfPageIndex(idx, count) },
+                    onScrollIdle = { scrollId -> readerViewModel.markProgressAtCurrentPage(scrollId) },
+                    onPdfPageChanged = { idx, count ->
+                        (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(idx, count)
+                    },
                 ),
         )
 
@@ -341,7 +329,7 @@ internal fun BaseReaderScreen(
                     onScrollTop = {
                         if (uiState.isPdf) {
                             if (uiState.pageCount > 0) {
-                                viewModel.setPdfPageIndex(0, uiState.pageCount)
+                                (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(0, uiState.pageCount)
                             }
                         } else {
                             webViewRef.value?.let { web ->
@@ -352,7 +340,7 @@ internal fun BaseReaderScreen(
                     onScrollBottom = {
                         if (uiState.isPdf) {
                             if (uiState.pageCount > 0) {
-                                viewModel.setPdfPageIndex(uiState.pageCount - 1, uiState.pageCount)
+                                (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(uiState.pageCount - 1, uiState.pageCount)
                             }
                         } else {
                             webViewRef.value?.let { web ->
@@ -368,7 +356,7 @@ internal fun BaseReaderScreen(
                     onOpenSettings = { if (renderer.supportsTextSettings) showSettingsPanel = !showSettingsPanel },
                     onPrevChapter = {
                         scope.launch {
-                            val nav = viewModel.getPreviousChapter()
+                            val nav = readerViewModel.getPreviousChapter()
                             val chId = nav?.chapterId
                             if (chId != null && chId >= 0) {
                                 onNavigateToChapter(
@@ -389,7 +377,7 @@ internal fun BaseReaderScreen(
                     },
                     onNextChapter = {
                         scope.launch {
-                            val nav = viewModel.getNextChapter()
+                            val nav = readerViewModel.getNextChapter()
                             val chId = nav?.chapterId
                             if (chId != null && chId >= 0) {
                                 onNavigateToChapter(
@@ -1246,6 +1234,7 @@ internal fun PdfPageViewer(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val targetWidthPx = remember(configuration.screenWidthDp) { with(density) { configuration.screenWidthDp.dp.roundToPx() } }
+    val swipeThresholdPx = with(density) { 64.dp.toPx() }
 
     var pageIndex by remember { mutableStateOf(currentPage.coerceAtLeast(0)) }
     var pageCount by remember { mutableStateOf(0) }
@@ -1265,6 +1254,9 @@ internal fun PdfPageViewer(
             pageCount = renderer.pageCount
             pageIndex = pageIndex.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
         }
+    }
+    LaunchedEffect(currentPage) {
+        pageIndex = currentPage.coerceAtLeast(0).coerceIn(0, (pageCount - 1).coerceAtLeast(0))
     }
 
     DisposableEffect(rendererHolder.value) {
@@ -1309,7 +1301,25 @@ internal fun PdfPageViewer(
             modifier =
                 Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .pointerInput(pageIndex, pageCount) {
+                        var totalDrag = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                            onDragEnd = {
+                                if (kotlin.math.abs(totalDrag) > swipeThresholdPx) {
+                                    if (totalDrag < 0 && pageIndex < pageCount - 1) {
+                                        pageIndex += 1
+                                    } else if (totalDrag > 0 && pageIndex > 0) {
+                                        pageIndex -= 1
+                                    }
+                                }
+                                totalDrag = 0f
+                            },
+                            onDragCancel = { totalDrag = 0f },
+                        )
+                    },
             contentAlignment = Alignment.Center,
         ) {
             when {

@@ -11,8 +11,11 @@ import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.model.ReaderBookInfo
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.ReaderTimeLeft
+import net.dom53.inkita.domain.reader.BaseReader
+import net.dom53.inkita.domain.reader.EpubReader
+import net.dom53.inkita.domain.reader.PdfReader
+import net.dom53.inkita.domain.reader.ReaderLoadResult
 import net.dom53.inkita.domain.repository.ReaderRepository
-import java.io.File
 
 data class ReaderUiState(
     val isLoading: Boolean = true,
@@ -28,15 +31,15 @@ data class ReaderUiState(
     val pdfPath: String? = null,
 )
 
-class ReaderViewModel(
-    private val chapterId: Int,
-    private val initialPage: Int,
-    private val readerRepository: ReaderRepository,
-    private val seriesId: Int?,
-    private val volumeId: Int?,
-    private val format: Format?,
+abstract class BaseReaderViewModel(
+    protected val chapterId: Int,
+    protected val initialPage: Int,
+    protected val reader: BaseReader,
+    protected val seriesId: Int?,
+    protected val volumeId: Int?,
+    private val anonymous: Boolean = false,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(ReaderUiState(pageIndex = initialPage))
+    protected val _state = MutableStateFlow(ReaderUiState(pageIndex = initialPage))
     val state: StateFlow<ReaderUiState> = _state
 
     init {
@@ -46,46 +49,33 @@ class ReaderViewModel(
     fun loadInitial() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
-            val savedProgress = runCatching { readerRepository.getProgress(chapterId) }.getOrNull()
-            val info = runCatching { readerRepository.getBookInfo(chapterId) }.getOrNull()
+            val savedProgress = runCatching { reader.getProgress(chapterId) }.getOrNull()
+            val info = runCatching { reader.getBookInfo(chapterId) }.getOrNull()
             val totalPages = info?.pages ?: 0
             _state.update {
                 it.copy(
-                    isPdf = format == Format.Pdf,
+                    isPdf = reader.format == Format.Pdf,
                     bookInfo = info,
                     pageCount = totalPages,
                     bookScrollId = savedProgress?.bookScrollId ?: it.bookScrollId,
                     pageIndex = it.pageIndex, // keep initialPage
                 )
             }
-            if (format == Format.Pdf) {
-                loadPdf()
-                loadTimeLeft()
-            } else {
-                loadPage(initialPage)
-                loadTimeLeft()
-            }
+            loadInitialContent()
+            loadTimeLeft()
         }
     }
 
-    fun loadPage(index: Int) {
+    open fun loadPage(index: Int) {
         viewModelScope.launch {
             val previous = _state.value
             _state.update { it.copy(isLoading = true, error = null) }
-            runCatching { readerRepository.getPageResult(chapterId, index) }
+            runCatching { reader.loadPage(chapterId, index) }
                 .onSuccess { result ->
-                    _state.update {
-                        it.copy(
-                            content = result.html,
-                            fromOffline = result.fromOffline,
-                            pageIndex = index,
-                            isLoading = false,
-                            error = null,
-                        )
-                    }
-                    sendProgress(index)
+                    applyLoadResult(result, index)
+                    updateProgress(index)
                     if (_state.value.bookInfo?.pages == null) {
-                        val info = runCatching { readerRepository.getBookInfo(chapterId) }.getOrNull()
+                        val info = runCatching { reader.getBookInfo(chapterId) }.getOrNull()
                         if (info != null) {
                             _state.update { st -> st.copy(bookInfo = info, pageCount = info.pages ?: st.pageCount) }
                         }
@@ -107,31 +97,12 @@ class ReaderViewModel(
         _state.update { it.copy(error = null) }
     }
 
-    private fun setPdfPage(
-        pageIndex: Int,
-        pageCount: Int,
-    ) {
-        _state.update { it.copy(pageIndex = pageIndex) }
-        viewModelScope.launch {
-            val info = _state.value.bookInfo
-            val progress =
-                ReaderProgress(
-                    chapterId = chapterId,
-                    page = pageIndex,
-                    bookScrollId = null,
-                    seriesId = seriesId,
-                    volumeId = info?.volumeId ?: volumeId,
-                    libraryId = info?.libraryId,
-                )
-            runCatching { readerRepository.setProgress(progress, totalPages = pageCount) }
-            _state.update { it.copy(bookScrollId = null) }
-        }
-    }
-
-    private fun sendProgress(
+    protected open fun updateProgress(
         pageIndex: Int,
         bookScrollId: String? = null,
+        totalPagesOverride: Int? = null,
     ) {
+        if (anonymous) return
         viewModelScope.launch {
             val info = _state.value.bookInfo
             val progress =
@@ -143,8 +114,8 @@ class ReaderViewModel(
                     volumeId = info?.volumeId ?: volumeId,
                     libraryId = info?.libraryId,
                 )
-            val totalPages = info?.pages
-            runCatching { readerRepository.setProgress(progress, totalPages = totalPages) }
+            val totalPages = totalPagesOverride ?: info?.pages
+            runCatching { reader.setProgress(progress, totalPages = totalPages) }
             _state.update { it.copy(bookScrollId = bookScrollId ?: it.bookScrollId) }
         }
     }
@@ -152,22 +123,24 @@ class ReaderViewModel(
     private fun loadTimeLeft() {
         viewModelScope.launch {
             if (seriesId == null) return@launch
-            val tl = runCatching<ReaderTimeLeft?> { readerRepository.getTimeLeft(seriesId, chapterId) }.getOrNull()
+            val tl = runCatching<ReaderTimeLeft?> { reader.getTimeLeft(seriesId, chapterId) }.getOrNull()
             _state.update { it.copy(timeLeft = tl) }
         }
     }
 
-    private fun loadPdf() {
+    private fun loadInitialContent() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
-            val file: File? =
-                runCatching { readerRepository.getPdfFile(chapterId) }
-                    .getOrNull()
-            if (file != null && file.exists()) {
-                _state.update { it.copy(pdfPath = file.absolutePath, isLoading = false) }
-            } else {
-                _state.update { it.copy(isLoading = false, error = "PDF not available") }
-            }
+            runCatching { reader.loadInitial(chapterId, initialPage) }
+                .onSuccess { result ->
+                    applyLoadResult(result, initialPage)
+                    if (reader.format == Format.Epub) {
+                        updateProgress(initialPage)
+                    }
+                }
+                .onFailure { e ->
+                    _state.update { it.copy(isLoading = false, error = e.message ?: "Error loading reader") }
+                }
         }
     }
 
@@ -176,10 +149,10 @@ class ReaderViewModel(
         val sid = info?.seriesId ?: seriesId ?: return null
         val vid = info?.volumeId ?: volumeId ?: return null
         val currentChapter = chapterId
-        val nextNav = runCatching { readerRepository.getNextChapter(sid, vid, currentChapter) }.getOrNull() ?: return null
+        val nextNav = runCatching { reader.getNextChapter(sid, vid, currentChapter) }.getOrNull() ?: return null
         val nextId = nextNav.chapterId ?: return null
         // fetch fresh book info for next chapter to capture correct volume
-        val nextInfo = runCatching { readerRepository.getBookInfo(nextId) }.getOrNull()
+        val nextInfo = runCatching { reader.getBookInfo(nextId) }.getOrNull()
         if (nextInfo != null) {
             val pages = nextInfo.pages ?: 0
             _state.update { it.copy(bookInfo = nextInfo, pageCount = pages, pageIndex = 0, content = null) }
@@ -197,9 +170,9 @@ class ReaderViewModel(
         val sid = info?.seriesId ?: seriesId ?: return null
         val vid = info?.volumeId ?: volumeId ?: return null
         val currentChapter = chapterId
-        val prevNav = runCatching { readerRepository.getPreviousChapter(sid, vid, currentChapter) }.getOrNull() ?: return null
+        val prevNav = runCatching { reader.getPreviousChapter(sid, vid, currentChapter) }.getOrNull() ?: return null
         val prevId = prevNav.chapterId ?: return null
-        val prevInfo = runCatching { readerRepository.getBookInfo(prevId) }.getOrNull()
+        val prevInfo = runCatching { reader.getBookInfo(prevId) }.getOrNull()
         if (prevInfo != null) {
             val pages = prevInfo.pages ?: 0
             _state.update { it.copy(bookInfo = prevInfo, pageCount = pages, pageIndex = 0, content = null) }
@@ -212,6 +185,45 @@ class ReaderViewModel(
         )
     }
 
+    fun markProgressAtCurrentPage(bookScrollId: String? = null) {
+        updateProgress(_state.value.pageIndex, bookScrollId)
+    }
+
+    open suspend fun isPageDownloaded(pageIndex: Int): Boolean =
+        runCatching { reader.isPageDownloaded(chapterId, pageIndex) }.getOrDefault(false)
+
+    protected fun applyLoadResult(
+        result: ReaderLoadResult,
+        pageIndex: Int,
+    ) {
+        _state.update {
+            it.copy(
+                content = result.content ?: it.content,
+                fromOffline = result.fromOffline,
+                pageIndex = pageIndex,
+                isLoading = false,
+                error = null,
+                pdfPath = result.pdfPath ?: it.pdfPath,
+            )
+        }
+    }
+}
+
+class EpubReaderViewModel(
+    chapterId: Int,
+    initialPage: Int,
+    readerRepository: ReaderRepository,
+    seriesId: Int?,
+    volumeId: Int?,
+    anonymous: Boolean = false,
+) : BaseReaderViewModel(
+    chapterId = chapterId,
+    initialPage = initialPage,
+    reader = EpubReader(readerRepository),
+    seriesId = seriesId,
+    volumeId = volumeId,
+    anonymous = anonymous,
+) {
     companion object {
         fun provideFactory(
             chapterId: Int,
@@ -219,24 +231,75 @@ class ReaderViewModel(
             readerRepository: ReaderRepository,
             seriesId: Int?,
             volumeId: Int?,
-            format: Format?,
+            anonymous: Boolean = false,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     @Suppress("UNCHECKED_CAST")
-                    return ReaderViewModel(chapterId, initialPage, readerRepository, seriesId, volumeId, format) as T
+                    return EpubReaderViewModel(
+                        chapterId,
+                        initialPage,
+                        readerRepository,
+                        seriesId,
+                        volumeId,
+                        anonymous,
+                    ) as T
                 }
             }
     }
+}
 
-    fun markProgressAtCurrentPage(bookScrollId: String? = null) {
-        sendProgress(_state.value.pageIndex, bookScrollId)
+class PdfReaderViewModel(
+    chapterId: Int,
+    initialPage: Int,
+    readerRepository: ReaderRepository,
+    seriesId: Int?,
+    volumeId: Int?,
+    anonymous: Boolean = false,
+) : BaseReaderViewModel(
+    chapterId = chapterId,
+    initialPage = initialPage,
+    reader = PdfReader(readerRepository),
+    seriesId = seriesId,
+    volumeId = volumeId,
+    anonymous = anonymous,
+) {
+    override fun loadPage(index: Int) {
+        _state.update { it.copy(pageIndex = index) }
+        updateProgress(index, totalPagesOverride = _state.value.pageCount)
     }
-
-    suspend fun isPageDownloaded(pageIndex: Int): Boolean = runCatching { readerRepository.isPageDownloaded(chapterId, pageIndex) }.getOrDefault(false)
 
     fun setPdfPageIndex(
         index: Int,
         pageCount: Int,
-    ) = setPdfPage(index, pageCount)
+    ) {
+        _state.update { it.copy(pageCount = pageCount, pageIndex = index) }
+        updateProgress(index, totalPagesOverride = pageCount)
+    }
+
+    override suspend fun isPageDownloaded(pageIndex: Int): Boolean = true
+
+    companion object {
+        fun provideFactory(
+            chapterId: Int,
+            initialPage: Int,
+            readerRepository: ReaderRepository,
+            seriesId: Int?,
+            volumeId: Int?,
+            anonymous: Boolean = false,
+        ): ViewModelProvider.Factory =
+            object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    @Suppress("UNCHECKED_CAST")
+                    return PdfReaderViewModel(
+                        chapterId,
+                        initialPage,
+                        readerRepository,
+                        seriesId,
+                        volumeId,
+                        anonymous,
+                    ) as T
+                }
+            }
+    }
 }
