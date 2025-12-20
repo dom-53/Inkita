@@ -95,6 +95,7 @@ class AppPreferences(
         private val KEY_VERBOSE_LOGGING = booleanPreferencesKey("verbose_logging")
         private val KEY_BROWSE_PAGE_SIZE = intPreferencesKey("browse_page_size")
         private val KEY_MAX_THUMBNAILS_PARALLEL = intPreferencesKey("max_thumbnails_parallel")
+        private val KEY_DISABLE_BROWSE_THUMBNAILS = booleanPreferencesKey("disable_browse_thumbnails")
 
         private const val REFRESH_CACHE_DEFAULT = 720
 
@@ -187,6 +188,8 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> (prefs[KEY_BROWSE_PAGE_SIZE] ?: 25).coerceIn(10, 50) }
     val maxThumbnailsParallelFlow: Flow<Int> =
         context.dataStore.data.map { prefs -> (prefs[KEY_MAX_THUMBNAILS_PARALLEL] ?: 4).coerceIn(2, 6) }
+    val disableBrowseThumbnailsFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_DISABLE_BROWSE_THUMBNAILS] ?: false }
 
     val prefetchCollectionsAllFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_COLLECTIONS_ALL] ?: true }
@@ -458,6 +461,12 @@ class AppPreferences(
     suspend fun setMaxThumbnailsParallel(value: Int) {
         context.dataStore.edit { prefs ->
             prefs[KEY_MAX_THUMBNAILS_PARALLEL] = value.coerceIn(2, 6)
+        }
+    }
+
+    suspend fun setDisableBrowseThumbnails(disabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_DISABLE_BROWSE_THUMBNAILS] = disabled
         }
     }
 

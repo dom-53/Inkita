@@ -131,6 +131,7 @@ fun BrowseScreen(
         initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
     )
     val browsePageSize by appPreferences.browsePageSizeFlow.collectAsState(initial = 25)
+    val disableBrowseThumbnails by appPreferences.disableBrowseThumbnailsFlow.collectAsState(initial = false)
 
     LaunchedEffect(gridState) {
         snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
@@ -222,6 +223,7 @@ fun BrowseScreen(
                         PlaceholderSeriesGrid(
                             placeholderCount = browsePageSize,
                             gridState = gridState,
+                            disableThumbnails = disableBrowseThumbnails,
                         )
                     } else {
                         SeriesGrid(
@@ -230,6 +232,7 @@ fun BrowseScreen(
                             isLoadingMore = uiState.isLoadingMore,
                             loadingPlaceholderCount = browsePageSize,
                             gridState = gridState,
+                            disableThumbnails = disableBrowseThumbnails,
                             onSeriesClick = { onOpenSeries(it.id) },
                             onLoadMore = { viewModel.loadNextPage() },
                         )
@@ -544,6 +547,7 @@ fun BrowseScreen(
 private fun PlaceholderSeriesGrid(
     placeholderCount: Int,
     gridState: LazyGridState,
+    disableThumbnails: Boolean,
 ) {
     val shimmerProgress = rememberShimmerProgress()
     LazyVerticalGrid(
@@ -555,25 +559,33 @@ private fun PlaceholderSeriesGrid(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(placeholderCount) {
-            PlaceholderSeriesTile(shimmerProgress = shimmerProgress)
+            PlaceholderSeriesTile(
+                shimmerProgress = shimmerProgress,
+                disableThumbnails = disableThumbnails,
+            )
         }
     }
 }
 
 @Composable
-private fun PlaceholderSeriesTile(shimmerProgress: Float) {
+private fun PlaceholderSeriesTile(
+    shimmerProgress: Float,
+    disableThumbnails: Boolean,
+) {
     Column(
         modifier = Modifier.fillMaxWidth(),
     ) {
-        ShimmerBox(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(8.dp)),
-            progress = shimmerProgress,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
+        if (!disableThumbnails) {
+            ShimmerBox(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(2f / 3f)
+                        .clip(RoundedCornerShape(8.dp)),
+                progress = shimmerProgress,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+        }
         ShimmerBox(
             modifier =
                 Modifier
@@ -601,6 +613,7 @@ private fun SeriesGrid(
     isLoadingMore: Boolean,
     loadingPlaceholderCount: Int,
     gridState: LazyGridState,
+    disableThumbnails: Boolean,
     onLoadMore: () -> Unit,
     onSeriesClick: (Series) -> Unit,
 ) {
@@ -636,49 +649,51 @@ private fun SeriesGrid(
                         .fillMaxWidth()
                         .clickable { onSeriesClick(series) },
             ) {
-                val imageData = series.localThumbPath?.let { java.io.File(it) } ?: seriesCoverUrl(config, series.id)
-                val imageRequest =
-                    remember(imageData) {
-                        imageData?.let {
-                            ImageRequest
-                                .Builder(context)
-                                .data(it)
-                                .diskCachePolicy(CachePolicy.ENABLED)
-                                .memoryCachePolicy(CachePolicy.ENABLED)
-                                .networkCachePolicy(CachePolicy.ENABLED)
-                                .build()
+                if (!disableThumbnails) {
+                    val imageData = series.localThumbPath?.let { java.io.File(it) } ?: seriesCoverUrl(config, series.id)
+                    val imageRequest =
+                        remember(imageData) {
+                            imageData?.let {
+                                ImageRequest
+                                    .Builder(context)
+                                    .data(it)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .networkCachePolicy(CachePolicy.ENABLED)
+                                    .build()
+                            }
                         }
-                    }
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(2f / 3f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    SubcomposeAsyncImage(
-                        model = imageRequest,
-                        contentDescription = series.name,
-                        modifier = Modifier.matchParentSize(),
-                        contentScale = ContentScale.Crop,
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        when (painter.state) {
-                            is coil.compose.AsyncImagePainter.State.Loading -> {
-                                ShimmerBox(
-                                    modifier = Modifier.matchParentSize(),
-                                    progress = shimmerProgress,
-                                )
+                        SubcomposeAsyncImage(
+                            model = imageRequest,
+                            contentDescription = series.name,
+                            modifier = Modifier.matchParentSize(),
+                            contentScale = ContentScale.Crop,
+                        ) {
+                            when (painter.state) {
+                                is coil.compose.AsyncImagePainter.State.Loading -> {
+                                    ShimmerBox(
+                                        modifier = Modifier.matchParentSize(),
+                                        progress = shimmerProgress,
+                                    )
+                                }
+                                is coil.compose.AsyncImagePainter.State.Error -> {
+                                    Icon(
+                                        imageVector = Icons.Filled.ImageNotSupported,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                else -> SubcomposeAsyncImageContent()
                             }
-                            is coil.compose.AsyncImagePainter.State.Error -> {
-                                Icon(
-                                    imageVector = Icons.Filled.ImageNotSupported,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            else -> SubcomposeAsyncImageContent()
                         }
                     }
                 }
@@ -710,7 +725,10 @@ private fun SeriesGrid(
 
         if (isLoadingMore) {
             items(loadingPlaceholderCount, key = { "loading_$it" }) {
-                PlaceholderSeriesTile(shimmerProgress = shimmerProgress)
+                PlaceholderSeriesTile(
+                    shimmerProgress = shimmerProgress,
+                    disableThumbnails = disableThumbnails,
+                )
             }
         }
     }

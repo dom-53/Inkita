@@ -89,6 +89,7 @@ fun SettingsAdvancedScreen(
     var verboseLogging by remember { mutableStateOf(false) }
     var browsePageSize by remember { mutableStateOf(25) }
     var maxThumbnailsParallel by remember { mutableStateOf(4) }
+    var disableBrowseThumbnails by remember { mutableStateOf(false) }
     val collectionsRepo = remember { CollectionsRepositoryImpl(context, appPreferences) }
     val downloadRepo =
         remember {
@@ -150,6 +151,9 @@ fun SettingsAdvancedScreen(
     }
     LaunchedEffect(Unit) {
         appPreferences.maxThumbnailsParallelFlow.collectLatest { maxThumbnailsParallel = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.disableBrowseThumbnailsFlow.collectLatest { disableBrowseThumbnails = it }
     }
     LaunchedEffect(Unit) {
         val cached = runCatching { appPreferences.loadCachedCollections() }.getOrDefault(emptyList())
@@ -377,6 +381,30 @@ fun SettingsAdvancedScreen(
                 maxThumbnailsParallel.toString(),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_browse_thumbnails_off_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_browse_thumbnails_off_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = disableBrowseThumbnails,
+                onCheckedChange = { checked ->
+                    disableBrowseThumbnails = checked
+                    scope.launch { appPreferences.setDisableBrowseThumbnails(checked) }
+                },
             )
         }
 
