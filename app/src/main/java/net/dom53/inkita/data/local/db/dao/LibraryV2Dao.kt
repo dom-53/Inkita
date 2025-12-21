@@ -136,4 +136,28 @@ interface LibraryV2Dao {
         """,
     )
     suspend fun getPeopleUpdatedAt(listType: String, page: Int): Long?
+
+    @Query("SELECT COUNT(*) FROM cached_series_v2")
+    suspend fun getSeriesCount(): Int
+
+    @Query("SELECT COUNT(*) FROM cached_series_list_refs_v2")
+    suspend fun getSeriesRefsCount(): Int
+
+    @Query("SELECT COUNT(*) FROM cached_collections_v2")
+    suspend fun getCollectionsCount(): Int
+
+    @Query("SELECT COUNT(*) FROM cached_collection_refs_v2")
+    suspend fun getCollectionRefsCount(): Int
+
+    @Query("SELECT COUNT(*) FROM cached_reading_lists_v2")
+    suspend fun getReadingListsCount(): Int
+
+    @Query("SELECT COUNT(*) FROM cached_reading_list_refs_v2")
+    suspend fun getReadingListRefsCount(): Int
+
+    @Query("SELECT COUNT(*) FROM cached_people_v2")
+    suspend fun getPeopleCount(): Int
+
+    @Query("SELECT COUNT(*) FROM cached_person_refs_v2")
+    suspend fun getPersonRefsCount(): Int
 }

@@ -494,14 +494,46 @@ class CacheManagerImpl(
         val thumbs = dirSize(thumbnailsDir)
         val libTs = appPreferences.lastLibraryRefreshFlow.first()
         val browseTs = appPreferences.lastBrowseRefreshFlow.first()
+        val libraryStats =
+            libraryV2Dao?.let { dao ->
+                listOf(
+                    dao.getSeriesCount(),
+                    dao.getSeriesRefsCount(),
+                    dao.getCollectionsCount(),
+                    dao.getCollectionRefsCount(),
+                    dao.getReadingListsCount(),
+                    dao.getReadingListRefsCount(),
+                    dao.getPeopleCount(),
+                    dao.getPersonRefsCount(),
+                )
+            }
+        val detailStats =
+            seriesDetailV2Dao?.let { dao ->
+                listOf(
+                    dao.getDetailsCount(),
+                    dao.getRelatedRefsCount(),
+                    dao.getVolumesCount(),
+                    dao.getSeriesVolumeRefsCount(),
+                    dao.getChaptersCount(),
+                    dao.getVolumeChapterRefsCount(),
+                )
+            }
         val stats =
             CacheStats(
-                seriesCount = 0,
-                tabRefs = 0,
-                browseRefs = 0,
-                detailsCount = 0,
-                volumesCount = 0,
-                chaptersCount = 0,
+                seriesCount = libraryStats?.getOrNull(0) ?: 0,
+                seriesListRefsCount = libraryStats?.getOrNull(1) ?: 0,
+                collectionsCount = libraryStats?.getOrNull(2) ?: 0,
+                collectionRefsCount = libraryStats?.getOrNull(3) ?: 0,
+                readingListsCount = libraryStats?.getOrNull(4) ?: 0,
+                readingListRefsCount = libraryStats?.getOrNull(5) ?: 0,
+                peopleCount = libraryStats?.getOrNull(6) ?: 0,
+                personRefsCount = libraryStats?.getOrNull(7) ?: 0,
+                detailsCount = detailStats?.getOrNull(0) ?: 0,
+                relatedRefsCount = detailStats?.getOrNull(1) ?: 0,
+                volumesCount = detailStats?.getOrNull(2) ?: 0,
+                seriesVolumeRefsCount = detailStats?.getOrNull(3) ?: 0,
+                chaptersCount = detailStats?.getOrNull(4) ?: 0,
+                volumeChapterRefsCount = detailStats?.getOrNull(5) ?: 0,
                 dbBytes = dbSize,
                 thumbnailsBytes = thumbs,
                 lastLibraryRefresh = libTs,
