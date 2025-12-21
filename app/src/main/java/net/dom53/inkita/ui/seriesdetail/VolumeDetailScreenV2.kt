@@ -126,7 +126,9 @@ fun VolumeDetailScreenV2(
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Text(
-                            text = "Avg time: ${formatHoursDouble(volume.avgHoursToRead) ?: "-"}",
+                            text =
+                                "Time: " +
+                                    (formatHoursRange(volume.minHoursToRead, volume.maxHoursToRead) ?: "-"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -184,6 +186,7 @@ fun VolumeDetailScreenV2(
                     if (selectedTab == SeriesDetailTab.Books) {
                         ChapterListV2(
                             chapters = chapterList,
+                            config = config,
                         )
                     }
                 }

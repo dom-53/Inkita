@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,6 +30,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import net.dom53.inkita.core.storage.AppConfig
+import net.dom53.inkita.ui.common.chapterCoverUrl
 
 internal enum class SeriesDetailTab {
     Books,
@@ -86,6 +90,7 @@ internal fun SectionChip(
 @Composable
 internal fun ChapterListV2(
     chapters: List<net.dom53.inkita.data.api.dto.ChapterDto>,
+    config: AppConfig,
 ) {
     if (chapters.isEmpty()) return
     Column(
@@ -93,6 +98,7 @@ internal fun ChapterListV2(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         chapters.forEachIndexed { index, chapter ->
+            val coverUrl = chapterCoverUrl(config, chapter.id)
             val title =
                 chapter.titleName?.takeIf { it.isNotBlank() }
                     ?: chapter.title?.takeIf { it.isNotBlank() }
@@ -106,6 +112,15 @@ internal fun ChapterListV2(
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                CoverImage(
+                    coverUrl = coverUrl,
+                    context = androidx.compose.ui.platform.LocalContext.current,
+                    modifier =
+                        Modifier
+                            .width(40.dp)
+                            .aspectRatio(2f / 3f),
+                )
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = "Ch. ${index + 1} - $title",
                     style = MaterialTheme.typography.bodyMedium,
@@ -148,6 +163,17 @@ internal fun formatHours(value: Float?): String? {
 
 internal fun formatHoursDouble(value: Double?): String? {
     return value?.let { String.format(Locale.US, "%.1f h", it) }
+}
+
+internal fun formatHoursRange(min: Double?, max: Double?): String? {
+    if (min == null && max == null) return null
+    val minText = min?.let { String.format(Locale.US, "%.1f h", it) }
+    val maxText = max?.let { String.format(Locale.US, "%.1f h", it) }
+    return when {
+        minText != null && maxText != null -> "$minText - $maxText"
+        minText != null -> minText
+        else -> maxText
+    }
 }
 
 internal fun formatCount(value: Long): String {
