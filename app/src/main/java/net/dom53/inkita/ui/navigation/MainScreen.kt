@@ -1,7 +1,6 @@
 package net.dom53.inkita.ui.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Language
@@ -15,9 +14,7 @@ sealed class MainScreen(
     val label: String,
     val icon: ImageVector,
 ) {
-    object Library : MainScreen("library", "Library", Icons.Filled.Book)
-
-    object LibraryV2 : MainScreen("library_v2", "Library V2", Icons.Filled.LibraryBooks)
+    object LibraryV2 : MainScreen("library_v2", "Library", Icons.Filled.LibraryBooks)
 
     object Updates : MainScreen("updates", "Updates", Icons.Filled.Update)
 
@@ -30,6 +27,6 @@ sealed class MainScreen(
     object Settings : MainScreen("settings", "Settings", Icons.Filled.Settings)
 
     companion object {
-        val items = listOf(Library, LibraryV2, Updates, History, Browse, Downloads, Settings)
+        val items = listOf(LibraryV2, Updates, History, Browse, Downloads, Settings)
     }
 }
