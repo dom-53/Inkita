@@ -293,6 +293,8 @@
     <string name="settings_cache_library_reading_lists_subtitle">Cache reading lists for offline use.</string>
     <string name="settings_cache_library_browse_people_title">Browse people</string>
     <string name="settings_cache_library_browse_people_subtitle">Cache people results for offline use.</string>
+    <string name="settings_cache_library_details_title">Series details</string>
+    <string name="settings_cache_library_details_subtitle">Cache series detail data for offline use.</string>
     <string name="settings_cache_always_refresh_title">Always refresh when online</string>
     <string name="settings_cache_always_refresh_subtitle">When online, prefer new data over cached data.</string>
     <string name="settings_cache_stale_hours_label">Cache stale after (hours)</string>

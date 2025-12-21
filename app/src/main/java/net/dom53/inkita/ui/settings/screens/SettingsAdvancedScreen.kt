@@ -71,6 +71,7 @@ fun SettingsAdvancedScreen(
     var libraryCacheCollectionsEnabled by remember { mutableStateOf(false) }
     var libraryCacheReadingListsEnabled by remember { mutableStateOf(false) }
     var libraryCacheBrowsePeopleEnabled by remember { mutableStateOf(false) }
+    var libraryCacheDetailsEnabled by remember { mutableStateOf(false) }
     var cacheAlwaysRefresh by remember { mutableStateOf(false) }
     var cacheStaleHours by remember { mutableStateOf(24) }
     var cacheStaleInput by remember { mutableStateOf("24") }
@@ -149,6 +150,9 @@ fun SettingsAdvancedScreen(
     }
     LaunchedEffect(Unit) {
         appPreferences.libraryCacheBrowsePeopleFlow.collectLatest { libraryCacheBrowsePeopleEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.libraryCacheDetailsFlow.collectLatest { libraryCacheDetailsEnabled = it }
     }
     LaunchedEffect(Unit) {
         appPreferences.cacheRefreshTtlMinutesFlow.collectLatest {
@@ -477,6 +481,15 @@ fun SettingsAdvancedScreen(
                 ) { checked ->
                     libraryCacheBrowsePeopleEnabled = checked
                     scope.launch { appPreferences.setLibraryCacheBrowsePeopleEnabled(checked) }
+                }
+                CacheToggleRow(
+                    title = stringResource(R.string.settings_cache_library_details_title),
+                    subtitle = stringResource(R.string.settings_cache_library_details_subtitle),
+                    checked = libraryCacheDetailsEnabled,
+                    enabled = globalCacheEnabled,
+                ) { checked ->
+                    libraryCacheDetailsEnabled = checked
+                    scope.launch { appPreferences.setLibraryCacheDetailsEnabled(checked) }
                 }
             }
         }

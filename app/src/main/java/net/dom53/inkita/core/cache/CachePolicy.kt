@@ -9,6 +9,7 @@ data class CachePolicy(
     val libraryCollectionsEnabled: Boolean,
     val libraryReadingListsEnabled: Boolean,
     val libraryBrowsePeopleEnabled: Boolean,
+    val libraryDetailsEnabled: Boolean,
 ) {
     val libraryWriteAllowed: Boolean get() = globalEnabled && libraryEnabled
     val browseWriteAllowed: Boolean get() = globalEnabled && browseEnabled

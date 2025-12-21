@@ -245,7 +245,7 @@ class SeriesDetailViewModelV2(
                 )
             }
             val policy = cacheManager.policy()
-            if (policy.globalEnabled && policy.libraryEnabled) {
+            if (policy.globalEnabled && policy.libraryEnabled && policy.libraryDetailsEnabled) {
                 cacheManager.cacheSeriesDetailV2(seriesId, updatedDetail)
             }
         }
@@ -259,7 +259,7 @@ class SeriesDetailViewModelV2(
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
             val staleHours = appPreferences.cacheStaleHoursFlow.first()
             val policy = cacheManager.policy()
-            val canCache = policy.globalEnabled && policy.libraryEnabled
+            val canCache = policy.globalEnabled && policy.libraryEnabled && policy.libraryDetailsEnabled
             val cachedDetail =
                 if (canCache) cacheManager.getCachedSeriesDetailV2(seriesId) else null
             val cachedUpdatedAt =

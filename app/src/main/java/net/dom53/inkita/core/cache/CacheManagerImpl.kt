@@ -116,6 +116,7 @@ class CacheManagerImpl(
         val libraryCollections = appPreferences.libraryCacheCollectionsFlow.first()
         val libraryReadingLists = appPreferences.libraryCacheReadingListsFlow.first()
         val libraryBrowsePeople = appPreferences.libraryCacheBrowsePeopleFlow.first()
+        val libraryDetails = appPreferences.libraryCacheDetailsFlow.first()
         return CachePolicy(
             globalEnabled = global,
             libraryEnabled = library,
@@ -125,6 +126,7 @@ class CacheManagerImpl(
             libraryCollectionsEnabled = libraryCollections,
             libraryReadingListsEnabled = libraryReadingLists,
             libraryBrowsePeopleEnabled = libraryBrowsePeople,
+            libraryDetailsEnabled = libraryDetails,
         )
     }
 
@@ -350,7 +352,7 @@ class CacheManagerImpl(
     ) {
         val dao = seriesDetailV2Dao ?: return
         val p = policy()
-        if (!p.globalEnabled || !p.libraryEnabled) return
+        if (!p.globalEnabled || !p.libraryEnabled || !p.libraryDetailsEnabled) return
         val now = System.currentTimeMillis()
         val metadata = detail.metadata
         val entity =
@@ -389,7 +391,7 @@ class CacheManagerImpl(
     override suspend fun getCachedSeriesDetailV2(seriesId: Int): InkitaDetailV2? {
         val dao = seriesDetailV2Dao ?: return null
         val p = policy()
-        if (!p.globalEnabled || !p.libraryEnabled) return null
+        if (!p.globalEnabled || !p.libraryEnabled || !p.libraryDetailsEnabled) return null
         val entity = dao.getSeriesDetail(seriesId) ?: return null
         val series = entity.seriesJson?.let { fromJson(seriesAdapter, it) }
         val metadata = entity.metadataJson?.let { fromJson(metadataAdapter, it) }
