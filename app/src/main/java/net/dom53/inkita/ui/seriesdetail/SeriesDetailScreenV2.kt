@@ -70,6 +70,8 @@ fun SeriesDetailScreenV2(
     onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
     onOpenVolume: (Int) -> Unit,
     onOpenSeries: (Int) -> Unit,
+    readerReturn: net.dom53.inkita.ui.reader.ReaderReturn? = null,
+    onConsumeReaderReturn: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     val viewModel: SeriesDetailViewModelV2 =
@@ -83,6 +85,12 @@ fun SeriesDetailScreenV2(
         if (uiState.showLoadedToast) {
             Toast.makeText(context, "Detail data loaded", Toast.LENGTH_SHORT).show()
             viewModel.consumeLoadedToast()
+        }
+    }
+    LaunchedEffect(readerReturn) {
+        if (readerReturn != null) {
+            viewModel.reload()
+            onConsumeReaderReturn()
         }
     }
     val config by appPreferences.configFlow.collectAsState(

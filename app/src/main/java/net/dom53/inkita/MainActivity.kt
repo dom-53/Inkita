@@ -369,6 +369,8 @@ fun InkitaApp(
                         onOpenSeries = { id ->
                             navController.navigate("series/$id")
                         },
+                        readerReturn = readerReturn.value,
+                        onConsumeReaderReturn = { entry.savedStateHandle["reader_return"] = null },
                         onBack = { navController.popBackStack() },
                     )
                 }

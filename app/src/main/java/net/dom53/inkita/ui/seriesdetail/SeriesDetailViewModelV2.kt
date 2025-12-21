@@ -72,6 +72,10 @@ class SeriesDetailViewModelV2(
         _state.update { it.copy(showLoadedToast = false) }
     }
 
+    fun reload() {
+        load()
+    }
+
     fun loadCollections() {
         if (_state.value.isLoadingCollections) return
         viewModelScope.launch {
