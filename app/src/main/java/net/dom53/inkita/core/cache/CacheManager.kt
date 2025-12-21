@@ -1,10 +1,10 @@
 package net.dom53.inkita.core.cache
 
-import net.dom53.inkita.domain.model.Series
-import net.dom53.inkita.domain.model.SeriesDetail
 import net.dom53.inkita.domain.model.Collection
 import net.dom53.inkita.domain.model.Person
 import net.dom53.inkita.domain.model.ReadingList
+import net.dom53.inkita.domain.model.Series
+import net.dom53.inkita.domain.model.SeriesDetail
 import net.dom53.inkita.domain.model.filter.SeriesQuery
 import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
 import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2

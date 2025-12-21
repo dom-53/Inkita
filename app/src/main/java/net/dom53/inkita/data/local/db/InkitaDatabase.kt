@@ -13,9 +13,9 @@ import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
 import net.dom53.inkita.data.local.db.dao.SeriesDetailV2Dao
+import net.dom53.inkita.data.local.db.entity.CachedChapterV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedCollectionRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedCollectionV2Entity
-import net.dom53.inkita.data.local.db.entity.CachedChapterV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedPageEntity
 import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedPersonV2Entity
@@ -28,10 +28,10 @@ import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesVolumeRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedVolumeChapterRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedVolumeV2Entity
-import net.dom53.inkita.data.local.db.entity.DownloadTaskEntity
-import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
+import net.dom53.inkita.data.local.db.entity.DownloadTaskEntity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
+import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
 
 @Database(
     entities = [

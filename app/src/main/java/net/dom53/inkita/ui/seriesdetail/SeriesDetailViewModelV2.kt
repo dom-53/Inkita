@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import net.dom53.inkita.core.cache.CacheManager
-import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.network.KavitaApiFactory
+import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.api.dto.AnnotationDto
 import net.dom53.inkita.data.api.dto.AppUserCollectionDto
@@ -442,10 +442,11 @@ class SeriesDetailViewModelV2(
 
     private suspend fun showDebugToast(messageRes: Int) {
         if (!appPreferences.debugToastsFlow.first()) return
-        Toast.makeText(
-            appPreferences.appContext,
-            appPreferences.appContext.getString(messageRes),
-            Toast.LENGTH_SHORT,
-        ).show()
+        Toast
+            .makeText(
+                appPreferences.appContext,
+                appPreferences.appContext.getString(messageRes),
+                Toast.LENGTH_SHORT,
+            ).show()
     }
 }

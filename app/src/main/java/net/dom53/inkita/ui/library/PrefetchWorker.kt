@@ -24,7 +24,8 @@ class PrefetchWorker(
         fun enqueue(context: Context) {
             LoggingManager.d("PrefetchWorker", "enqueue called (skeleton)")
             val constraints =
-                Constraints.Builder()
+                Constraints
+                    .Builder()
                     .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
                     .build()
             val work =

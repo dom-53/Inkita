@@ -8,19 +8,10 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.storage.AppPreferences
-import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
-import net.dom53.inkita.data.local.db.dao.SeriesDetailV2Dao
-import net.dom53.inkita.data.local.db.entity.CachedCollectionRefEntity
-import net.dom53.inkita.data.local.db.entity.CachedCollectionV2Entity
-import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
-import net.dom53.inkita.data.local.db.entity.CachedPersonV2Entity
-import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
-import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
-import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
-import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
 import net.dom53.inkita.data.api.dto.AnnotationDto
 import net.dom53.inkita.data.api.dto.AppUserCollectionDto
 import net.dom53.inkita.data.api.dto.BookmarkDto
@@ -34,16 +25,25 @@ import net.dom53.inkita.data.api.dto.SeriesDetailDto
 import net.dom53.inkita.data.api.dto.SeriesDetailPlusDto
 import net.dom53.inkita.data.api.dto.SeriesDto
 import net.dom53.inkita.data.api.dto.SeriesMetadataDto
+import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
+import net.dom53.inkita.data.local.db.dao.SeriesDetailV2Dao
+import net.dom53.inkita.data.local.db.entity.CachedCollectionRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedCollectionV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedPersonV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
+import net.dom53.inkita.domain.model.Collection
+import net.dom53.inkita.domain.model.Format
+import net.dom53.inkita.domain.model.Person
+import net.dom53.inkita.domain.model.ReadState
+import net.dom53.inkita.domain.model.ReadingList
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.domain.model.SeriesDetail
-import net.dom53.inkita.domain.model.Collection
-import net.dom53.inkita.domain.model.Person
-import net.dom53.inkita.domain.model.ReadingList
-import net.dom53.inkita.domain.model.Format
-import net.dom53.inkita.domain.model.ReadState
 import net.dom53.inkita.domain.model.filter.SeriesQuery
 import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
-import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -166,24 +166,16 @@ class CacheManagerImpl(
         // Legacy cache removed; no-op.
     }
 
-    override suspend fun getCachedSeries(query: SeriesQuery): List<Series> {
-        return emptyList()
-    }
+    override suspend fun getCachedSeries(query: SeriesQuery): List<Series> = emptyList()
 
-    override suspend fun getCachedSeriesForTab(key: LibraryTabCacheKey): List<Series> {
-        return emptyList()
-    }
+    override suspend fun getCachedSeriesForTab(key: LibraryTabCacheKey): List<Series> = emptyList()
 
     override suspend fun getCachedBrowsePage(
         queryKey: String,
         page: Int,
-    ): List<Series> {
-        return emptyList()
-    }
+    ): List<Series> = emptyList()
 
-    override suspend fun getCachedSeriesDetail(seriesId: Int): SeriesDetail? {
-        return null
-    }
+    override suspend fun getCachedSeriesDetail(seriesId: Int): SeriesDetail? = null
 
     override suspend fun cacheLibraryV2SeriesList(
         listType: String,
@@ -317,10 +309,11 @@ class CacheManagerImpl(
         if (!isLibraryV2CacheAllowed(p, listType)) return
         val now = System.currentTimeMillis()
         val unique =
-            people.mapNotNull { person ->
-                val id = person.id ?: return@mapNotNull null
-                id to person
-            }.distinctBy { it.first }
+            people
+                .mapNotNull { person ->
+                    val id = person.id ?: return@mapNotNull null
+                    id to person
+                }.distinctBy { it.first }
         dao.upsertPeople(unique.map { CachedPersonV2Entity(it.first, it.second.name, now) })
         dao.clearPersonRefs(listType, page)
         val refs =
@@ -626,15 +619,24 @@ class CacheManagerImpl(
         val genres =
             entity.genres
                 ?.let { fromJsonList(stringListAdapter, it) }
-                ?.mapIndexed { index, name -> net.dom53.inkita.data.api.dto.GenreTagDto(-(index + 1), name) }
+                ?.mapIndexed { index, name ->
+                    net.dom53.inkita.data.api.dto
+                        .GenreTagDto(-(index + 1), name)
+                }
         val tags =
             entity.tags
                 ?.let { fromJsonList(stringListAdapter, it) }
-                ?.map { name -> net.dom53.inkita.data.api.dto.TagDto(null, name) }
+                ?.map { name ->
+                    net.dom53.inkita.data.api.dto
+                        .TagDto(null, name)
+                }
         val writers =
             entity.writers
                 ?.let { fromJsonList(stringListAdapter, it) }
-                ?.map { name -> net.dom53.inkita.data.api.dto.PersonDto(name = name) }
+                ?.map { name ->
+                    net.dom53.inkita.data.api.dto
+                        .PersonDto(name = name)
+                }
         return SeriesMetadataDto(
             summary = entity.summary,
             publicationStatus = entity.publicationStatus,
@@ -645,11 +647,15 @@ class CacheManagerImpl(
         )
     }
 
-    private fun <T> fromJson(adapter: com.squareup.moshi.JsonAdapter<T>, value: String): T? =
-        runCatching { adapter.fromJson(value) }.getOrNull()
+    private fun <T> fromJson(
+        adapter: com.squareup.moshi.JsonAdapter<T>,
+        value: String,
+    ): T? = runCatching { adapter.fromJson(value) }.getOrNull()
 
-    private fun <T> fromJsonList(adapter: com.squareup.moshi.JsonAdapter<List<T>>, value: String): List<T>? =
-        runCatching { adapter.fromJson(value) }.getOrNull()
+    private fun <T> fromJsonList(
+        adapter: com.squareup.moshi.JsonAdapter<List<T>>,
+        value: String,
+    ): List<T>? = runCatching { adapter.fromJson(value) }.getOrNull()
 
     private fun Series.toCachedSeriesV2(updatedAt: Long): CachedSeriesV2Entity =
         CachedSeriesV2Entity(

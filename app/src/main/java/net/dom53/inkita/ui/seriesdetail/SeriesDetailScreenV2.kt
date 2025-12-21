@@ -25,14 +25,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Downloading
 import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Downloading
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -43,13 +44,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -65,12 +65,13 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import net.dom53.inkita.core.storage.AppConfig
-import net.dom53.inkita.core.storage.AppPreferences
+import kotlinx.coroutines.launch
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
+import net.dom53.inkita.core.storage.AppConfig
+import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.domain.model.Format
@@ -79,7 +80,6 @@ import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
-import kotlinx.coroutines.launch
 
 @Composable
 fun SeriesDetailScreenV2(
@@ -210,20 +210,25 @@ fun SeriesDetailScreenV2(
                                                     add(chapter to (chapter.volumeId ?: volume.id))
                                                 }
                                         }
-                                        detail?.detail?.chapters
+                                        detail
+                                            ?.detail
+                                            ?.chapters
                                             ?.forEach { chapter ->
                                                 add(chapter to chapter.volumeId)
                                             }
-                                        detail?.detail?.specials
+                                        detail
+                                            ?.detail
+                                            ?.specials
                                             ?.forEach { chapter ->
                                                 add(chapter to chapter.volumeId)
                                             }
-                                        detail?.detail?.storylineChapters
+                                        detail
+                                            ?.detail
+                                            ?.storylineChapters
                                             ?.forEach { chapter ->
                                                 add(chapter to chapter.volumeId)
                                             }
-                                    }
-                                        .distinctBy { it.first.id }
+                                    }.distinctBy { it.first.id }
                                         .filter { (it.first.pages ?: 0) > 0 }
                                 if (chaptersWithVolume.isEmpty()) {
                                     Toast
@@ -1023,8 +1028,7 @@ private fun VolumeGridRow(
                                     .background(
                                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
                                         shape = MaterialTheme.shapes.small,
-                                    )
-                                    .padding(4.dp),
+                                    ).padding(4.dp),
                         ) {
                             Icon(
                                 imageVector =

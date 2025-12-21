@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import net.dom53.inkita.R
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import net.dom53.inkita.core.network.NetworkUtils
@@ -23,7 +24,6 @@ import net.dom53.inkita.domain.repository.LibraryRepository
 import net.dom53.inkita.domain.repository.PersonRepository
 import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
-import net.dom53.inkita.R
 
 data class HomeSeriesItem(
     val id: Int,
@@ -783,13 +783,16 @@ class LibraryV2ViewModel(
         }
     }
 
-    private suspend fun maybeShowDebugToast(@StringRes messageRes: Int) {
+    private suspend fun maybeShowDebugToast(
+        @StringRes messageRes: Int,
+    ) {
         if (!appPreferences.debugToastsFlow.first()) return
-        Toast.makeText(
-            appPreferences.appContext,
-            appPreferences.appContext.getString(messageRes),
-            Toast.LENGTH_SHORT,
-        ).show()
+        Toast
+            .makeText(
+                appPreferences.appContext,
+                appPreferences.appContext.getString(messageRes),
+                Toast.LENGTH_SHORT,
+            ).show()
     }
 
     private fun showCollectionSeriesDebugToast(collectionId: Int) {

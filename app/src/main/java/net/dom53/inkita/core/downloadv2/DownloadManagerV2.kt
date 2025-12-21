@@ -23,14 +23,16 @@ class DownloadManagerV2(
 
     fun enqueueWorker() {
         val constraints =
-            Constraints.Builder()
+            Constraints
+                .Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
         val request =
             OneTimeWorkRequestBuilder<DownloadWorkerV2>()
                 .setConstraints(constraints)
                 .build()
-        WorkManager.getInstance(appContext)
+        WorkManager
+            .getInstance(appContext)
             .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
     }
 

@@ -20,8 +20,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Downloading
 import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Downloading
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -163,8 +163,7 @@ internal fun ChapterListV2(
                                     .background(
                                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
                                         shape = MaterialTheme.shapes.small,
-                                    )
-                                    .padding(4.dp),
+                                    ).padding(4.dp),
                         ) {
                             Icon(
                                 imageVector =

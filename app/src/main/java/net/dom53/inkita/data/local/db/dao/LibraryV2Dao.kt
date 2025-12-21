@@ -22,7 +22,10 @@ interface LibraryV2Dao {
     suspend fun upsertSeriesRefs(refs: List<CachedSeriesListRefEntity>)
 
     @Query("DELETE FROM cached_series_list_refs_v2 WHERE listType = :listType AND listKey = :listKey")
-    suspend fun clearSeriesRefs(listType: String, listKey: String)
+    suspend fun clearSeriesRefs(
+        listType: String,
+        listKey: String,
+    )
 
     @Query("DELETE FROM cached_series_list_refs_v2")
     suspend fun clearAllSeriesRefs()
@@ -38,7 +41,10 @@ interface LibraryV2Dao {
         ORDER BY ref.position ASC
         """,
     )
-    suspend fun getSeriesForList(listType: String, listKey: String): List<CachedSeriesV2Entity>
+    suspend fun getSeriesForList(
+        listType: String,
+        listKey: String,
+    ): List<CachedSeriesV2Entity>
 
     @Query(
         """
@@ -46,7 +52,10 @@ interface LibraryV2Dao {
         WHERE listType = :listType AND listKey = :listKey
         """,
     )
-    suspend fun getSeriesListUpdatedAt(listType: String, listKey: String): Long?
+    suspend fun getSeriesListUpdatedAt(
+        listType: String,
+        listKey: String,
+    ): Long?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertCollections(items: List<CachedCollectionV2Entity>)
@@ -111,7 +120,10 @@ interface LibraryV2Dao {
     suspend fun upsertPersonRefs(refs: List<CachedPersonRefEntity>)
 
     @Query("DELETE FROM cached_person_refs_v2 WHERE listType = :listType AND page = :page")
-    suspend fun clearPersonRefs(listType: String, page: Int)
+    suspend fun clearPersonRefs(
+        listType: String,
+        page: Int,
+    )
 
     @Query("DELETE FROM cached_person_refs_v2")
     suspend fun clearAllPersonRefs()
@@ -127,7 +139,10 @@ interface LibraryV2Dao {
         ORDER BY ref.position ASC
         """,
     )
-    suspend fun getPeopleForList(listType: String, page: Int): List<CachedPersonV2Entity>
+    suspend fun getPeopleForList(
+        listType: String,
+        page: Int,
+    ): List<CachedPersonV2Entity>
 
     @Query(
         """
@@ -135,7 +150,10 @@ interface LibraryV2Dao {
         WHERE listType = :listType AND page = :page
         """,
     )
-    suspend fun getPeopleUpdatedAt(listType: String, page: Int): Long?
+    suspend fun getPeopleUpdatedAt(
+        listType: String,
+        page: Int,
+    ): Long?
 
     @Query("SELECT COUNT(*) FROM cached_series_v2")
     suspend fun getSeriesCount(): Int

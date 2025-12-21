@@ -54,9 +54,7 @@ class DownloadQueueViewModel(
         }
     }
 
-    fun deleteDownloaded(
-        itemId: Long,
-    ) {
+    fun deleteDownloaded(itemId: Long) {
         viewModelScope.launch { downloadDao.deleteItemById(itemId) }
     }
 
@@ -71,7 +69,10 @@ class DownloadQueueViewModel(
         viewModelScope.launch { downloadDao.deleteJobsByStatus(DownloadJobV2Entity.STATUS_COMPLETED) }
     }
 
-    private suspend fun updateJobStatus(id: Long, status: String) {
+    private suspend fun updateJobStatus(
+        id: Long,
+        status: String,
+    ) {
         val job = downloadDao.getJob(id) ?: return
         downloadDao.updateJob(
             job.copy(
