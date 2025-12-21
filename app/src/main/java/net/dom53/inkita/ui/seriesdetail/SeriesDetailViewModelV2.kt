@@ -64,6 +64,35 @@ class SeriesDetailViewModelV2(
         _state.update { it.copy(showLoadedToast = false) }
     }
 
+    fun toggleWantToRead() {
+        viewModelScope.launch {
+            val current = _state.value.detail ?: return@launch
+            val currentSeriesId = current.series?.id ?: seriesId
+            val config = appPreferences.configFlow.first()
+            if (!config.isConfigured) {
+                _state.update { it.copy(error = "Not configured") }
+                return@launch
+            }
+            val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+            val want = current.wantToRead == true
+            val response =
+                if (want) {
+                    api.removeWantToRead(net.dom53.inkita.data.api.dto.WantToReadDto(listOf(currentSeriesId)))
+                } else {
+                    api.addWantToRead(net.dom53.inkita.data.api.dto.WantToReadDto(listOf(currentSeriesId)))
+                }
+            if (!response.isSuccessful) {
+                _state.update { it.copy(error = "Failed to update want-to-read") }
+                return@launch
+            }
+            _state.update { state ->
+                state.copy(
+                    detail = state.detail?.copy(wantToRead = !want),
+                )
+            }
+        }
+    }
+
     private fun load() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }

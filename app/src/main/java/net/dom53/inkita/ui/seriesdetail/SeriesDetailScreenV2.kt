@@ -1,24 +1,75 @@
 package net.dom53.inkita.ui.seriesdetail
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.core.storage.AppConfig
+import net.dom53.inkita.ui.common.seriesCoverUrl
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
+import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
+import net.dom53.inkita.ui.browse.utils.PublicationState
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import android.content.Intent
+import android.net.Uri
 
 @Composable
 fun SeriesDetailScreenV2(
@@ -30,28 +81,654 @@ fun SeriesDetailScreenV2(
         viewModel(
             factory = SeriesDetailViewModelV2.provideFactory(seriesId, appPreferences),
         )
-    val uiState = viewModel.state.collectAsState()
+    val uiState by viewModel.state.collectAsState()
     val context = LocalContext.current
-    LaunchedEffect(uiState.value.showLoadedToast) {
-        if (uiState.value.showLoadedToast) {
+    val clipboardManager = LocalClipboardManager.current
+    LaunchedEffect(uiState.showLoadedToast) {
+        if (uiState.showLoadedToast) {
             Toast.makeText(context, "Detail data loaded", Toast.LENGTH_SHORT).show()
             viewModel.consumeLoadedToast()
         }
     }
-    Column(
+    val config by appPreferences.configFlow.collectAsState(
+        initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
+    )
+    var summaryExpanded by remember { mutableStateOf(false) }
+    var coverExpanded by remember { mutableStateOf(false) }
+    Box(
         modifier = Modifier.fillMaxSize(),
     ) {
-        IconButton(onClick = onBack) {
-            Icon(Icons.Filled.ArrowBack, contentDescription = null)
-        }
-        Box(
+        Column(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "Detail V2",
-                style = MaterialTheme.typography.titleMedium,
+            IconButton(onClick = onBack) {
+                Icon(Icons.Filled.ArrowBack, contentDescription = null)
+            }
+            when {
+                uiState.isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "Loading...",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
+
+                uiState.error != null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = uiState.error ?: "Error",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+
+                else -> {
+                    val detail = uiState.detail
+                    val series = detail?.series
+                    val metadata = detail?.metadata
+                    val coverUrl = series?.id?.let { seriesCoverUrl(config, it) }
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp)
+                                .verticalScroll(rememberScrollState()),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            CoverImage(
+                                coverUrl = coverUrl,
+                                context = context,
+                                modifier =
+                                    Modifier
+                                        .width(140.dp)
+                                        .aspectRatio(2f / 3f)
+                                        .clickable { coverExpanded = true },
+                            )
+                                HeaderInfo(
+                                    seriesId = seriesId,
+                                    series = series,
+                                    metadata = metadata,
+                                    detail = detail,
+                                    context = context,
+                                    clipboardManager = clipboardManager,
+                                    onCopyToast = {
+                                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        ActionsRowV2(
+                            wantToRead = detail?.wantToRead == true,
+                            onToggleWant = {
+                                viewModel.toggleWantToRead()
+                            },
+                            onOpenCollections = {
+                                Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show()
+                            },
+                            onOpenWeb = {
+                                val url = webUrl(config, series?.libraryId, seriesId)
+                                if (url == null) {
+                                    Toast.makeText(context, "Missing library id", Toast.LENGTH_SHORT).show()
+                                    return@ActionsRowV2
+                                }
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                }.onFailure {
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(net.dom53.inkita.R.string.general_unable_to_share),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                            },
+                            onShare = {
+                                val url = webUrl(config, series?.libraryId, seriesId)
+                                val title = series?.name?.ifBlank { null } ?: "Series $seriesId"
+                                val shareIntent =
+                                    Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_SUBJECT, title)
+                                        putExtra(Intent.EXTRA_TEXT, url ?: title)
+                                    }
+                                runCatching {
+                                    context.startActivity(
+                                        Intent.createChooser(
+                                            shareIntent,
+                                            context.getString(net.dom53.inkita.R.string.general_share),
+                                        ),
+                                    )
+                                }.onFailure {
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(net.dom53.inkita.R.string.general_unable_to_share),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                            },
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        SummarySectionV2(
+                            summary = cleanHtml(metadata?.summary),
+                            genres = metadata?.genres?.mapNotNull { it.title }.orEmpty(),
+                            tags = metadata?.tags?.mapNotNull { it.title }.orEmpty(),
+                            expanded = summaryExpanded,
+                            onToggle = { summaryExpanded = !summaryExpanded },
+                        )
+                        Button(
+                            onClick = {
+                                Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = "Pokračovat ve čtení")
+                        }
+                        val booksCount = detail?.detail?.volumes?.size
+                        val chaptersCount = detail?.detail?.chapters?.size
+                        val specialsCount = detail?.detail?.specials?.size
+                        val relatedCount = detail?.related?.let { relatedSeriesCount(it) }
+                        val tabs =
+                            listOf(
+                                TabItem(SeriesDetailTab.Books, booksCount ?: 0),
+                                TabItem(SeriesDetailTab.Chapters, chaptersCount ?: 0),
+                                TabItem(SeriesDetailTab.Specials, specialsCount ?: 0),
+                                TabItem(SeriesDetailTab.Related, relatedCount ?: 0),
+                                TabItem(SeriesDetailTab.Recommendations, 0),
+                                TabItem(SeriesDetailTab.Reviews, 0),
+                            ).filter { it.count > 0 }
+                        var selectedTab by remember { mutableStateOf(tabs.firstOrNull()?.id ?: SeriesDetailTab.Books) }
+                        LaunchedEffect(tabs) {
+                            if (tabs.none { it.id == selectedTab }) {
+                                tabs.firstOrNull()?.let { selectedTab = it.id }
+                            }
+                        }
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            tabs.forEach { tab ->
+                                SectionChip(
+                                    label = tab.id.label,
+                                    count = tab.count,
+                                    selected = selectedTab == tab.id,
+                                    onClick = { selectedTab = tab.id },
+                                )
+                            }
+                        }
+                        if (selectedTab == SeriesDetailTab.Books) {
+                            VolumeListV2(
+                                volumes = detail?.detail?.volumes.orEmpty(),
+                                coverUrl = series?.id?.let { seriesCoverUrl(config, it) },
+                                context = context,
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
+                }
+            }
+        }
+
+        if (coverExpanded) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .clickable { coverExpanded = false },
+                contentAlignment = Alignment.Center,
+            ) {
+                CoverImage(
+                    coverUrl = uiState.detail?.series?.id?.let { seriesCoverUrl(config, it) },
+                    context = context,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp)
+                            .aspectRatio(2f / 3f)
+                            .clickable { coverExpanded = false },
+                )
+            }
+        }
+    }
+}
+
+
+private fun formatHours(value: Float?): String? {
+    return value?.let { String.format(Locale.US, "%.1f h", it) }
+}
+
+private fun formatCount(value: Long): String {
+    return when {
+        value >= 1_000_000L -> String.format(Locale.US, "%.1fM", value / 1_000_000f)
+        value >= 1_000L -> String.format(Locale.US, "%.0fk", value / 1_000f)
+        else -> value.toString()
+    }
+}
+
+private fun formatDate(value: String): String {
+    val formatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault())
+    val parsed =
+        runCatching { OffsetDateTime.parse(value).toLocalDate() }.getOrNull()
+            ?: runCatching { LocalDateTime.parse(value).toLocalDate() }.getOrNull()
+            ?: runCatching { Instant.parse(value).atZone(ZoneId.systemDefault()).toLocalDate() }.getOrNull()
+    return parsed?.format(formatter) ?: value
+}
+
+
+private fun webUrl(
+    config: AppConfig,
+    libraryId: Int?,
+    seriesId: Int,
+): String? {
+    if (!config.isConfigured || libraryId == null) return null
+    val base = if (config.serverUrl.endsWith("/")) config.serverUrl.dropLast(1) else config.serverUrl
+    return "$base/library/$libraryId/series/$seriesId"
+}
+
+@Composable
+private fun CoverImage(
+    coverUrl: String?,
+    context: android.content.Context,
+    modifier: Modifier = Modifier,
+) {
+    if (coverUrl != null) {
+        AsyncImage(
+            model =
+                ImageRequest
+                    .Builder(context)
+                    .data(coverUrl)
+                    .crossfade(true)
+                    .build(),
+            contentDescription = null,
+            modifier = modifier,
+        )
+    } else {
+        Box(
+            modifier =
+                modifier
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+        )
+    }
+}
+
+@Composable
+private fun ActionsRowV2(
+    wantToRead: Boolean,
+    onToggleWant: () -> Unit,
+    onOpenCollections: () -> Unit,
+    onOpenWeb: () -> Unit,
+    onShare: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilledTonalButton(
+            onClick = onOpenCollections,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+            colors =
+                ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.SwapHoriz,
+                contentDescription = stringResource(net.dom53.inkita.R.string.general_collections),
+                modifier = Modifier.size(18.dp),
             )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(stringResource(net.dom53.inkita.R.string.general_collections))
+        }
+        FilledTonalButton(
+            onClick = onToggleWant,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+            colors =
+                ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+        ) {
+            Icon(
+                imageVector = if (wantToRead) Icons.Filled.Star else Icons.Filled.StarBorder,
+                contentDescription = stringResource(net.dom53.inkita.R.string.general_want_to_read),
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(stringResource(net.dom53.inkita.R.string.general_want_to_read))
+        }
+        IconButton(onClick = onOpenWeb) {
+            Icon(Icons.Filled.Public, contentDescription = stringResource(net.dom53.inkita.R.string.general_open_in_browser))
+        }
+        IconButton(onClick = onShare) {
+            Icon(Icons.Filled.Share, contentDescription = stringResource(net.dom53.inkita.R.string.general_share))
+        }
+    }
+}
+
+@Composable
+private fun VolumeListV2(
+    volumes: List<net.dom53.inkita.data.api.dto.VolumeDto>,
+    coverUrl: String?,
+    context: android.content.Context,
+) {
+    if (volumes.isEmpty()) return
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        volumes.forEachIndexed { index, volume ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CoverImage(
+                    coverUrl = coverUrl,
+                    context = context,
+                    modifier =
+                        Modifier
+                            .width(56.dp)
+                            .aspectRatio(2f / 3f),
+                )
+                val title =
+                    volume.name?.takeIf { it.isNotBlank() }
+                        ?: "Volume ${index + 1}"
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeaderInfo(
+    seriesId: Int,
+    series: net.dom53.inkita.data.api.dto.SeriesDto?,
+    metadata: net.dom53.inkita.data.api.dto.SeriesMetadataDto?,
+    detail: InkitaDetailV2?,
+    context: android.content.Context,
+    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
+    onCopyToast: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val seriesTitle = series?.name?.ifBlank { null } ?: "Series $seriesId"
+        Text(
+            text = seriesTitle,
+            style = MaterialTheme.typography.titleLarge,
+            modifier =
+                Modifier.clickable {
+                    if (seriesTitle.isNotBlank()) {
+                        clipboardManager.setText(AnnotatedString(seriesTitle))
+                        onCopyToast()
+                    }
+                },
+        )
+        val writerNames =
+            metadata
+                ?.writers
+                ?.mapNotNull { it.name?.takeIf { name -> name.isNotBlank() } }
+                ?.joinToString(", ")
+                ?.ifBlank { null }
+        Text(
+            text = "Author: ${writerNames ?: "-"}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text =
+                "Publication: " +
+                    (metadata?.publicationStatus?.let { status ->
+                        PublicationState.entries.firstOrNull { it.code == status }?.let { state ->
+                            context.getString(state.titleRes)
+                        }
+                    } ?: "-"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text =
+                "Release year: " +
+                    (metadata?.releaseYear?.toString() ?: "-"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text =
+                "Avg time: " +
+                    (formatHours(series?.avgHoursToRead) ?: "-") +
+                    " / " +
+                    (formatHours(detail?.timeLeft?.avgHours) ?: "-"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text =
+                "${stringResource(id = net.dom53.inkita.R.string.general_words)}: " +
+                    (series?.wordCount?.let { formatCount(it) } ?: "-"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text =
+                "Status: " +
+                    (readStateLabel(
+                        context,
+                        unreadCount = detail?.detail?.unreadCount,
+                        totalCount = detail?.detail?.totalCount,
+                        hasProgress = detail?.hasProgress,
+                    ) ?: "-"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val lastRead = series?.latestReadDate?.takeIf { it.isNotBlank() }
+        val lastUpdated = series?.lastChapterAdded?.takeIf { it.isNotBlank() }
+        Text(
+            text = "Last read: ${lastRead?.let { formatDate(it) } ?: "-"}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = "Last update: ${lastUpdated?.let { formatDate(it) } ?: "-"}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun SectionChip(
+    label: String,
+    count: Int?,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val labelText = if (count != null) "$label $count" else label
+    AssistChip(
+        onClick = onClick,
+        label = { Text(labelText) },
+        colors =
+            androidx.compose.material3.AssistChipDefaults.assistChipColors(
+                containerColor =
+                    if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    },
+                labelColor =
+                    if (selected) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+            ),
+    )
+}
+
+private enum class SeriesDetailTab {
+    Books,
+    Chapters,
+    Specials,
+    Related,
+    Recommendations,
+    Reviews;
+
+    val label: String
+        get() =
+            when (this) {
+                Books -> "Books"
+                Chapters -> "Chapters"
+                Specials -> "Specials"
+                Related -> "Related"
+                Recommendations -> "Recommendations"
+                Reviews -> "Reviews"
+            }
+}
+
+private fun relatedSeriesCount(related: net.dom53.inkita.data.api.dto.RelatedSeriesDto): Int {
+    return listOf(
+        related.sequels,
+        related.prequels,
+        related.spinOffs,
+        related.adaptations,
+        related.sideStories,
+        related.characters,
+        related.contains,
+        related.others,
+        related.alternativeSettings,
+        related.alternativeVersions,
+        related.doujinshis,
+        related.parent,
+        related.editions,
+        related.annuals,
+    ).sumOf { it?.size ?: 0 }
+}
+
+private data class TabItem(
+    val id: SeriesDetailTab,
+    val count: Int,
+)
+
+private fun readStateLabel(
+    context: android.content.Context,
+    unreadCount: Int?,
+    totalCount: Int?,
+    hasProgress: Boolean?,
+): String? {
+    if (unreadCount == null || totalCount == null) {
+        return when (hasProgress) {
+            true -> context.resources.getString(net.dom53.inkita.R.string.general_reading_status_in_progress)
+            false -> context.resources.getString(net.dom53.inkita.R.string.general_reading_status_unread)
+            null -> null
+        }
+    }
+    if (totalCount <= 0) {
+        return null
+    }
+    return when {
+        unreadCount <= 0 -> context.resources.getString(net.dom53.inkita.R.string.general_reading_status_completed)
+        unreadCount >= totalCount -> context.resources.getString(net.dom53.inkita.R.string.general_reading_status_unread)
+        else -> context.resources.getString(net.dom53.inkita.R.string.general_reading_status_in_progress)
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SummarySectionV2(
+    summary: String?,
+    genres: List<String>,
+    tags: List<String>,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        val summaryText = summary?.ifBlank { null }
+        if (summaryText != null) {
+            Text(
+                text = summaryText,
+                maxLines = if (expanded) Int.MAX_VALUE else 4,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onToggle) {
+                    Text(
+                        text =
+                            if (expanded) {
+                                stringResource(id = net.dom53.inkita.R.string.general_less)
+                            } else {
+                                stringResource(id = net.dom53.inkita.R.string.general_more)
+                            },
+                    )
+                }
+            }
+        }
+
+        if (expanded) {
+            ChipGroup(
+                title = stringResource(id = net.dom53.inkita.R.string.general_genres),
+                items = genres,
+            )
+            ChipGroup(
+                title = stringResource(id = net.dom53.inkita.R.string.general_tags),
+                items = tags,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChipGroup(
+    title: String,
+    items: List<String>,
+) {
+    val trimmed = items.mapNotNull { it.trim().takeIf { titleText -> titleText.isNotEmpty() } }
+    if (trimmed.isEmpty()) {
+        return
+    }
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            trimmed.forEach { item ->
+                AssistChip(onClick = {}, label = { Text(item) })
+            }
         }
     }
 }
