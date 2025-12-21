@@ -9,6 +9,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import net.dom53.inkita.data.local.db.dao.DownloadDao
+import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
 import net.dom53.inkita.data.local.db.dao.SeriesDetailV2Dao
@@ -29,6 +30,8 @@ import net.dom53.inkita.data.local.db.entity.CachedVolumeChapterRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedVolumeV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadTaskEntity
 import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
+import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
+import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 
 @Database(
     entities = [
@@ -49,9 +52,11 @@ import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
         CachedPageEntity::class,
         DownloadTaskEntity::class,
         DownloadedPageEntity::class,
+        DownloadJobV2Entity::class,
+        DownloadedItemV2Entity::class,
         net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity::class,
     ],
-    version = 16,
+    version = 17,
     exportSchema = false,
 )
 abstract class InkitaDatabase : RoomDatabase() {
@@ -62,6 +67,8 @@ abstract class InkitaDatabase : RoomDatabase() {
     abstract fun readerDao(): ReaderDao
 
     abstract fun downloadDao(): DownloadDao
+
+    abstract fun downloadV2Dao(): DownloadV2Dao
 
     companion object {
         @Volatile
@@ -480,6 +487,50 @@ abstract class InkitaDatabase : RoomDatabase() {
                     database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN seriesDetailPlusJson TEXT")
                 }
             }
+        private val MIGRATION_16_17 =
+            object : Migration(16, 17) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS download_jobs_v2(
+                            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            type TEXT NOT NULL,
+                            format TEXT,
+                            strategy TEXT,
+                            seriesId INTEGER,
+                            volumeId INTEGER,
+                            chapterId INTEGER,
+                            status TEXT NOT NULL,
+                            totalItems INTEGER,
+                            completedItems INTEGER,
+                            priority INTEGER NOT NULL,
+                            createdAt INTEGER NOT NULL,
+                            updatedAt INTEGER NOT NULL,
+                            error TEXT
+                        )
+                        """.trimIndent(),
+                    )
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS download_items_v2(
+                            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            jobId INTEGER NOT NULL,
+                            type TEXT NOT NULL,
+                            chapterId INTEGER,
+                            page INTEGER,
+                            url TEXT,
+                            localPath TEXT,
+                            bytes INTEGER,
+                            checksum TEXT,
+                            status TEXT NOT NULL,
+                            createdAt INTEGER NOT NULL,
+                            updatedAt INTEGER NOT NULL,
+                            error TEXT
+                        )
+                        """.trimIndent(),
+                    )
+                }
+            }
 
         fun getInstance(context: Context): InkitaDatabase =
             INSTANCE ?: synchronized(this) {
@@ -504,6 +555,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         MIGRATION_13_14,
                         MIGRATION_14_15,
                         MIGRATION_15_16,
+                        MIGRATION_16_17,
                     ).build()
                     .also { INSTANCE = it }
             }

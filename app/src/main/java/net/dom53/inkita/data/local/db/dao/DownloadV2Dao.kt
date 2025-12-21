@@ -1,0 +1,46 @@
+package net.dom53.inkita.data.local.db.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
+import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
+import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
+
+@Dao
+interface DownloadV2Dao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertJob(job: DownloadJobV2Entity): Long
+
+    @Update
+    suspend fun updateJob(job: DownloadJobV2Entity)
+
+    @Query("SELECT * FROM download_jobs_v2 WHERE id = :jobId")
+    suspend fun getJob(jobId: Long): DownloadJobV2Entity?
+
+    @Query("SELECT * FROM download_jobs_v2 ORDER BY updatedAt DESC")
+    fun observeJobs(): Flow<List<DownloadJobV2Entity>>
+
+    @Query("SELECT * FROM download_jobs_v2 WHERE status = :status ORDER BY updatedAt DESC")
+    suspend fun getJobsByStatus(status: String): List<DownloadJobV2Entity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertItems(items: List<DownloadedItemV2Entity>)
+
+    @Query("SELECT * FROM download_items_v2 WHERE jobId = :jobId ORDER BY id ASC")
+    suspend fun getItemsForJob(jobId: Long): List<DownloadedItemV2Entity>
+
+    @Query("DELETE FROM download_items_v2 WHERE jobId = :jobId")
+    suspend fun clearItemsForJob(jobId: Long)
+
+    @Query("DELETE FROM download_jobs_v2 WHERE id = :jobId")
+    suspend fun deleteJob(jobId: Long)
+
+    @Query("DELETE FROM download_items_v2")
+    suspend fun clearAllItems()
+
+    @Query("DELETE FROM download_jobs_v2")
+    suspend fun clearAllJobs()
+}
