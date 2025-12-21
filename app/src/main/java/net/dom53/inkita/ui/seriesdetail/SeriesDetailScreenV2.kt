@@ -51,11 +51,13 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.ui.browse.utils.PublicationState
+import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
@@ -65,6 +67,7 @@ fun SeriesDetailScreenV2(
     seriesId: Int,
     appPreferences: AppPreferences,
     onOpenVolume: (Int) -> Unit,
+    onOpenSeries: (Int) -> Unit,
     onBack: () -> Unit,
 ) {
     val viewModel: SeriesDetailViewModelV2 =
@@ -229,7 +232,9 @@ fun SeriesDetailScreenV2(
                         val booksCount = detail?.detail?.volumes?.size
                         val chaptersCount = detail?.detail?.chapters?.size
                         val specialsCount = detail?.detail?.specials?.size
-                        val relatedCount = detail?.related?.let { relatedSeriesCount(it) }
+                        val relatedCount =
+                            (detail?.related?.let { relatedSeriesCount(it) } ?: 0) +
+                                (detail?.collections?.size ?: 0)
                         val tabs =
                             listOf(
                                 TabItem(SeriesDetailTab.Books, booksCount ?: 0),
@@ -279,6 +284,14 @@ fun SeriesDetailScreenV2(
                                 },
                             )
                         }
+                        if (selectedTab == SeriesDetailTab.Related) {
+                            RelatedCollectionsSection(
+                                related = detail?.related,
+                                collections = detail?.collections.orEmpty(),
+                                config = config,
+                                onOpenSeries = onOpenSeries,
+                            )
+                        }
                         Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
@@ -308,6 +321,102 @@ fun SeriesDetailScreenV2(
                             .aspectRatio(2f / 3f)
                             .clickable { coverExpanded = false },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RelatedCollectionsSection(
+    related: net.dom53.inkita.data.api.dto.RelatedSeriesDto?,
+    collections: List<net.dom53.inkita.data.api.dto.AppUserCollectionDto>,
+    config: AppConfig,
+    onOpenSeries: (Int) -> Unit,
+) {
+    val relatedGroups = relatedSeriesGroups(related)
+    if (relatedGroups.isNotEmpty()) {
+        Text(
+            text = stringResource(id = net.dom53.inkita.R.string.general_related),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            relatedGroups.forEach { group ->
+                group.items.forEach { item ->
+                    val coverUrl = seriesCoverUrl(config, item.id)
+                    Column(
+                        modifier =
+                            Modifier
+                                .width(140.dp)
+                                .clickable { onOpenSeries(item.id) },
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        CoverImage(
+                            coverUrl = coverUrl,
+                            context = LocalContext.current,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(2f / 3f),
+                        )
+                        Text(
+                            text = item.name?.ifBlank { null } ?: "Series ${item.id}",
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = group.title,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+
+    if (collections.isNotEmpty()) {
+        Text(
+            text = stringResource(id = net.dom53.inkita.R.string.general_collections),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            collections.forEach { collection ->
+                val coverUrl = collectionCoverUrl(config, collection.id)
+                Column(
+                    modifier = Modifier.width(140.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    CoverImage(
+                        coverUrl = coverUrl,
+                        context = LocalContext.current,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f),
+                    )
+                    Text(
+                        text = collection.title?.ifBlank { null } ?: "Collection ${collection.id}",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -525,23 +634,38 @@ private fun HeaderInfo(
     }
 }
 
-private fun relatedSeriesCount(related: net.dom53.inkita.data.api.dto.RelatedSeriesDto): Int =
-    listOf(
-        related.sequels,
-        related.prequels,
-        related.spinOffs,
-        related.adaptations,
-        related.sideStories,
-        related.characters,
-        related.contains,
-        related.others,
-        related.alternativeSettings,
-        related.alternativeVersions,
-        related.doujinshis,
-        related.parent,
-        related.editions,
-        related.annuals,
-    ).sumOf { it?.size ?: 0 }
+private fun relatedSeriesCount(related: net.dom53.inkita.data.api.dto.RelatedSeriesDto): Int {
+    return relatedSeriesGroups(related).sumOf { it.items.size }
+}
+
+private data class RelatedGroupUi(
+    val title: String,
+    val items: List<net.dom53.inkita.data.api.dto.SeriesDto>,
+)
+
+private fun relatedSeriesGroups(
+    related: net.dom53.inkita.data.api.dto.RelatedSeriesDto?,
+): List<RelatedGroupUi> {
+    if (related == null) return emptyList()
+    val groups =
+        listOf(
+            RelatedGroupUi("Sequels", related.sequels.orEmpty()),
+            RelatedGroupUi("Prequels", related.prequels.orEmpty()),
+            RelatedGroupUi("Spin-offs", related.spinOffs.orEmpty()),
+            RelatedGroupUi("Adaptations", related.adaptations.orEmpty()),
+            RelatedGroupUi("Side stories", related.sideStories.orEmpty()),
+            RelatedGroupUi("Characters", related.characters.orEmpty()),
+            RelatedGroupUi("Contains", related.contains.orEmpty()),
+            RelatedGroupUi("Others", related.others.orEmpty()),
+            RelatedGroupUi("Alternative settings", related.alternativeSettings.orEmpty()),
+            RelatedGroupUi("Alternative versions", related.alternativeVersions.orEmpty()),
+            RelatedGroupUi("Doujinshis", related.doujinshis.orEmpty()),
+            RelatedGroupUi("Parent", related.parent.orEmpty()),
+            RelatedGroupUi("Editions", related.editions.orEmpty()),
+            RelatedGroupUi("Annuals", related.annuals.orEmpty()),
+        )
+    return groups.filter { it.items.isNotEmpty() }
+}
 
 private fun readStateLabel(
     context: android.content.Context,

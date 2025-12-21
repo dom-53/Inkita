@@ -356,15 +356,18 @@ fun InkitaApp(
                                     "reader_return",
                                     null,
                                 ).collectAsState(initial = null)
-                        SeriesDetailScreenV2(
-                            seriesId = seriesId,
-                            appPreferences = appPreferences,
-                            onOpenVolume = { volumeId ->
-                                navController.navigate("volume/$volumeId")
-                            },
-                            onBack = { navController.popBackStack() },
-                        )
-                    }
+                    SeriesDetailScreenV2(
+                        seriesId = seriesId,
+                        appPreferences = appPreferences,
+                        onOpenVolume = { volumeId ->
+                            navController.navigate("volume/$volumeId")
+                        },
+                        onOpenSeries = { id ->
+                            navController.navigate("series/$id")
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
                     composable(
                         route = "volume/{volumeId}",
                         arguments = listOf(navArgument("volumeId") { type = NavType.IntType }),
