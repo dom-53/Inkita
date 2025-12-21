@@ -9,6 +9,7 @@ import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.sync.ProgressSyncWorker
 import net.dom53.inkita.data.local.db.dao.DownloadDao
+import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
 import net.dom53.inkita.data.local.db.entity.CachedPageEntity
 import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
@@ -29,6 +30,7 @@ class ReaderRepositoryImpl(
     private val appPreferences: AppPreferences,
     private val readerDao: ReaderDao,
     private val downloadDao: DownloadDao? = null,
+    private val downloadV2Dao: DownloadV2Dao? = null,
 ) : ReaderRepository {
     class PageNotDownloadedException(
         message: String,
@@ -39,6 +41,15 @@ class ReaderRepositoryImpl(
         page: Int,
     ): ReaderPageResult {
         val preferOffline = appPreferences.preferOfflinePagesFlow.first()
+        val downloadedV2 = downloadV2Dao?.getDownloadedPageForChapter(chapterId, page)
+        val downloadedHtmlV2 =
+            downloadedV2?.localPath?.let { path ->
+                if (isPathPresent(path)) {
+                    readDownloadedHtml(path)
+                } else {
+                    null
+                }
+            }
         val downloaded = downloadDao?.getDownloadedPage(chapterId, page)
         val downloadedHtml =
             downloaded?.let { pageEntity ->
@@ -50,12 +61,13 @@ class ReaderRepositoryImpl(
                 }
             }
         val cached = readerDao.getPage(chapterId, page)?.html
+        val offlineHtml = downloadedHtmlV2 ?: downloadedHtml
 
-        if (!NetworkUtils.isOnline(context) && downloadedHtml == null) {
+        if (!NetworkUtils.isOnline(context) && offlineHtml == null) {
             throw PageNotDownloadedException("Page not downloaded for offline reading")
         }
 
-        if (preferOffline && downloadedHtml != null) return ReaderPageResult(downloadedHtml, true)
+        if (preferOffline && offlineHtml != null) return ReaderPageResult(offlineHtml, true)
 
         val apiHtml =
             try {
@@ -75,18 +87,18 @@ class ReaderRepositoryImpl(
                 )
                 body
             } catch (io: IOException) {
-                if (downloadedHtml != null) return ReaderPageResult(downloadedHtml, true)
+                if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
                 if (cached != null) return ReaderPageResult(cached, false)
                 if (!NetworkUtils.isOnline(context)) throw PageNotDownloadedException("Page not downloaded for offline reading")
                 throw io
             } catch (e: Exception) {
-                if (downloadedHtml != null) return ReaderPageResult(downloadedHtml, true)
+                if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
                 if (cached != null) return ReaderPageResult(cached, false)
                 throw e
             }
 
         if (apiHtml != null) return ReaderPageResult(apiHtml, false)
-        if (downloadedHtml != null) return ReaderPageResult(downloadedHtml, true)
+        if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
         if (cached != null) return ReaderPageResult(cached, false)
 
         throw PageNotDownloadedException("Page not downloaded for offline reading")
@@ -101,6 +113,15 @@ class ReaderRepositoryImpl(
         chapterId: Int,
         page: Int,
     ): Boolean {
+        val v2Item = downloadV2Dao?.getDownloadedPageForChapter(chapterId, page)
+        if (v2Item != null) {
+            val path = v2Item.localPath
+            if (!path.isNullOrBlank()) {
+                val present = isPathPresent(path)
+                if (!present) return false
+                return present
+            }
+        }
         val downloaded = downloadDao?.getDownloadedPage(chapterId, page) ?: return false
         val present = isPathPresent(downloaded.htmlPath)
         if (!present) {

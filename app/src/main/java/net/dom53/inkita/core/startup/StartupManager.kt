@@ -123,6 +123,7 @@ object StartupManager {
                 preferences,
                 database.readerDao(),
                 database.downloadDao(),
+                database.downloadV2Dao(),
             )
 
         // Kick off sync of offline reader progress; worker will only run when online.

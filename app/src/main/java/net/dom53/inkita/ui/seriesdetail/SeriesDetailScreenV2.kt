@@ -518,8 +518,9 @@ fun SeriesDetailScreenV2(
                                 volumes.forEach { volume ->
                                     val list = grouped[volume.id].orEmpty()
                                     val completed =
-                                        list.count {
-                                            it.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED
+                                        list.count { item ->
+                                            item.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                isItemPathPresent(item.localPath)
                                         }
                                     val expected =
                                         volume.pages
@@ -554,7 +555,14 @@ fun SeriesDetailScreenV2(
                                 },
                                 onLongPressVolume = { volume ->
                                     scope.launch {
-                                        val completed = downloadDao.countCompletedItemsForVolume(volume.id)
+                                        val completed =
+                                            downloadedItemsBySeries.value
+                                                .filter { it.volumeId == volume.id }
+                                                .count { item ->
+                                                    item.status ==
+                                                        net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                        isItemPathPresent(item.localPath)
+                                                }
                                         val expected =
                                             volume.pages
                                                 ?.takeIf { it > 0 }
@@ -802,6 +810,16 @@ private enum class DownloadVolumeState {
     None,
     Partial,
     Complete,
+}
+
+private fun isItemPathPresent(path: String?): Boolean {
+    if (path.isNullOrBlank()) return false
+    return if (path.startsWith("content://")) {
+        true
+    } else {
+        val normalized = path.removePrefix("file://")
+        java.io.File(normalized).exists()
+    }
 }
 
 @Composable

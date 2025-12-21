@@ -49,6 +49,7 @@ class EpubDownloadStrategyV2(
         val completedPages =
             existing
                 .filter { it.status == DownloadedItemV2Entity.STATUS_COMPLETED && it.page != null }
+                .filter { item -> isPathPresent(item.localPath) }
                 .mapNotNull { it.page }
                 .toSet()
         if (pageIndex == null && pageCount == null) return -1L
@@ -310,6 +311,16 @@ class EpubDownloadStrategyV2(
         val md = MessageDigest.getInstance("MD5")
         val bytes = md.digest(input.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun isPathPresent(path: String?): Boolean {
+        if (path.isNullOrBlank()) return false
+        return if (path.startsWith("content://")) {
+            true
+        } else {
+            val normalized = path.removePrefix("file://")
+            File(normalized).exists()
+        }
     }
 
     companion object {

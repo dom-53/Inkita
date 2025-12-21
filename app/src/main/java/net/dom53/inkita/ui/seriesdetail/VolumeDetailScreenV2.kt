@@ -66,6 +66,7 @@ import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
 import net.dom53.inkita.core.network.KavitaApiFactory
+import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
@@ -354,6 +355,7 @@ fun VolumeDetailScreenV2(
                     val downloadedPages =
                         downloadedItemsForChapter.value
                             .filter { it.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED }
+                            .filter { item -> isItemPathPresent(item.localPath) }
                             .mapNotNull { it.page }
                             .toSet()
                     ChapterPagesSection(
@@ -401,6 +403,15 @@ fun VolumeDetailScreenV2(
                             }
                         },
                         onOpenPage = { chapter, page ->
+                            if ((offlineMode || !NetworkUtils.isOnline(context)) && !downloadedPages.contains(page)) {
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.getString(net.dom53.inkita.R.string.reader_page_not_downloaded),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                return@ChapterPagesSection
+                            }
                             onOpenReader(
                                 chapter.id,
                                 page,
@@ -422,8 +433,9 @@ fun VolumeDetailScreenV2(
                         chapterList.forEach { chapter ->
                             val list = grouped[chapter.id].orEmpty()
                             val completed =
-                                list.count {
-                                    it.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED
+                                list.count { item ->
+                                    item.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                        isItemPathPresent(item.localPath)
                                 }
                             val expected = chapter.pages?.takeIf { it > 0 } ?: 0
                             val state =
@@ -463,8 +475,15 @@ fun VolumeDetailScreenV2(
                             },
                             onChapterLongPress = { chapter, index ->
                                 scope.launch {
-                                    val completed = downloadDao.countCompletedItemsForChapter(chapter.id)
-                                    val expected = chapter.pages?.takeIf { it > 0 } ?: 0
+                                val completed =
+                                    downloadDao
+                                        .getItemsForChapter(chapter.id)
+                                        .count { item ->
+                                            item.status ==
+                                                net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                isItemPathPresent(item.localPath)
+                                        }
+                                val expected = chapter.pages?.takeIf { it > 0 } ?: 0
                                     if (expected == 0 && completed == 0) {
                                         Toast
                                             .makeText(
@@ -833,5 +852,15 @@ private fun ChapterPagesSection(
                 }
             }
         }
+    }
+}
+
+private fun isItemPathPresent(path: String?): Boolean {
+    if (path.isNullOrBlank()) return false
+    return if (path.startsWith("content://")) {
+        true
+    } else {
+        val normalized = path.removePrefix("file://")
+        java.io.File(normalized).exists()
     }
 }

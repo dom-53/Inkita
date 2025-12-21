@@ -38,6 +38,21 @@ interface DownloadV2Dao {
     @Query("SELECT * FROM download_items_v2 WHERE chapterId = :chapterId ORDER BY id ASC")
     suspend fun getItemsForChapter(chapterId: Int): List<DownloadedItemV2Entity>
 
+    @Query(
+        """
+        SELECT * FROM download_items_v2
+        WHERE chapterId = :chapterId
+          AND page = :page
+          AND status = :status
+        LIMIT 1
+        """,
+    )
+    suspend fun getDownloadedPageForChapter(
+        chapterId: Int,
+        page: Int,
+        status: String = DownloadedItemV2Entity.STATUS_COMPLETED,
+    ): DownloadedItemV2Entity?
+
     @Query("DELETE FROM download_items_v2 WHERE chapterId = :chapterId AND status != :status")
     suspend fun deleteItemsForChapterNotStatus(
         chapterId: Int,
