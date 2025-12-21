@@ -77,20 +77,27 @@ class SeriesRepositoryImpl(
         }
     }
 
-    override suspend fun getSeriesDetail(seriesId: Int): SeriesDetail {
+    override suspend fun getSeriesDetail(
+        seriesId: Int,
+        useCache: Boolean,
+    ): SeriesDetail {
         val config = appPreferences.configFlow.first()
 
         if (!config.isConfigured) {
-            val cached = cacheManager.getCachedSeriesDetail(seriesId)
-            LoggingManager.d("SeriesRepo", "Detail offline-only (not configured), cached=${cached != null}")
-            if (cached != null) return cached
+            if (useCache) {
+                val cached = cacheManager.getCachedSeriesDetail(seriesId)
+                LoggingManager.d("SeriesRepo", "Detail offline-only (not configured), cached=${cached != null}")
+                if (cached != null) return cached
+            }
             throw Exception("The app is not configured, API key is missing.")
         }
 
         if (!NetworkUtils.isOnline(context)) {
-            val cached = cacheManager.getCachedSeriesDetail(seriesId)
-            LoggingManager.w("SeriesRepo", "Offline; using cached detail for $seriesId: ${cached != null}")
-            if (cached != null) return cached
+            if (useCache) {
+                val cached = cacheManager.getCachedSeriesDetail(seriesId)
+                LoggingManager.w("SeriesRepo", "Offline; using cached detail for $seriesId: ${cached != null}")
+                if (cached != null) return cached
+            }
             throw IOException("Offline")
         }
 
@@ -100,7 +107,14 @@ class SeriesRepositoryImpl(
                 apiKey = config.apiKey,
             )
 
-        val cachedFallback = cacheManager.getCachedSeriesDetail(seriesId).also { LoggingManager.d("SeriesRepo", "Cached detail fallback present=${it != null}") }
+        val cachedFallback =
+            if (useCache) {
+                cacheManager.getCachedSeriesDetail(seriesId).also {
+                    LoggingManager.d("SeriesRepo", "Cached detail fallback present=${it != null}")
+                }
+            } else {
+                null
+            }
 
         return try {
             val seriesResponse = api.getSeriesById(seriesId)
@@ -237,8 +251,10 @@ class SeriesRepositoryImpl(
                     timeLeftMax = timeLeft?.maxHours,
                     timeLeftAvg = timeLeft?.avgHours,
                 )
-            cacheSeriesDetail(detail)
-            LoggingManager.d("SeriesRepo", "Cached detail stored for series $seriesId (volumes=${volumes.size})")
+            if (useCache) {
+                cacheSeriesDetail(detail)
+                LoggingManager.d("SeriesRepo", "Cached detail stored for series $seriesId (volumes=${volumes.size})")
+            }
             detail
         } catch (e: Exception) {
             LoggingManager.e("SeriesRepo", "Detail fetch failed: ${e.message}")

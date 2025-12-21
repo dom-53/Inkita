@@ -15,6 +15,7 @@ import net.dom53.inkita.core.cache.CacheManagerImpl
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.notification.AppNotificationManager
+import net.dom53.inkita.core.prefetch.PrefetchPolicy
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.repository.CollectionsRepositoryImpl
@@ -59,17 +60,15 @@ class PrefetchWorker(
                 return Result.success()
             }
 
-            val prefetchInProgress = prefs.prefetchInProgressFlow.first()
-            val prefetchWant = prefs.prefetchWantFlow.first()
-            val prefetchCollections = prefs.prefetchCollectionsFlow.first()
-            val prefetchCollectionsAll = prefs.prefetchCollectionsAllFlow.first()
-            val selectedCollectionIds = prefs.prefetchCollectionIdsFlow.first()
-            val prefetchDetails = prefs.prefetchDetailsFlow.first()
-            if (!prefetchInProgress && !prefetchWant && !prefetchCollections) {
+            val policy = prefs.prefetchPolicy()
+            if (!policy.hasTargetsEnabled) {
                 LoggingManager.d(tag, "No prefetch targets enabled, finishing")
                 return Result.success()
             }
-            LoggingManager.d(tag, "Flags inProgress=$prefetchInProgress want=$prefetchWant collections=$prefetchCollections details=$prefetchDetails")
+            LoggingManager.d(
+                tag,
+                "Flags inProgress=${policy.inProgressEnabled} want=${policy.wantEnabled} collections=${policy.collectionsEnabled} details=${policy.detailsEnabled}",
+            )
             LoggingManager.d(
                 tag,
                 "Constraints met? metered=${status.isMetered} offlineAllowed=${status.isOnlineAllowed}",
@@ -93,12 +92,12 @@ class PrefetchWorker(
             val collectionsRepo = CollectionsRepositoryImpl(applicationContext, prefs)
 
             val targetCollections =
-                if (prefetchCollections) {
+                if (policy.collectionsEnabled) {
                     val allCollections = runCatching { collectionsRepo.getCollections() }.getOrDefault(emptyList())
-                    if (prefetchCollectionsAll) {
+                    if (policy.collectionsAll) {
                         allCollections
                     } else {
-                        val filtered = allCollections.filter { selectedCollectionIds.contains(it.id) }
+                        val filtered = allCollections.filter { policy.selectedCollectionIds.contains(it.id) }
                         if (filtered.isEmpty()) {
                             LoggingManager.d(tag, "No selected collections found, skipping collection prefetch")
                         }
@@ -109,8 +108,8 @@ class PrefetchWorker(
                 }
             val tasks =
                 buildList {
-                    if (prefetchInProgress) add(0)
-                    if (prefetchWant) add(1)
+                    if (policy.inProgressEnabled) add(0)
+                    if (policy.wantEnabled) add(1)
                     if (targetCollections.isNotEmpty()) {
                         targetCollections.forEachIndexed { idx, _ -> add(idx + 2) }
                     }
@@ -125,7 +124,7 @@ class PrefetchWorker(
             var completed = 0
             tasks.forEach { tabIndex ->
                 runCatching {
-                    prefetchTab(tabIndex, targetCollections, seriesRepo, collectionsRepo, cacheManager, prefetchDetails)
+                prefetchTab(tabIndex, targetCollections, seriesRepo, collectionsRepo, cacheManager, policy.detailsEnabled)
                     LoggingManager.d(tag, "Prefetched tab $tabIndex")
                 }.onFailure { e ->
                     LoggingManager.e(tag, "Prefetch tab $tabIndex failed", e)
@@ -291,12 +290,11 @@ class PrefetchWorker(
                 LoggingManager.d("PrefetchWorker", "Skipping enqueue, offline/offlineMode=${status.offlineMode}")
                 return
             }
-            val allowMetered = prefs.prefetchAllowMeteredFlow.firstBlocking()
-            val allowLowBattery = prefs.prefetchAllowLowBatteryFlow.firstBlocking()
+            val policy = prefs.prefetchPolicyBlocking()
             val constraints =
                 monitor.buildConstraints(
-                    allowMetered = allowMetered,
-                    requireBatteryNotLow = !allowLowBattery,
+                    allowMetered = policy.allowMetered,
+                    requireBatteryNotLow = !policy.allowLowBattery,
                 )
             LoggingManager.d(
                 "PrefetchWorker",
@@ -313,4 +311,4 @@ class PrefetchWorker(
 }
 
 // Simple blocking helper for enqueue-time preference read
-private fun <T> kotlinx.coroutines.flow.Flow<T>.firstBlocking(): T = kotlinx.coroutines.runBlocking { first() }
+private fun AppPreferences.prefetchPolicyBlocking(): PrefetchPolicy = kotlinx.coroutines.runBlocking { prefetchPolicy() }

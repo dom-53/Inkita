@@ -13,6 +13,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import net.dom53.inkita.core.prefetch.PrefetchPolicy
 import net.dom53.inkita.domain.model.Collection
 
 private val Context.dataStore by preferencesDataStore(name = "inkita_prefs")
@@ -209,6 +210,18 @@ class AppPreferences(
                 ?.filter { it > 0 }
                 ?: emptyList()
         }
+
+    suspend fun prefetchPolicy(): PrefetchPolicy =
+        PrefetchPolicy(
+            inProgressEnabled = prefetchInProgressFlow.first(),
+            wantEnabled = prefetchWantFlow.first(),
+            collectionsEnabled = prefetchCollectionsFlow.first(),
+            detailsEnabled = prefetchDetailsFlow.first(),
+            allowMetered = prefetchAllowMeteredFlow.first(),
+            allowLowBattery = prefetchAllowLowBatteryFlow.first(),
+            collectionsAll = prefetchCollectionsAllFlow.first(),
+            collectionIds = prefetchCollectionIdsFlow.first(),
+        )
 
     suspend fun updateKavitaConfig(
         serverUrl: String,

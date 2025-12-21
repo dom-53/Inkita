@@ -112,31 +112,12 @@ class SeriesDetailViewModel(
     }
 
     fun loadDetail() {
-        val cfg = latestConfig ?: return
+        if (latestConfig == null) return
         viewModelScope.launch {
             // Start refresh state
             _state.update { it.copy(isLoading = true, error = null) }
 
-            val cached = runCatching { seriesRepository.getCachedSeriesDetail(seriesId) }.getOrNull()
-            if (cached != null) {
-                val progress = buildVolumeProgress(cached, allowNetwork = false)
-                val continueTarget = computeContinueTarget(cached, progress)
-                _state.update {
-                    it.copy(
-                        detail = cached,
-                        volumeProgress = progress,
-                        // keep isLoading true until network finishes
-                        error = null,
-                        continueVolumeId = continueTarget?.first,
-                        continuePage = continueTarget?.second,
-                        continueChapterId = continueTarget?.third,
-                        downloadedChapters = latestDownloads,
-                        downloadedVolumeIds = computeDownloadedVolumes(cached, latestDownloads),
-                    )
-                }
-            }
-
-            val result = runCatching { seriesRepository.getSeriesDetail(seriesId) }
+            val result = runCatching { seriesRepository.getSeriesDetail(seriesId, false) }
             result
                 .onSuccess { loaded ->
                     val progress = buildVolumeProgress(loaded)
@@ -155,31 +136,8 @@ class SeriesDetailViewModel(
                         )
                     }
                 }.onFailure { e ->
-                    if (cached != null) {
-                        val allowNetwork = e !is UnknownHostException
-                        val progress = buildVolumeProgress(cached, allowNetwork)
-                        val continueTarget = computeContinueTarget(cached, progress)
-                        _state.update {
-                            it.copy(
-                                detail = cached,
-                                volumeProgress = progress,
-                                isLoading = false,
-                                error = null,
-                                continueVolumeId = continueTarget?.first,
-                                continuePage = continueTarget?.second,
-                                continueChapterId = continueTarget?.third,
-                                downloadedChapters = latestDownloads,
-                                downloadedVolumeIds = computeDownloadedVolumes(cached, latestDownloads),
-                            )
-                        }
-                        if (e !is UnknownHostException) {
-                            _events.tryEmit(e.message ?: "Failed to refresh detail")
-                        }
-                        return@launch
-                    } else {
-                        _state.update { it.copy(isLoading = false, error = e.message ?: "Failed to load detail.") }
-                        _events.tryEmit(e.message ?: "Failed to refresh detail")
-                    }
+                    _state.update { it.copy(isLoading = false, error = e.message ?: "Failed to load detail.") }
+                    _events.tryEmit(e.message ?: "Failed to refresh detail")
                 }
             // preload want/collections once after load
             ensureWantAndCollections()

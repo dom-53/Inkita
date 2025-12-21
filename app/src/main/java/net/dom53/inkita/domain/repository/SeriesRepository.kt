@@ -12,7 +12,10 @@ interface SeriesRepository {
         prefetchThumbnails: Boolean = true,
     ): List<Series>
 
-    suspend fun getSeriesDetail(seriesId: Int): SeriesDetail
+    suspend fun getSeriesDetail(
+        seriesId: Int,
+        useCache: Boolean = true,
+    ): SeriesDetail
 
     suspend fun getOnDeckSeries(
         pageNumber: Int,
