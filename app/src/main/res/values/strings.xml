@@ -391,6 +391,7 @@
     <string name="advanced_cache_stats_chapters">Chapters: %1$d</string>
     <string name="advanced_cache_stats_volume_chapter_refs">Volume chapter refs: %1$d</string>
     <string name="advanced_cache_stats_db_size">DB size: %1$s</string>
+    <string name="advanced_cache_stats_thumbnails_count">Thumbnails (count): %1$d</string>
     <string name="advanced_cache_stats_thumbnails">Thumbnails: %1$s</string>
     <string name="advanced_cache_stats_last_library">Last library refresh: %1$s</string>
     <string name="advanced_cache_stats_last_browse">Last browse refresh: %1$s</string>

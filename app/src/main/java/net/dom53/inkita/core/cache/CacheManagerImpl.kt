@@ -492,6 +492,7 @@ class CacheManagerImpl(
         val policy = policy()
         val dbSize = dbFile?.takeIf { it.exists() }?.length() ?: 0L
         val thumbs = dirSize(thumbnailsDir)
+        val thumbsCount = dirFileCount(thumbnailsDir)
         val libTs = appPreferences.lastLibraryRefreshFlow.first()
         val browseTs = appPreferences.lastBrowseRefreshFlow.first()
         val libraryStats =
@@ -535,6 +536,7 @@ class CacheManagerImpl(
                 chaptersCount = detailStats?.getOrNull(4) ?: 0,
                 volumeChapterRefsCount = detailStats?.getOrNull(5) ?: 0,
                 dbBytes = dbSize,
+                thumbnailsCount = thumbsCount,
                 thumbnailsBytes = thumbs,
                 lastLibraryRefresh = libTs,
                 lastBrowseRefresh = browseTs,
@@ -550,6 +552,13 @@ class CacheManagerImpl(
             .filter { it.isFile }
             .map { it.length() }
             .sum()
+    }
+
+    private fun dirFileCount(dir: File?): Int {
+        if (dir == null || !dir.exists()) return 0
+        return dir
+            .walkBottomUp()
+            .count { it.isFile }
     }
 
     private fun clearThumbnailsInternal() {

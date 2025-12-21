@@ -971,6 +971,7 @@ fun SettingsAdvancedScreen(
                             appendLine(context.getString(R.string.advanced_cache_stats_chapters, stats.chaptersCount))
                             appendLine(context.getString(R.string.advanced_cache_stats_volume_chapter_refs, stats.volumeChapterRefsCount))
                             appendLine(context.getString(R.string.advanced_cache_stats_db_size, bytesToMb(stats.dbBytes)))
+                            appendLine(context.getString(R.string.advanced_cache_stats_thumbnails_count, stats.thumbnailsCount))
                             appendLine(context.getString(R.string.advanced_cache_stats_thumbnails, bytesToMb(stats.thumbnailsBytes)))
                             appendLine(context.getString(R.string.advanced_cache_stats_last_library, formatTs(stats.lastLibraryRefresh)))
                             appendLine(context.getString(R.string.advanced_cache_stats_last_browse, formatTs(stats.lastBrowseRefresh)))

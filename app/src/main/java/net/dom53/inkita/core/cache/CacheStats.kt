@@ -16,6 +16,7 @@ data class CacheStats(
     val chaptersCount: Int = 0,
     val volumeChapterRefsCount: Int = 0,
     val dbBytes: Long = 0L,
+    val thumbnailsCount: Int = 0,
     val thumbnailsBytes: Long = 0L,
     val lastLibraryRefresh: Long = 0L,
     val lastBrowseRefresh: Long = 0L,
