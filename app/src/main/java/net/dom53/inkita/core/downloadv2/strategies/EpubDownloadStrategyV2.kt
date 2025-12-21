@@ -76,6 +76,7 @@ class EpubDownloadStrategyV2(
                 status = DownloadJobV2Entity.STATUS_PENDING,
                 totalItems = missingPages.size,
                 completedItems = 0,
+                retryCount = 0,
                 priority = request.priority,
                 createdAt = now,
                 updatedAt = now,

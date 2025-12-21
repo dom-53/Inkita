@@ -2,6 +2,7 @@ package net.dom53.inkita.core.downloadv2
 
 import android.content.Context
 import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -28,6 +29,11 @@ class DownloadManagerV2(
             OneTimeWorkRequestBuilder<DownloadWorkerV2>()
                 .setConstraints(constraints)
                 .build()
-        WorkManager.getInstance(appContext).enqueue(request)
+        WorkManager.getInstance(appContext)
+            .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
+    }
+
+    companion object {
+        private const val WORK_NAME = "download_v2_worker"
     }
 }

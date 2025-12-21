@@ -15,6 +15,7 @@ data class DownloadJobV2Entity(
     val status: String,
     val totalItems: Int?,
     val completedItems: Int?,
+    val retryCount: Int = 0,
     val priority: Int,
     val createdAt: Long,
     val updatedAt: Long,
