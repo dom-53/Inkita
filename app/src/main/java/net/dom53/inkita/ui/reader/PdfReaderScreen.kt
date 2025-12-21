@@ -27,6 +27,7 @@ fun PdfReaderScreen(
         initialPage = initialPage,
         readerViewModel =
             viewModel(
+                key = "reader-$chapterId",
                 factory =
                     PdfReaderViewModel.provideFactory(
                         chapterId = chapterId,

@@ -28,6 +28,7 @@ fun EpubReaderScreen(
         initialPage = initialPage,
         readerViewModel =
             viewModel(
+                key = "reader-$chapterId",
                 factory =
                     EpubReaderViewModel.provideFactory(
                         chapterId = chapterId,

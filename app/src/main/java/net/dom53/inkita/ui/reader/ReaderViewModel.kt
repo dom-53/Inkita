@@ -49,7 +49,7 @@ abstract class BaseReaderViewModel(
 
     fun loadInitial() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            _state.update { it.copy(isLoading = true, error = null, timeLeft = null) }
             val savedProgress = runCatching { reader.getProgress(chapterId) }.getOrNull()
             val info = runCatching { reader.getBookInfo(chapterId) }.getOrNull()
             val totalPages = info?.pages ?: 0
@@ -118,6 +118,7 @@ abstract class BaseReaderViewModel(
             val totalPages = totalPagesOverride ?: info?.pages
             runCatching { reader.setProgress(progress, totalPages = totalPages) }
             _state.update { it.copy(bookScrollId = bookScrollId ?: it.bookScrollId) }
+            loadTimeLeft()
         }
     }
 

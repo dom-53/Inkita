@@ -520,7 +520,8 @@ internal fun BaseReaderScreen(
 
 private fun ReaderUiState.timeLeftText(context: Context): String? {
     val tl = timeLeft ?: return null
-    return "${context.resources.getString(R.string.reader_time_left)}: ${tl.avgHours} h"
+    val rounded = String.format(java.util.Locale.getDefault(), "%.1f", tl.avgHours)
+    return "${context.resources.getString(R.string.reader_time_left)}: $rounded h"
 }
 
 @Composable
