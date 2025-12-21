@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Public
@@ -582,14 +584,59 @@ private fun VolumeGridRow(
                         .clickable { onOpenVolume(volume) },
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                CoverImage(
-                    coverUrl = coverUrl,
-                    context = LocalContext.current,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(2f / 3f),
-                )
+                Box {
+                    CoverImage(
+                        coverUrl = coverUrl,
+                        context = LocalContext.current,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f),
+                    )
+                    if ((volume.pagesRead ?: 0) == 0) {
+                        Canvas(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(2f / 3f),
+                        ) {
+                            val sizePx = 26.dp.toPx()
+                            val path =
+                                Path().apply {
+                                    moveTo(size.width - sizePx, 0f)
+                                    lineTo(size.width, 0f)
+                                    lineTo(size.width, sizePx)
+                                    close()
+                                }
+                            drawPath(
+                                path = path,
+                                color = Color(0xFFE91E63),
+                            )
+                        }
+                    }
+                    val pagesRead = volume.pagesRead ?: 0
+                    val pagesTotal = volume.pages ?: 0
+                    if (pagesTotal > 0 && pagesRead in 1 until pagesTotal) {
+                        val progress =
+                            (pagesRead.toFloat() / pagesTotal.toFloat()).coerceIn(0f, 1f)
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .align(Alignment.BottomStart)
+                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+                        )
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth(progress)
+                                    .height(6.dp)
+                                    .align(Alignment.BottomStart)
+                                    .background(MaterialTheme.colorScheme.primary),
+                        )
+                    }
+                }
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodySmall,
