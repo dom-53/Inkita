@@ -128,7 +128,7 @@ fun VolumeDetailScreenV2(
                         Text(
                             text =
                                 "Time: " +
-                                    (formatHoursRange(volume.minHoursToRead, volume.maxHoursToRead) ?: "-"),
+                                    (formatHoursRangeInt(volume.minHoursToRead, volume.maxHoursToRead) ?: "-"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

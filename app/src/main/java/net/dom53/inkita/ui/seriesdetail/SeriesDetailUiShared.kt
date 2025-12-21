@@ -189,6 +189,10 @@ internal fun formatHoursRange(
     }
 }
 
+internal fun formatHoursRangeInt(min: Int?, max: Int?): String? {
+    return formatHoursRange(min?.toDouble(), max?.toDouble())
+}
+
 internal fun formatCount(value: Long): String =
     when {
         value >= 1_000_000L -> String.format(Locale.US, "%.1fM", value / 1_000_000f)

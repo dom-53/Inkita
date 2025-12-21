@@ -101,9 +101,9 @@ fun VolumeDto.toDomain(): Volume =
         minNumber = minNumber,
         maxNumber = maxNumber,
         chapters = chapters?.map { it.toDomain() } ?: emptyList(),
-        minHoursToRead = minHoursToRead,
-        maxHoursToRead = maxHoursToRead,
-        avgHoursToRead = avgHoursToRead,
+        minHoursToRead = minHoursToRead?.toDouble(),
+        maxHoursToRead = maxHoursToRead?.toDouble(),
+        avgHoursToRead = avgHoursToRead?.toDouble(),
         bookId = chapters?.firstOrNull()?.id,
     )
 
@@ -209,9 +209,9 @@ fun VolumeDto.toDomain(
         minNumber = minNumber,
         maxNumber = maxNumber,
         chapters = chapters,
-        minHoursToRead = minHoursToRead,
-        maxHoursToRead = maxHoursToRead,
-        avgHoursToRead = avgHoursToRead,
+        minHoursToRead = minHoursToRead?.toDouble(),
+        maxHoursToRead = maxHoursToRead?.toDouble(),
+        avgHoursToRead = avgHoursToRead?.toDouble(),
         bookId = bookId,
     )
 

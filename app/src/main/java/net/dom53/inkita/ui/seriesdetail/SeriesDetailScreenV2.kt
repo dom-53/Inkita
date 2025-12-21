@@ -224,13 +224,32 @@ fun SeriesDetailScreenV2(
                             expanded = summaryExpanded,
                             onToggle = { summaryExpanded = !summaryExpanded },
                         )
+                        val continuePoint = detail?.continuePoint
+                        val continueLabel =
+                            if (continuePoint != null && detail?.hasProgress == true) {
+                                val page = (continuePoint.pagesRead ?: 0) + 1
+                                val volId = continuePoint.volumeId
+                                val volumeNumber =
+                                    detail
+                                        ?.detail
+                                        ?.volumes
+                                        ?.firstOrNull { it.id == volId }
+                                        ?.let { volumeNumberText(it) }
+                                if (volumeNumber != null) {
+                                    "Pokračovat Vol. $volumeNumber Ch. $page"
+                                } else {
+                                    "Pokračovat Ch. $page"
+                                }
+                            } else {
+                                "Začíst číst"
+                            }
                         Button(
                             onClick = {
                                 Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text(text = "Pokračovat ve čtení")
+                            Text(text = continueLabel)
                         }
                         val booksCount = detail?.detail?.volumes?.size
                         val chaptersCount = detail?.detail?.chapters?.size
@@ -701,6 +720,12 @@ private fun relatedSeriesGroups(
             RelatedGroupUi("Annuals", related.annuals.orEmpty()),
         )
     return groups.filter { it.items.isNotEmpty() }
+}
+
+private fun volumeNumberText(volume: net.dom53.inkita.data.api.dto.VolumeDto): String {
+    val volNumber = volume.minNumber ?: volume.maxNumber
+    if (volNumber == null) return volume.name?.takeIf { it.isNotBlank() } ?: ""
+    return if (volNumber % 1f == 0f) volNumber.toInt().toString() else volNumber.toString()
 }
 
 private fun readStateLabel(
