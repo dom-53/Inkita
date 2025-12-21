@@ -79,6 +79,10 @@ class SeriesDetailViewModelV2(
     fun loadCollections() {
         if (_state.value.isLoadingCollections) return
         viewModelScope.launch {
+            if (appPreferences.offlineModeFlow.first()) {
+                _state.update { it.copy(collectionError = "Offline mode") }
+                return@launch
+            }
             _state.update { it.copy(isLoadingCollections = true, collectionError = null) }
             val result = runCatching { collectionsRepository.getCollections() }
             result
@@ -94,6 +98,10 @@ class SeriesDetailViewModelV2(
     ) {
         val cfg = latestConfig ?: return
         viewModelScope.launch {
+            if (appPreferences.offlineModeFlow.first()) {
+                _state.update { it.copy(collectionError = "Offline mode") }
+                return@launch
+            }
             val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
             val result =
                 runCatching {
@@ -139,6 +147,10 @@ class SeriesDetailViewModelV2(
         if (title.isBlank()) return
         val cfg = latestConfig ?: return
         viewModelScope.launch {
+            if (appPreferences.offlineModeFlow.first()) {
+                _state.update { it.copy(collectionError = "Offline mode") }
+                return@launch
+            }
             val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
             val response =
                 runCatching {
@@ -168,6 +180,10 @@ class SeriesDetailViewModelV2(
     private fun refreshCollectionsForSeries() {
         val cfg = latestConfig ?: return
         viewModelScope.launch {
+            if (appPreferences.offlineModeFlow.first()) {
+                _state.update { it.copy(collectionError = "Offline mode") }
+                return@launch
+            }
             val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
             runCatching {
                 api.getCollectionsForSeries(seriesId)
@@ -191,6 +207,10 @@ class SeriesDetailViewModelV2(
         viewModelScope.launch {
             val current = _state.value.detail ?: return@launch
             val currentSeriesId = current.series?.id ?: seriesId
+            if (appPreferences.offlineModeFlow.first()) {
+                _state.update { it.copy(error = "Offline mode") }
+                return@launch
+            }
             val config = appPreferences.configFlow.first()
             if (!config.isConfigured) {
                 _state.update { it.copy(error = "Not configured") }
@@ -225,6 +245,10 @@ class SeriesDetailViewModelV2(
     private fun load() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
+            if (appPreferences.offlineModeFlow.first()) {
+                _state.update { it.copy(isLoading = false, error = "Offline mode") }
+                return@launch
+            }
             val config = appPreferences.configFlow.first()
             latestConfig = config
             if (!config.isConfigured) {
