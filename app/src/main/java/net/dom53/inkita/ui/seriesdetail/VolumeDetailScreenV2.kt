@@ -84,8 +84,13 @@ fun VolumeDetailScreenV2(
                 val resp = api.getVolumeById(volumeId)
                 if (resp.isSuccessful) {
                     resp.body()?.let { updated ->
-                        volumeState = updated
-                        VolumeDetailCache.put(payload.copy(volume = updated))
+                        val merged =
+                            updated.copy(
+                                name = payload.volume.name,
+                                title = payload.volume.title,
+                            )
+                        volumeState = merged
+                        VolumeDetailCache.put(payload.copy(volume = merged))
                     }
                 }
             }
