@@ -44,6 +44,13 @@ interface DownloadV2Dao {
         status: String = DownloadedItemV2Entity.STATUS_COMPLETED,
     )
 
+    @Query("DELETE FROM download_items_v2 WHERE chapterId = :chapterId AND page = :page AND status != :status")
+    suspend fun deleteItemsForChapterPageNotStatus(
+        chapterId: Int,
+        page: Int,
+        status: String = DownloadedItemV2Entity.STATUS_COMPLETED,
+    )
+
     @Query("SELECT * FROM download_items_v2 WHERE status = :status ORDER BY updatedAt DESC")
     fun observeItemsByStatus(status: String): Flow<List<DownloadedItemV2Entity>>
 
@@ -93,6 +100,12 @@ interface DownloadV2Dao {
 
     @Query("DELETE FROM download_items_v2 WHERE chapterId = :chapterId")
     suspend fun deleteItemsForChapter(chapterId: Int)
+
+    @Query("DELETE FROM download_items_v2 WHERE chapterId = :chapterId AND page = :page")
+    suspend fun deleteItemsForChapterPage(
+        chapterId: Int,
+        page: Int,
+    )
 
     @Query("DELETE FROM download_jobs_v2 WHERE chapterId = :chapterId")
     suspend fun deleteJobsForChapter(chapterId: Int)

@@ -42,7 +42,8 @@ class EpubDownloadStrategyV2(
         val seriesId = request.seriesId ?: return -1L
         val volumeId = request.volumeId
         val chapterId = request.chapterId ?: return -1L
-        val pageCount = request.pageCount ?: return -1L
+        val pageCount = request.pageCount
+        val pageIndex = request.pageIndex
         val now = System.currentTimeMillis()
         val existing = downloadDao.getItemsForChapter(chapterId)
         val completedPages =
@@ -50,8 +51,19 @@ class EpubDownloadStrategyV2(
                 .filter { it.status == DownloadedItemV2Entity.STATUS_COMPLETED && it.page != null }
                 .mapNotNull { it.page }
                 .toSet()
-        downloadDao.deleteItemsForChapterNotStatus(chapterId)
-        val missingPages = (0 until pageCount).filter { page -> page !in completedPages }
+        if (pageIndex == null && pageCount == null) return -1L
+        if (pageIndex != null) {
+            downloadDao.deleteItemsForChapterPageNotStatus(chapterId, pageIndex)
+        } else {
+            downloadDao.deleteItemsForChapterNotStatus(chapterId)
+        }
+        val missingPages =
+            if (pageIndex != null) {
+                listOf(pageIndex).filter { page -> page !in completedPages }
+            } else {
+                val count = pageCount ?: return -1L
+                (0 until count).filter { page -> page !in completedPages }
+            }
         if (missingPages.isEmpty()) return -1L
         val job =
             DownloadJobV2Entity(

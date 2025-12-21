@@ -47,6 +47,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.material.DismissDirection
+import androidx.compose.material.DismissValue
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.FractionalThreshold
+import androidx.compose.material.SwipeToDismiss
+import androidx.compose.material.rememberDismissState
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
@@ -62,6 +68,8 @@ import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileDownload
 
 @Composable
 fun VolumeDetailScreenV2(
@@ -346,6 +354,45 @@ fun VolumeDetailScreenV2(
                         chapter = selectedChapter,
                         chapterIndex = selectedChapterIndex ?: 0,
                         downloadedPages = downloadedPages,
+                        onTogglePageDownload = { chapter, page, isDownloaded ->
+                            if (offlineMode) {
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                return@ChapterPagesSection
+                            }
+                            if (isDownloaded) {
+                                scope.launch {
+                                    downloadDao.deleteItemsForChapterPage(chapter.id, page)
+                                }
+                            } else {
+                                val format = Format.fromId(payload.formatId)
+                                if (format != Format.Epub) {
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    return@ChapterPagesSection
+                                }
+                                scope.launch {
+                                    val request =
+                                        DownloadRequestV2(
+                                            type = DownloadJobV2Entity.TYPE_CHAPTER,
+                                            format = EpubDownloadStrategyV2.FORMAT_EPUB,
+                                            seriesId = payload.seriesId,
+                                            volumeId = volume.id,
+                                            chapterId = chapter.id,
+                                            pageIndex = page,
+                                        )
+                                    downloadManagerV2.enqueue(request)
+                                }
+                            }
+                        },
                         onOpenPage = { chapter, page ->
                             onOpenReader(
                                 chapter.id,
@@ -617,11 +664,13 @@ fun VolumeDetailScreenV2(
     }
 }
 
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 private fun ChapterPagesSection(
     chapter: net.dom53.inkita.data.api.dto.ChapterDto?,
     chapterIndex: Int,
     downloadedPages: Set<Int>,
+    onTogglePageDownload: (net.dom53.inkita.data.api.dto.ChapterDto, Int, Boolean) -> Unit,
     onOpenPage: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -670,6 +719,7 @@ private fun ChapterPagesSection(
         repeat(pages) { index ->
             val isRead = index < pagesRead
             val isCurrent = pagesRead in 0 until pages && index == pagesRead
+            val isDownloaded = downloadedPages.contains(index)
             val containerColor =
                 if (isRead) {
                     MaterialTheme.colorScheme.surfaceVariant
@@ -684,47 +734,94 @@ private fun ChapterPagesSection(
                 }
             val border =
                 if (isCurrent) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(shape)
-                        .background(containerColor)
-                        .then(
-                            if (border != null) {
-                                Modifier.border(border, shape)
-                            } else {
-                                Modifier
-                            },
-                        )
-                        .clickable { chapter?.let { onOpenPage(it, index) } }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = "${stringResource(net.dom53.inkita.R.string.general_page)} ${index + 1}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = textColor,
-                    modifier = Modifier.width(86.dp),
-                )
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = textColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (downloadedPages.contains(index)) {
-                    Icon(
-                        imageVector = Icons.Filled.DownloadDone,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
+            val dismissState =
+                rememberDismissState(confirmStateChange = { true })
+            var handledDismiss by remember { mutableStateOf(false) }
+            LaunchedEffect(dismissState.currentValue) {
+                if (dismissState.currentValue != DismissValue.Default && !handledDismiss) {
+                    handledDismiss = true
+                    chapter?.let { onTogglePageDownload(it, index, isDownloaded) }
+                    dismissState.reset()
+                    handledDismiss = false
                 }
             }
+            SwipeToDismiss(
+                state = dismissState,
+                directions = setOf(DismissDirection.EndToStart),
+                dismissThresholds = { FractionalThreshold(0.25f) },
+                background = {
+                    val icon =
+                        if (isDownloaded) {
+                            Icons.Filled.Delete
+                        } else {
+                            Icons.Filled.FileDownload
+                        }
+                    val tint =
+                        if (isDownloaded) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
+                    val alignment = Alignment.CenterEnd
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color.Transparent)
+                                .padding(horizontal = 16.dp),
+                        contentAlignment = alignment,
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = tint,
+                        )
+                    }
+                },
+                dismissContent = {
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(shape)
+                                .background(containerColor)
+                                .then(
+                                    if (border != null) {
+                                        Modifier.border(border, shape)
+                                    } else {
+                                        Modifier
+                                    },
+                                )
+                                .clickable { chapter?.let { onOpenPage(it, index) } }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            text = "${stringResource(net.dom53.inkita.R.string.general_page)} ${index + 1}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = textColor,
+                            modifier = Modifier.width(86.dp),
+                        )
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = textColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (isDownloaded) {
+                            Icon(
+                                imageVector = Icons.Filled.DownloadDone,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                },
+            )
         }
     }
 }

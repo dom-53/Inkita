@@ -7,5 +7,6 @@ data class DownloadRequestV2(
     val volumeId: Int? = null,
     val chapterId: Int? = null,
     val pageCount: Int? = null,
+    val pageIndex: Int? = null,
     val priority: Int = 0,
 )
