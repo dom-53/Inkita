@@ -88,6 +88,10 @@ class LibraryV2ViewModel(
     }
 
     fun selectSection(section: LibraryV2Section) {
+        if (section == LibraryV2Section.Home) {
+            goHome()
+            return
+        }
         _state.update { it.copy(selectedSection = section) }
         if (section == LibraryV2Section.WantToRead) {
             ensureWantToRead()
@@ -100,6 +104,29 @@ class LibraryV2ViewModel(
         }
         if (section == LibraryV2Section.BrowsePeople) {
             ensurePeople()
+        }
+    }
+
+    fun handleBack(): Boolean {
+        val current = _state.value
+        return when {
+            current.selectedSection == LibraryV2Section.Collections && current.selectedCollectionId != null -> {
+                selectCollection(null)
+                true
+            }
+
+            current.selectedSection != LibraryV2Section.Home -> {
+                goHome()
+                true
+            }
+
+            else -> false
+        }
+    }
+
+    fun goHome() {
+        _state.update {
+            clearLibrarySelection(clearCollectionSelection(it.copy(selectedSection = LibraryV2Section.Home)))
         }
     }
 
@@ -332,6 +359,28 @@ class LibraryV2ViewModel(
             }
         }
     }
+
+    private fun clearCollectionSelection(state: LibraryV2UiState): LibraryV2UiState =
+        state.copy(
+            selectedCollectionId = null,
+            selectedCollectionName = null,
+            collectionSeries = emptyList(),
+            isCollectionSeriesLoading = false,
+            collectionSeriesError = null,
+        )
+
+    private fun clearLibrarySelection(state: LibraryV2UiState): LibraryV2UiState =
+        state.copy(
+            selectedLibraryId = null,
+            selectedLibraryName = null,
+            librarySeries = emptyList(),
+            isLibrarySeriesLoading = false,
+            isLibrarySeriesLoadingMore = false,
+            librarySeriesError = null,
+            librarySeriesPage = 1,
+            canLoadMoreLibrarySeries = true,
+            libraryAccessDenied = false,
+        )
 
 
     fun loadMorePeople() {

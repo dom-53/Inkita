@@ -242,8 +242,10 @@ fun LibraryV2Screen(
             }
         },
     ) {
-        if (uiState.selectedSection == LibraryV2Section.Collections && uiState.selectedCollectionId != null) {
-            BackHandler { viewModel.selectCollection(null) }
+        val canHandleBack =
+            uiState.selectedSection != LibraryV2Section.Home || uiState.selectedCollectionId != null
+        if (canHandleBack) {
+            BackHandler { viewModel.handleBack() }
         }
         Column(
             modifier = Modifier.fillMaxSize(),
