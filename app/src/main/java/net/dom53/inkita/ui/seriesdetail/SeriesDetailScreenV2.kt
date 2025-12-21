@@ -57,6 +57,7 @@ import coil.request.ImageRequest
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.ui.common.seriesCoverUrl
+import net.dom53.inkita.ui.common.volumeCoverUrl
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
@@ -273,7 +274,8 @@ fun SeriesDetailScreenV2(
                         if (selectedTab == SeriesDetailTab.Books) {
                             VolumeListV2(
                                 volumes = detail?.detail?.volumes.orEmpty(),
-                                coverUrl = series?.id?.let { seriesCoverUrl(config, it) },
+                                config = config,
+                                seriesCoverUrl = series?.id?.let { seriesCoverUrl(config, it) },
                                 context = context,
                             )
                         }
@@ -425,7 +427,8 @@ private fun ActionsRowV2(
 @Composable
 private fun VolumeListV2(
     volumes: List<net.dom53.inkita.data.api.dto.VolumeDto>,
-    coverUrl: String?,
+    config: AppConfig,
+    seriesCoverUrl: String?,
     context: android.content.Context,
 ) {
     if (volumes.isEmpty()) return
@@ -434,6 +437,7 @@ private fun VolumeListV2(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         volumes.forEachIndexed { index, volume ->
+            val coverUrl = volumeCoverUrl(config, volume.id) ?: seriesCoverUrl
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

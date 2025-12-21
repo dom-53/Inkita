@@ -37,3 +37,12 @@ fun personCoverUrl(
     val base = if (config.serverUrl.endsWith("/")) config.serverUrl.dropLast(1) else config.serverUrl
     return "$base/api/Image/person-cover?personId=$personId&apiKey=${config.imageApiKey}"
 }
+
+fun volumeCoverUrl(
+    config: AppConfig,
+    volumeId: Int,
+): String? {
+    if (config.serverUrl.isBlank() || config.imageApiKey.isBlank()) return null
+    val base = if (config.serverUrl.endsWith("/")) config.serverUrl.dropLast(1) else config.serverUrl
+    return "$base/api/Image/volume-cover?volumeId=$volumeId&apiKey=${config.imageApiKey}"
+}
