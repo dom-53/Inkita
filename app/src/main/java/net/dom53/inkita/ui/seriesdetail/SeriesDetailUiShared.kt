@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import coil.request.ImageRequest
@@ -118,18 +123,63 @@ internal fun ChapterListV2(
                     ?: chapter.title?.takeIf { it.isNotBlank() }
                     ?: chapter.range?.takeIf { it.isNotBlank() }
                     ?: "Chapter ${index + 1}"
+            val pagesRead = chapter.pagesRead ?: 0
+            val pagesTotal = chapter.pages ?: 0
             Column(
                 modifier = Modifier.width(140.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                CoverImage(
-                    coverUrl = coverUrl,
-                    context = androidx.compose.ui.platform.LocalContext.current,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(2f / 3f),
-                )
+                Box {
+                    CoverImage(
+                        coverUrl = coverUrl,
+                        context = androidx.compose.ui.platform.LocalContext.current,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f),
+                    )
+                    if (pagesRead == 0) {
+                        Canvas(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(2f / 3f),
+                        ) {
+                            val sizePx = 26.dp.toPx()
+                            val path =
+                                Path().apply {
+                                    moveTo(size.width - sizePx, 0f)
+                                    lineTo(size.width, 0f)
+                                    lineTo(size.width, sizePx)
+                                    close()
+                                }
+                            drawPath(
+                                path = path,
+                                color = Color(0xFFE91E63),
+                            )
+                        }
+                    }
+                    if (pagesTotal > 0 && pagesRead in 1 until pagesTotal) {
+                        val progress =
+                            (pagesRead.toFloat() / pagesTotal.toFloat()).coerceIn(0f, 1f)
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .align(Alignment.BottomStart)
+                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+                        )
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth(progress)
+                                    .height(6.dp)
+                                    .align(Alignment.BottomStart)
+                                    .background(MaterialTheme.colorScheme.primary),
+                        )
+                    }
+                }
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodySmall,

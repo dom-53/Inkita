@@ -87,7 +87,6 @@ fun SeriesDetailScreenV2(
     val clipboardManager = LocalClipboardManager.current
     LaunchedEffect(uiState.showLoadedToast) {
         if (uiState.showLoadedToast) {
-            Toast.makeText(context, "Detail data loaded", Toast.LENGTH_SHORT).show()
             viewModel.consumeLoadedToast()
         }
     }
