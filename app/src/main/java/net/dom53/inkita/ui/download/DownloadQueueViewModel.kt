@@ -5,16 +5,16 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
-import net.dom53.inkita.data.repository.DownloadRepositoryImpl
-import net.dom53.inkita.domain.repository.DownloadRepository
+import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
+import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
+import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 
 class DownloadQueueViewModel(
-    private val repo: DownloadRepository,
+    private val downloadDao: DownloadV2Dao,
 ) : ViewModel() {
     val tasks =
-        repo
-            .observeTasks()
+        downloadDao
+            .observeJobs()
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Lazily,
@@ -22,8 +22,8 @@ class DownloadQueueViewModel(
             )
 
     val downloaded =
-        repo
-            .observeDownloadedPages()
+        downloadDao
+            .observeItemsByStatus(DownloadedItemV2Entity.STATUS_COMPLETED)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Lazily,
@@ -32,41 +32,53 @@ class DownloadQueueViewModel(
 
     fun cancelTask(id: Long) {
         viewModelScope.launch {
-            repo.cancelTask(id)
+            updateJobStatus(id, DownloadJobV2Entity.STATUS_CANCELED)
         }
     }
 
     fun pauseTask(id: Long) {
         viewModelScope.launch {
-            repo.pauseTask(id)
+            updateJobStatus(id, DownloadJobV2Entity.STATUS_PAUSED)
         }
     }
 
     fun resumeTask(id: Long) {
         viewModelScope.launch {
-            repo.resumeTask(id)
+            updateJobStatus(id, DownloadJobV2Entity.STATUS_PENDING)
         }
     }
 
     fun retryTask(id: Long) {
         viewModelScope.launch {
-            repo.retryTask(id)
+            updateJobStatus(id, DownloadJobV2Entity.STATUS_PENDING)
         }
     }
 
     fun deleteDownloaded(
-        chapterId: Int,
-        page: Int,
+        itemId: Long,
     ) {
-        viewModelScope.launch { repo.deleteDownloadedPage(chapterId, page) }
+        viewModelScope.launch { downloadDao.deleteItemById(itemId) }
     }
 
     fun deleteTask(id: Long) {
-        viewModelScope.launch { repo.deleteTask(id) }
+        viewModelScope.launch {
+            downloadDao.clearItemsForJob(id)
+            downloadDao.deleteJob(id)
+        }
     }
 
     fun clearCompleted() {
-        viewModelScope.launch { repo.clearCompletedTasks() }
+        viewModelScope.launch { downloadDao.deleteJobsByStatus(DownloadJobV2Entity.STATUS_COMPLETED) }
+    }
+
+    private suspend fun updateJobStatus(id: Long, status: String) {
+        val job = downloadDao.getJob(id) ?: return
+        downloadDao.updateJob(
+            job.copy(
+                status = status,
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
     }
 }
 
@@ -78,10 +90,6 @@ object DownloadQueueViewModelFactory {
         val db =
             net.dom53.inkita.data.local.db.InkitaDatabase
                 .getInstance(context)
-        val manager =
-            net.dom53.inkita.core.download
-                .DownloadManager(context)
-        val repo: DownloadRepository = DownloadRepositoryImpl(db.downloadDao(), manager, context.applicationContext)
-        return DownloadQueueViewModel(repo)
+        return DownloadQueueViewModel(db.downloadV2Dao())
     }
 }

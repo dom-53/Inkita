@@ -433,6 +433,7 @@
     <string name="download_action_retry">Retry</string>
     <string name="download_action_clear">Clear</string>
     <string name="download_completed_title">Series %1$s · Chapter %2$s · Page %3$s</string>
+    <string name="download_item_v2_title">Item %1$d · Chapter %2$s · Page %3$s</string>
     <string name="download_completed_status">Status: %1$s</string>
     <string name="download_completed_updated">Updated: %1$s</string>
     <string name="download_completed_size">Size: %1$s</string>

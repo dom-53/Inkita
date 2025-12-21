@@ -26,11 +26,20 @@ interface DownloadV2Dao {
     @Query("SELECT * FROM download_jobs_v2 WHERE status = :status ORDER BY updatedAt DESC")
     suspend fun getJobsByStatus(status: String): List<DownloadJobV2Entity>
 
+    @Query("DELETE FROM download_jobs_v2 WHERE status = :status")
+    suspend fun deleteJobsByStatus(status: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertItems(items: List<DownloadedItemV2Entity>)
 
     @Query("SELECT * FROM download_items_v2 WHERE jobId = :jobId ORDER BY id ASC")
     suspend fun getItemsForJob(jobId: Long): List<DownloadedItemV2Entity>
+
+    @Query("SELECT * FROM download_items_v2 WHERE status = :status ORDER BY updatedAt DESC")
+    fun observeItemsByStatus(status: String): Flow<List<DownloadedItemV2Entity>>
+
+    @Query("DELETE FROM download_items_v2 WHERE id = :itemId")
+    suspend fun deleteItemById(itemId: Long)
 
     @Query("DELETE FROM download_items_v2 WHERE jobId = :jobId")
     suspend fun clearItemsForJob(jobId: Long)
