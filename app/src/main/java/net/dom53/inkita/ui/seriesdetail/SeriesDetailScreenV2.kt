@@ -268,11 +268,10 @@ fun SeriesDetailScreenV2(
                             }
                         }
                         if (selectedTab == SeriesDetailTab.Books) {
-                            VolumeListV2(
+                            VolumeGridRow(
                                 volumes = detail?.detail?.volumes.orEmpty(),
                                 config = config,
                                 seriesCoverUrl = series?.id?.let { seriesCoverUrl(config, it) },
-                                context = context,
                                 onOpenVolume = { volume ->
                                     VolumeDetailCache.put(
                                         VolumeDetailPayload(
@@ -489,42 +488,50 @@ private fun ActionsRowV2(
 }
 
 @Composable
-private fun VolumeListV2(
+private fun VolumeGridRow(
     volumes: List<net.dom53.inkita.data.api.dto.VolumeDto>,
     config: AppConfig,
     seriesCoverUrl: String?,
-    context: android.content.Context,
     onOpenVolume: (net.dom53.inkita.data.api.dto.VolumeDto) -> Unit,
 ) {
     if (volumes.isEmpty()) return
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         volumes.forEachIndexed { index, volume ->
             val coverUrl = volumeCoverUrl(config, volume.id) ?: seriesCoverUrl
-            Row(
+            val title =
+                volume.name?.takeIf { it.isNotBlank() }
+                    ?: "Volume ${index + 1}"
+            Column(
                 modifier =
                     Modifier
-                        .fillMaxWidth()
+                        .width(140.dp)
                         .clickable { onOpenVolume(volume) },
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 CoverImage(
                     coverUrl = coverUrl,
-                    context = context,
+                    context = LocalContext.current,
                     modifier =
                         Modifier
-                            .width(56.dp)
+                            .fillMaxWidth()
                             .aspectRatio(2f / 3f),
                 )
-                val title =
-                    volume.name?.takeIf { it.isNotBlank() }
-                        ?: "Volume ${index + 1}"
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "Vol. ${index + 1}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

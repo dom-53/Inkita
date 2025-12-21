@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -94,9 +96,12 @@ internal fun ChapterListV2(
     config: AppConfig,
 ) {
     if (chapters.isEmpty()) return
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         chapters.forEachIndexed { index, chapter ->
             val coverUrl = chapterCoverUrl(config, chapter.id)
@@ -105,23 +110,28 @@ internal fun ChapterListV2(
                     ?: chapter.title?.takeIf { it.isNotBlank() }
                     ?: chapter.range?.takeIf { it.isNotBlank() }
                     ?: "Chapter ${index + 1}"
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            Column(
+                modifier = Modifier.width(140.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 CoverImage(
                     coverUrl = coverUrl,
                     context = androidx.compose.ui.platform.LocalContext.current,
                     modifier =
                         Modifier
-                            .width(56.dp)
+                            .fillMaxWidth()
                             .aspectRatio(2f / 3f),
                 )
                 Text(
-                    text = "Ch. ${index + 1} - $title",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f),
+                    text = title,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "Ch. ${index + 1}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
