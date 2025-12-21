@@ -8,6 +8,8 @@ data class DownloadedItemV2Entity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val jobId: Long,
     val type: String,
+    val seriesId: Int?,
+    val volumeId: Int?,
     val chapterId: Int?,
     val page: Int?,
     val url: String?,

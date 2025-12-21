@@ -38,6 +38,15 @@ interface DownloadV2Dao {
     @Query("SELECT * FROM download_items_v2 WHERE status = :status ORDER BY updatedAt DESC")
     fun observeItemsByStatus(status: String): Flow<List<DownloadedItemV2Entity>>
 
+    @Query("SELECT * FROM download_items_v2 WHERE seriesId = :seriesId ORDER BY updatedAt DESC")
+    fun observeItemsForSeries(seriesId: Int): Flow<List<DownloadedItemV2Entity>>
+
+    @Query("SELECT * FROM download_items_v2 WHERE volumeId = :volumeId ORDER BY updatedAt DESC")
+    fun observeItemsForVolume(volumeId: Int): Flow<List<DownloadedItemV2Entity>>
+
+    @Query("SELECT * FROM download_items_v2 WHERE chapterId = :chapterId ORDER BY updatedAt DESC")
+    fun observeItemsForChapter(chapterId: Int): Flow<List<DownloadedItemV2Entity>>
+
     @Query("DELETE FROM download_items_v2 WHERE id = :itemId")
     suspend fun deleteItemById(itemId: Long)
 

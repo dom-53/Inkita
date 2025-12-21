@@ -56,7 +56,7 @@ import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
         DownloadedItemV2Entity::class,
         net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity::class,
     ],
-    version = 17,
+    version = 18,
     exportSchema = false,
 )
 abstract class InkitaDatabase : RoomDatabase() {
@@ -531,6 +531,13 @@ abstract class InkitaDatabase : RoomDatabase() {
                     )
                 }
             }
+        private val MIGRATION_17_18 =
+            object : Migration(17, 18) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL("ALTER TABLE download_items_v2 ADD COLUMN seriesId INTEGER")
+                    database.execSQL("ALTER TABLE download_items_v2 ADD COLUMN volumeId INTEGER")
+                }
+            }
 
         fun getInstance(context: Context): InkitaDatabase =
             INSTANCE ?: synchronized(this) {
@@ -556,6 +563,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         MIGRATION_14_15,
                         MIGRATION_15_16,
                         MIGRATION_16_17,
+                        MIGRATION_17_18,
                     ).build()
                     .also { INSTANCE = it }
             }

@@ -136,6 +136,10 @@ fun SeriesDetailScreenV2(
         remember(context.applicationContext) {
             InkitaDatabase.getInstance(context.applicationContext).downloadV2Dao()
         }
+    val downloadedItemsBySeries =
+        downloadDao
+            .observeItemsForSeries(seriesId)
+            .collectAsState(initial = emptyList())
     val downloadManagerV2 =
         remember(context.applicationContext) {
             val strategy =
@@ -430,10 +434,19 @@ fun SeriesDetailScreenV2(
                         }
                         if (selectedTab == SeriesDetailTab.Books) {
                             val volumes = detail?.detail?.volumes.orEmpty()
-                            LaunchedEffect(volumes) {
+                            LaunchedEffect(volumes, downloadedItemsBySeries.value) {
+                                val items = downloadedItemsBySeries.value
+                                val grouped =
+                                    items
+                                        .filter { it.volumeId != null }
+                                        .groupBy { it.volumeId!! }
                                 volumes.forEach { volume ->
-                                    val total = downloadDao.countItemsForVolume(volume.id)
-                                    val completed = downloadDao.countCompletedItemsForVolume(volume.id)
+                                    val list = grouped[volume.id].orEmpty()
+                                    val total = list.size
+                                    val completed =
+                                        list.count {
+                                            it.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED
+                                        }
                                     val state =
                                         when {
                                             total > 0 && completed >= total -> DownloadVolumeState.Complete

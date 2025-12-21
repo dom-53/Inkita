@@ -45,6 +45,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.core.network.KavitaApiFactory
@@ -75,7 +76,7 @@ fun VolumeDetailScreenV2(
     val offlineMode by appPreferences.offlineModeFlow.collectAsState(initial = false)
     var selectedChapter by remember(volumeId) { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
     var selectedChapterIndex by remember(volumeId) { mutableStateOf<Int?>(null) }
-    var downloadedPages by remember(volumeId) { mutableStateOf<Set<Int>>(emptySet()) }
+    val selectedChapterId = selectedChapter?.id
 
     if (payload == null) {
         Box(
@@ -120,6 +121,19 @@ fun VolumeDetailScreenV2(
     val volume = volumeState
     val coverUrl = volumeCoverUrl(config, volume.id) ?: seriesCoverUrl(config, payload.seriesId)
     val chapterList = volume.chapters.orEmpty()
+    val downloadedItemsByVolume =
+        downloadDao
+            .observeItemsForVolume(volume.id)
+            .collectAsState(initial = emptyList())
+    val downloadedItemsForChapterFlow =
+        remember(selectedChapterId) {
+            if (selectedChapterId != null) {
+                downloadDao.observeItemsForChapter(selectedChapterId)
+            } else {
+                flowOf(emptyList())
+            }
+        }
+    val downloadedItemsForChapter = downloadedItemsForChapterFlow.collectAsState(initial = emptyList())
     val summary = chapterList.firstOrNull { !it.summary.isNullOrBlank() }?.summary
     val releaseYear =
         chapterList
@@ -296,10 +310,11 @@ fun VolumeDetailScreenV2(
                         TabItem(SeriesDetailTab.Books, chapterList.size),
                     ).filter { it.count > 0 }
                 if (selectedChapter != null) {
-                    LaunchedEffect(selectedChapter?.id) {
-                        val chapterId = selectedChapter?.id ?: return@LaunchedEffect
-                        downloadedPages = downloadDao.getCompletedPagesForChapter(chapterId).toSet()
-                    }
+                    val downloadedPages =
+                        downloadedItemsForChapter.value
+                            .filter { it.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED }
+                            .mapNotNull { it.page }
+                            .toSet()
                     ChapterPagesSection(
                         chapter = selectedChapter,
                         chapterIndex = selectedChapterIndex ?: 0,
@@ -320,10 +335,16 @@ fun VolumeDetailScreenV2(
                     )
                 } else if (tabs.isNotEmpty()) {
                     var selectedTab by remember { mutableStateOf(tabs.first().id) }
-                    LaunchedEffect(chapterList) {
+                    LaunchedEffect(chapterList, downloadedItemsByVolume.value) {
+                        val items = downloadedItemsByVolume.value
+                        val grouped = items.groupBy { it.chapterId }
                         chapterList.forEach { chapter ->
-                            val total = downloadDao.countItemsForChapter(chapter.id)
-                            val completed = downloadDao.countCompletedItemsForChapter(chapter.id)
+                            val list = grouped[chapter.id].orEmpty()
+                            val total = list.size
+                            val completed =
+                                list.count {
+                                    it.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED
+                                }
                             chapterDownloadStates[chapter.id] = total > 0 && completed >= total
                         }
                     }

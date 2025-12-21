@@ -66,6 +66,8 @@ class EpubDownloadStrategyV2(
                 DownloadedItemV2Entity(
                     jobId = jobId,
                     type = DownloadedItemV2Entity.TYPE_PAGE,
+                    seriesId = seriesId,
+                    volumeId = volumeId,
                     chapterId = chapterId,
                     page = page,
                     url = null,
