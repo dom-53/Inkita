@@ -10,13 +10,18 @@ import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
 import net.dom53.inkita.data.local.db.dao.SeriesDetailV2Dao
+import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.domain.model.SeriesDetail
 import net.dom53.inkita.domain.model.Collection
 import net.dom53.inkita.domain.model.Person
 import net.dom53.inkita.domain.model.ReadingList
+import net.dom53.inkita.domain.model.Format
+import net.dom53.inkita.domain.model.ReadState
 import net.dom53.inkita.domain.model.filter.SeriesQuery
 import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
+import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -122,14 +127,43 @@ class CacheManagerImpl(
         listKey: String,
         series: List<Series>,
     ) {
-        // Skeleton only; no-op.
+        val dao = libraryV2Dao ?: return
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return
+        val now = System.currentTimeMillis()
+        val unique = series.distinctBy { it.id }
+        val enriched = enrichThumbnails(unique)
+        dao.upsertSeries(enriched.map { it.toCachedSeriesV2(now) })
+        dao.clearSeriesRefs(listType, listKey)
+        val refs =
+            enriched.mapIndexed { index, item ->
+                CachedSeriesListRefEntity(
+                    listType = listType,
+                    listKey = listKey,
+                    seriesId = item.id,
+                    position = index,
+                    updatedAt = now,
+                )
+            }
+        dao.upsertSeriesRefs(refs)
     }
 
     override suspend fun getCachedLibraryV2SeriesList(
         listType: String,
         listKey: String,
     ): List<Series> {
-        return emptyList()
+        val dao = libraryV2Dao ?: return emptyList()
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return emptyList()
+        return dao.getSeriesForList(listType, listKey).map { it.toDomainSeries() }
+    }
+
+    override suspend fun getLibraryV2SeriesListUpdatedAt(
+        listType: String,
+        listKey: String,
+    ): Long? {
+        val dao = libraryV2Dao ?: return null
+        return dao.getSeriesListUpdatedAt(listType, listKey)
     }
 
     override suspend fun cacheLibraryV2Collections(
@@ -261,6 +295,53 @@ class CacheManagerImpl(
         }
         LoggingManager.d("CacheManager", "Cleared database cache")
     }
+
+    private fun isLibraryV2CacheAllowed(
+        policy: CachePolicy,
+        listType: String,
+    ): Boolean {
+        if (!policy.globalEnabled || !policy.libraryEnabled) return false
+        return when (listType) {
+            LibraryV2CacheKeys.HOME_ON_DECK,
+            LibraryV2CacheKeys.HOME_RECENTLY_UPDATED,
+            LibraryV2CacheKeys.HOME_RECENTLY_ADDED,
+            -> policy.libraryHomeEnabled
+            else -> false
+        }
+    }
+
+    private fun Series.toCachedSeriesV2(updatedAt: Long): CachedSeriesV2Entity =
+        CachedSeriesV2Entity(
+            id = id,
+            name = name,
+            summary = summary,
+            libraryId = libraryId,
+            format = format?.name,
+            pages = pages,
+            pagesRead = pagesRead,
+            readState = readState?.name,
+            minHoursToRead = minHoursToRead,
+            maxHoursToRead = maxHoursToRead,
+            avgHoursToRead = avgHoursToRead,
+            localThumbPath = localThumbPath,
+            updatedAt = updatedAt,
+        )
+
+    private fun CachedSeriesV2Entity.toDomainSeries(): Series =
+        Series(
+            id = id,
+            name = name,
+            summary = summary,
+            libraryId = libraryId,
+            format = format?.let { runCatching { Format.valueOf(it) }.getOrNull() },
+            pages = pages,
+            pagesRead = pagesRead,
+            readState = readState?.let { runCatching { ReadState.valueOf(it) }.getOrNull() },
+            minHoursToRead = minHoursToRead,
+            maxHoursToRead = maxHoursToRead,
+            avgHoursToRead = avgHoursToRead,
+            localThumbPath = localThumbPath,
+        )
 
     private suspend fun downloadThumbnailIfNeeded(
         serverUrl: String,

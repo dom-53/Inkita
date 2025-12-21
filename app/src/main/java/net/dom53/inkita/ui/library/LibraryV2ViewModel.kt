@@ -5,8 +5,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import net.dom53.inkita.core.cache.CacheManager
+import net.dom53.inkita.core.cache.LibraryV2CacheKeys
+import net.dom53.inkita.core.network.NetworkUtils
+import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.domain.model.Collection
 import net.dom53.inkita.domain.model.Library
 import net.dom53.inkita.domain.model.Person
@@ -78,6 +83,8 @@ class LibraryV2ViewModel(
     private val collectionsRepository: CollectionsRepository,
     private val readingListRepository: ReadingListRepository,
     private val personRepository: PersonRepository,
+    private val cacheManager: CacheManager,
+    private val appPreferences: AppPreferences,
 ) : ViewModel() {
     private val _state = MutableStateFlow(LibraryV2UiState())
     val state: StateFlow<LibraryV2UiState> = _state
@@ -221,6 +228,49 @@ class LibraryV2ViewModel(
     private fun loadHome() {
         viewModelScope.launch {
             _state.update { it.copy(isHomeLoading = true, homeError = null) }
+            val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
+            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
+            val cachedOnDeck =
+                cacheManager.getCachedLibraryV2SeriesList(
+                    LibraryV2CacheKeys.HOME_ON_DECK,
+                    "",
+                )
+            val cachedUpdated =
+                cacheManager.getCachedLibraryV2SeriesList(
+                    LibraryV2CacheKeys.HOME_RECENTLY_UPDATED,
+                    "",
+                )
+            val cachedAdded =
+                cacheManager.getCachedLibraryV2SeriesList(
+                    LibraryV2CacheKeys.HOME_RECENTLY_ADDED,
+                    "",
+                )
+            val cachedUpdatedAt =
+                cacheManager.getLibraryV2SeriesListUpdatedAt(
+                    LibraryV2CacheKeys.HOME_ON_DECK,
+                    "",
+                )
+            val cachedHasData =
+                cachedOnDeck.isNotEmpty() || cachedUpdated.isNotEmpty() || cachedAdded.isNotEmpty()
+            val isStale =
+                cachedUpdatedAt == null ||
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+            if (cachedHasData) {
+                _state.update {
+                    it.copy(
+                        onDeck = cachedOnDeck.map { series -> HomeSeriesItem(series.id, series.name) },
+                        recentlyUpdated = cachedUpdated.map { series -> HomeSeriesItem(series.id, series.name) },
+                        recentlyAdded = cachedAdded.map { series -> HomeSeriesItem(series.id, series.name) },
+                        isHomeLoading = true,
+                        homeError = null,
+                    )
+                }
+                if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    _state.update { it.copy(isHomeLoading = false) }
+                    return@launch
+                }
+            }
             val onDeckResult = runCatching { seriesRepository.getOnDeckSeries(1, 20, 0) }
             val updatedResult = runCatching { seriesRepository.getRecentlyUpdatedSeries(1, 20) }
             val addedResult = runCatching { seriesRepository.getRecentlyAddedSeries(1, 20) }
@@ -244,6 +294,39 @@ class LibraryV2ViewModel(
                     val title = series.name.ifBlank { "Series ${series.id}" }
                     HomeSeriesItem(id = series.id, title = title)
                 }
+            cacheManager.cacheLibraryV2SeriesList(
+                LibraryV2CacheKeys.HOME_ON_DECK,
+                "",
+                onDeckResult.getOrDefault(emptyList()),
+            )
+            cacheManager.cacheLibraryV2SeriesList(
+                LibraryV2CacheKeys.HOME_RECENTLY_ADDED,
+                "",
+                addedResult.getOrDefault(emptyList()),
+            )
+            val updatedSeries =
+                updatedResult.getOrDefault(emptyList()).mapNotNull { item ->
+                    val id = item.seriesId ?: return@mapNotNull null
+                    val title =
+                        item.seriesName?.ifBlank { null }
+                            ?: item.title?.ifBlank { null }
+                            ?: "Series $id"
+                    net.dom53.inkita.domain.model.Series(
+                        id = id,
+                        name = title,
+                        summary = null,
+                        libraryId = null,
+                        format = null,
+                        pages = null,
+                        pagesRead = null,
+                        readState = null,
+                    )
+                }
+            cacheManager.cacheLibraryV2SeriesList(
+                LibraryV2CacheKeys.HOME_RECENTLY_UPDATED,
+                "",
+                updatedSeries,
+            )
 
             val error =
                 onDeckResult.exceptionOrNull()
@@ -423,6 +506,8 @@ class LibraryV2ViewModel(
             collectionsRepository: CollectionsRepository,
             readingListRepository: ReadingListRepository,
             personRepository: PersonRepository,
+            cacheManager: CacheManager,
+            appPreferences: AppPreferences,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -433,6 +518,8 @@ class LibraryV2ViewModel(
                         collectionsRepository,
                         readingListRepository,
                         personRepository,
+                        cacheManager,
+                        appPreferences,
                     ) as T
             }
     }

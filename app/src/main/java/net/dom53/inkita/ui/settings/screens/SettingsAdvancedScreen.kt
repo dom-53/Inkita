@@ -71,6 +71,10 @@ fun SettingsAdvancedScreen(
     var libraryCacheCollectionsEnabled by remember { mutableStateOf(false) }
     var libraryCacheReadingListsEnabled by remember { mutableStateOf(false) }
     var libraryCacheBrowsePeopleEnabled by remember { mutableStateOf(false) }
+    var cacheAlwaysRefresh by remember { mutableStateOf(false) }
+    var cacheStaleHours by remember { mutableStateOf(24) }
+    var cacheStaleInput by remember { mutableStateOf("24") }
+    var cacheStaleFocused by remember { mutableStateOf(false) }
     var cacheTtlMinutes by remember { mutableStateOf(0) }
     var ttlInput by remember { mutableStateOf("0") }
     var useHours by remember { mutableStateOf(false) }
@@ -115,6 +119,17 @@ fun SettingsAdvancedScreen(
     }
     LaunchedEffect(Unit) {
         appPreferences.browseCacheEnabledFlow.collectLatest { browseCacheEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.cacheAlwaysRefreshFlow.collectLatest { cacheAlwaysRefresh = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.cacheStaleHoursFlow.collectLatest {
+            cacheStaleHours = it
+            if (!cacheStaleFocused) {
+                cacheStaleInput = it.toString()
+            }
+        }
     }
     LaunchedEffect(Unit) {
         appPreferences.libraryCacheHomeFlow.collectLatest { libraryCacheHomeEnabled = it }
@@ -238,6 +253,66 @@ fun SettingsAdvancedScreen(
                         }
                     }
                 },
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_cache_always_refresh_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_cache_always_refresh_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = cacheAlwaysRefresh,
+                onCheckedChange = { checked ->
+                    cacheAlwaysRefresh = checked
+                    scope.launch { appPreferences.setCacheAlwaysRefresh(checked) }
+                },
+                enabled = globalCacheEnabled,
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = cacheStaleInput,
+                onValueChange = { value ->
+                    cacheStaleInput = value
+                    val parsed = value.toIntOrNull()
+                    if (parsed != null) {
+                        cacheStaleHours = parsed.coerceIn(1, 168)
+                        scope.launch { appPreferences.setCacheStaleHours(cacheStaleHours) }
+                    }
+                },
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .onFocusChanged { state ->
+                            cacheStaleFocused = state.isFocused
+                            if (!state.isFocused) {
+                                cacheStaleInput = cacheStaleHours.toString()
+                            }
+                        },
+                label = { Text(stringResource(R.string.settings_cache_stale_hours_label)) },
+                supportingText = { Text(stringResource(R.string.settings_cache_stale_hours_hint)) },
+                singleLine = true,
+                enabled = globalCacheEnabled,
+            )
+            Text(
+                text = stringResource(R.string.settings_cache_units_hours),
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
 

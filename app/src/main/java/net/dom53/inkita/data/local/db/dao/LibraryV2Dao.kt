@@ -40,6 +40,14 @@ interface LibraryV2Dao {
     )
     suspend fun getSeriesForList(listType: String, listKey: String): List<CachedSeriesV2Entity>
 
+    @Query(
+        """
+        SELECT MAX(updatedAt) FROM cached_series_list_refs_v2
+        WHERE listType = :listType AND listKey = :listKey
+        """,
+    )
+    suspend fun getSeriesListUpdatedAt(listType: String, listKey: String): Long?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertCollections(items: List<CachedCollectionV2Entity>)
 

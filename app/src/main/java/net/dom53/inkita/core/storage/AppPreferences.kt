@@ -74,6 +74,8 @@ class AppPreferences(
         private val KEY_CACHE_ENABLED = booleanPreferencesKey("cache_enabled")
         private val KEY_LIBRARY_CACHE_ENABLED = booleanPreferencesKey("library_cache_enabled")
         private val KEY_BROWSE_CACHE_ENABLED = booleanPreferencesKey("browse_cache_enabled")
+        private val KEY_CACHE_ALWAYS_REFRESH = booleanPreferencesKey("cache_always_refresh")
+        private val KEY_CACHE_STALE_HOURS = intPreferencesKey("cache_stale_hours")
         private val KEY_LIBRARY_CACHE_HOME = booleanPreferencesKey("library_cache_home")
         private val KEY_LIBRARY_CACHE_WANT = booleanPreferencesKey("library_cache_want")
         private val KEY_LIBRARY_CACHE_COLLECTIONS = booleanPreferencesKey("library_cache_collections")
@@ -163,6 +165,10 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_ENABLED] ?: false }
     val browseCacheEnabledFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_BROWSE_CACHE_ENABLED] ?: false }
+    val cacheAlwaysRefreshFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_CACHE_ALWAYS_REFRESH] ?: false }
+    val cacheStaleHoursFlow: Flow<Int> =
+        context.dataStore.data.map { prefs -> (prefs[KEY_CACHE_STALE_HOURS] ?: 24).coerceIn(1, 168) }
     val libraryCacheHomeFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_HOME] ?: false }
     val libraryCacheWantToReadFlow: Flow<Boolean> =
@@ -358,6 +364,18 @@ class AppPreferences(
     suspend fun setBrowseCacheEnabled(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[KEY_BROWSE_CACHE_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setCacheAlwaysRefresh(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_CACHE_ALWAYS_REFRESH] = enabled
+        }
+    }
+
+    suspend fun setCacheStaleHours(hours: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_CACHE_STALE_HOURS] = hours.coerceIn(1, 168)
         }
     }
 
