@@ -47,6 +47,32 @@ interface DownloadV2Dao {
     @Query("DELETE FROM download_jobs_v2 WHERE seriesId = :seriesId")
     suspend fun deleteJobsForSeries(seriesId: Int)
 
+    @Query(
+        """
+        SELECT COUNT(*) FROM download_items_v2
+        WHERE jobId IN (SELECT id FROM download_jobs_v2 WHERE volumeId = :volumeId)
+          AND status = :status
+        """,
+    )
+    suspend fun countCompletedItemsForVolume(
+        volumeId: Int,
+        status: String = DownloadedItemV2Entity.STATUS_COMPLETED,
+    ): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM download_items_v2
+        WHERE jobId IN (SELECT id FROM download_jobs_v2 WHERE volumeId = :volumeId)
+        """,
+    )
+    suspend fun countItemsForVolume(volumeId: Int): Int
+
+    @Query("DELETE FROM download_items_v2 WHERE jobId IN (SELECT id FROM download_jobs_v2 WHERE volumeId = :volumeId)")
+    suspend fun deleteItemsForVolume(volumeId: Int)
+
+    @Query("DELETE FROM download_jobs_v2 WHERE volumeId = :volumeId")
+    suspend fun deleteJobsForVolume(volumeId: Int)
+
     @Query("DELETE FROM download_items_v2 WHERE jobId = :jobId")
     suspend fun clearItemsForJob(jobId: Long)
 

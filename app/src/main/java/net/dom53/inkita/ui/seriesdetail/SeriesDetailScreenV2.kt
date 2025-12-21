@@ -127,6 +127,7 @@ fun SeriesDetailScreenV2(
     var showCollectionDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showDownloadVolumeDialog by remember { mutableStateOf(false) }
+    var downloadVolumeIsDownloaded by remember { mutableStateOf(false) }
     var selectedVolume by remember { mutableStateOf<net.dom53.inkita.data.api.dto.VolumeDto?>(null) }
     val downloadDao =
         remember(context.applicationContext) {
@@ -440,8 +441,13 @@ fun SeriesDetailScreenV2(
                                     onOpenVolume(volume.id)
                                 },
                                 onLongPressVolume = { volume ->
-                                    selectedVolume = volume
-                                    showDownloadVolumeDialog = true
+                                    scope.launch {
+                                        val total = downloadDao.countItemsForVolume(volume.id)
+                                        val completed = downloadDao.countCompletedItemsForVolume(volume.id)
+                                        downloadVolumeIsDownloaded = total > 0 && total == completed
+                                        selectedVolume = volume
+                                        showDownloadVolumeDialog = true
+                                    }
                                 },
                             )
                         }
@@ -518,7 +524,17 @@ fun SeriesDetailScreenV2(
                     showDownloadVolumeDialog = false
                     selectedVolume = null
                 },
-                title = { Text(stringResource(net.dom53.inkita.R.string.series_detail_download_volume_title)) },
+                title = {
+                    Text(
+                        stringResource(
+                            if (downloadVolumeIsDownloaded) {
+                                net.dom53.inkita.R.string.series_detail_remove_volume_title
+                            } else {
+                                net.dom53.inkita.R.string.series_detail_download_volume_title
+                            },
+                        ),
+                    )
+                },
                 text = {
                     val volLabel =
                         volume
@@ -531,7 +547,15 @@ fun SeriesDetailScreenV2(
                                 }
                             ?: context.getString(net.dom53.inkita.R.string.series_detail_vol_short_plain)
                     Text(
-                        text = stringResource(net.dom53.inkita.R.string.series_detail_download_volume_body, volLabel),
+                        text =
+                            stringResource(
+                                if (downloadVolumeIsDownloaded) {
+                                    net.dom53.inkita.R.string.series_detail_remove_volume_body
+                                } else {
+                                    net.dom53.inkita.R.string.series_detail_download_volume_body
+                                },
+                                volLabel,
+                            ),
                     )
                 },
                 confirmButton = {
@@ -539,6 +563,20 @@ fun SeriesDetailScreenV2(
                         onClick = {
                             showDownloadVolumeDialog = false
                             selectedVolume = null
+                            val volume = volume ?: return@Button
+                            if (downloadVolumeIsDownloaded) {
+                                scope.launch {
+                                    downloadDao.deleteItemsForVolume(volume.id)
+                                    downloadDao.deleteJobsForVolume(volume.id)
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                }
+                                return@Button
+                            }
                             if (offlineMode) {
                                 Toast
                                     .makeText(
@@ -559,7 +597,6 @@ fun SeriesDetailScreenV2(
                                     ).show()
                                 return@Button
                             }
-                            val volume = volume ?: return@Button
                             val chapters =
                                 volume.chapters
                                     ?.filter { (it.pages ?: 0) > 0 }
@@ -597,7 +634,15 @@ fun SeriesDetailScreenV2(
                             }
                         },
                     ) {
-                        Text(stringResource(net.dom53.inkita.R.string.series_detail_download_volume_confirm))
+                        Text(
+                            stringResource(
+                                if (downloadVolumeIsDownloaded) {
+                                    net.dom53.inkita.R.string.series_detail_remove_volume_confirm
+                                } else {
+                                    net.dom53.inkita.R.string.series_detail_download_volume_confirm
+                                },
+                            ),
+                        )
                     }
                 },
                 dismissButton = {
