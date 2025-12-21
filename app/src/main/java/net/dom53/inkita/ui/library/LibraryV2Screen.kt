@@ -391,7 +391,6 @@ fun LibraryV2Screen(
                 }
                 LibraryV2Section.LibrarySeries -> {
                     LibrarySeriesGrid(
-                        title = uiState.selectedLibraryName ?: "Library",
                         items = uiState.librarySeries,
                         isLoading = uiState.isLibrarySeriesLoading,
                         isLoadingMore = uiState.isLibrarySeriesLoadingMore,
@@ -982,7 +981,6 @@ private fun PersonCard(
 
 @Composable
 private fun LibrarySeriesGrid(
-    title: String,
     items: List<net.dom53.inkita.domain.model.Series>,
     isLoading: Boolean,
     isLoadingMore: Boolean,
@@ -1006,11 +1004,6 @@ private fun LibrarySeriesGrid(
         }
     }
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-        )
         Box(modifier = Modifier.fillMaxSize()) {
             when {
                 accessDenied -> {
