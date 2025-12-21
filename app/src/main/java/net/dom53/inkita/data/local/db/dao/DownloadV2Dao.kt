@@ -93,6 +93,19 @@ interface DownloadV2Dao {
     )
     suspend fun countItemsForChapter(chapterId: Int): Int
 
+    @Query(
+        """
+        SELECT page FROM download_items_v2
+        WHERE chapterId = :chapterId
+          AND status = :status
+          AND page IS NOT NULL
+        """,
+    )
+    suspend fun getCompletedPagesForChapter(
+        chapterId: Int,
+        status: String = DownloadedItemV2Entity.STATUS_COMPLETED,
+    ): List<Int>
+
     @Query("DELETE FROM download_items_v2 WHERE jobId = :jobId")
     suspend fun clearItemsForJob(jobId: Long)
 

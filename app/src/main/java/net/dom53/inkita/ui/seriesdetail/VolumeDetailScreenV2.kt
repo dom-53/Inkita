@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import kotlinx.coroutines.flow.first
@@ -73,6 +75,7 @@ fun VolumeDetailScreenV2(
     val offlineMode by appPreferences.offlineModeFlow.collectAsState(initial = false)
     var selectedChapter by remember(volumeId) { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
     var selectedChapterIndex by remember(volumeId) { mutableStateOf<Int?>(null) }
+    var downloadedPages by remember(volumeId) { mutableStateOf<Set<Int>>(emptySet()) }
 
     if (payload == null) {
         Box(
@@ -293,9 +296,14 @@ fun VolumeDetailScreenV2(
                         TabItem(SeriesDetailTab.Books, chapterList.size),
                     ).filter { it.count > 0 }
                 if (selectedChapter != null) {
+                    LaunchedEffect(selectedChapter?.id) {
+                        val chapterId = selectedChapter?.id ?: return@LaunchedEffect
+                        downloadedPages = downloadDao.getCompletedPagesForChapter(chapterId).toSet()
+                    }
                     ChapterPagesSection(
                         chapter = selectedChapter,
                         chapterIndex = selectedChapterIndex ?: 0,
+                        downloadedPages = downloadedPages,
                         onOpenPage = { chapter, page ->
                             onOpenReader(
                                 chapter.id,
@@ -379,6 +387,7 @@ fun VolumeDetailScreenV2(
 private fun ChapterPagesSection(
     chapter: net.dom53.inkita.data.api.dto.ChapterDto?,
     chapterIndex: Int,
+    downloadedPages: Set<Int>,
     onOpenPage: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -471,7 +480,16 @@ private fun ChapterPagesSection(
                     color = textColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
+                if (downloadedPages.contains(index)) {
+                    Icon(
+                        imageVector = Icons.Filled.DownloadDone,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
     }
