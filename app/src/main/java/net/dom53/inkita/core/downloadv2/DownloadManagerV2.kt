@@ -8,6 +8,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 
+@Suppress("UnusedPrivateProperty")
 class DownloadManagerV2(
     private val appContext: Context,
     private val downloadDao: DownloadV2Dao,
