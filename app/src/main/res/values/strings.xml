@@ -104,6 +104,9 @@
     <string name="series_detail_continue_vol_ch">Continue Vol. %1$s Pg. %2$d</string>
     <string name="series_detail_continue_ch">Continue Pg. %1$d</string>
     <string name="series_detail_start_reading">Start reading</string>
+    <string name="series_detail_download_volume_title">Download volume</string>
+    <string name="series_detail_download_volume_body">Download %1$s?</string>
+    <string name="series_detail_download_volume_confirm">Download</string>
     <string name="series_detail_author_label">Author: %1$s</string>
     <string name="series_detail_publication_label">Publication: %1$s</string>
     <string name="series_detail_release_year_label">Release year: %1$s</string>

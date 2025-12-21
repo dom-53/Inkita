@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
@@ -32,11 +34,14 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -111,14 +116,57 @@ fun SeriesDetailScreenV2(
     var summaryExpanded by remember { mutableStateOf(false) }
     var coverExpanded by remember { mutableStateOf(false) }
     var showCollectionDialog by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var showDownloadVolumeDialog by remember { mutableStateOf(false) }
+    var selectedVolume by remember { mutableStateOf<net.dom53.inkita.data.api.dto.VolumeDto?>(null) }
     Box(
         modifier = Modifier.fillMaxSize(),
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = null)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = null)
+                }
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = null)
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(net.dom53.inkita.R.string.series_download_all)) },
+                            onClick = {
+                                showMenu = false
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(net.dom53.inkita.R.string.series_clear_downloads)) },
+                            onClick = {
+                                showMenu = false
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                            },
+                        )
+                    }
+                }
             }
             when {
                 uiState.isLoading -> {
@@ -359,6 +407,10 @@ fun SeriesDetailScreenV2(
                                     )
                                     onOpenVolume(volume.id)
                                 },
+                                onLongPressVolume = { volume ->
+                                    selectedVolume = volume
+                                    showDownloadVolumeDialog = true
+                                },
                             )
                         }
                         if (selectedTab == SeriesDetailTab.Related) {
@@ -426,6 +478,57 @@ fun SeriesDetailScreenV2(
                             .clickable { coverExpanded = false },
                 )
             }
+        }
+        if (showDownloadVolumeDialog) {
+            val volume = selectedVolume
+            AlertDialog(
+                onDismissRequest = {
+                    showDownloadVolumeDialog = false
+                    selectedVolume = null
+                },
+                title = { Text(stringResource(net.dom53.inkita.R.string.series_detail_download_volume_title)) },
+                text = {
+                    val volLabel =
+                        volume
+                            ?.name
+                            ?.takeIf { it.isNotBlank() }
+                            ?: volume
+                                ?.let { volumeNumberText(it) }
+                                ?.let { number ->
+                                    context.getString(net.dom53.inkita.R.string.series_detail_vol_short, number)
+                                }
+                            ?: context.getString(net.dom53.inkita.R.string.series_detail_vol_short_plain)
+                    Text(
+                        text = stringResource(net.dom53.inkita.R.string.series_detail_download_volume_body, volLabel),
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showDownloadVolumeDialog = false
+                            selectedVolume = null
+                            Toast
+                                .makeText(
+                                    context,
+                                    context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                        },
+                    ) {
+                        Text(stringResource(net.dom53.inkita.R.string.series_detail_download_volume_confirm))
+                    }
+                },
+                dismissButton = {
+                    Button(
+                        onClick = {
+                            showDownloadVolumeDialog = false
+                            selectedVolume = null
+                        },
+                    ) {
+                        Text(stringResource(net.dom53.inkita.R.string.general_cancel))
+                    }
+                },
+            )
         }
     }
 }
@@ -609,6 +712,7 @@ private fun VolumeGridRow(
     config: AppConfig,
     seriesCoverUrl: String?,
     onOpenVolume: (net.dom53.inkita.data.api.dto.VolumeDto) -> Unit,
+    onLongPressVolume: (net.dom53.inkita.data.api.dto.VolumeDto) -> Unit,
 ) {
     if (volumes.isEmpty()) return
     Row(
@@ -627,7 +731,10 @@ private fun VolumeGridRow(
                 modifier =
                     Modifier
                         .width(140.dp)
-                        .clickable { onOpenVolume(volume) },
+                        .combinedClickable(
+                            onClick = { onOpenVolume(volume) },
+                            onLongClick = { onLongPressVolume(volume) },
+                        ),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Box {
