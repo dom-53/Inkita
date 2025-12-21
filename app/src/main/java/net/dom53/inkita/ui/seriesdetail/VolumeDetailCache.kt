@@ -5,6 +5,7 @@ import net.dom53.inkita.data.api.dto.VolumeDto
 data class VolumeDetailPayload(
     val seriesId: Int,
     val volume: VolumeDto,
+    val formatId: Int? = null,
 )
 
 object VolumeDetailCache {

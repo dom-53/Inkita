@@ -321,6 +321,7 @@ fun SeriesDetailScreenV2(
                                         VolumeDetailPayload(
                                             seriesId = seriesId,
                                             volume = volume,
+                                            formatId = detail?.series?.format,
                                         ),
                                     )
                                     onOpenVolume(volume.id)

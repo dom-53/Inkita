@@ -46,6 +46,7 @@ import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
 fun VolumeDetailScreenV2(
     volumeId: Int,
     appPreferences: AppPreferences,
+    onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -164,7 +165,47 @@ fun VolumeDetailScreenV2(
                         else -> "Pokračovat $volText Ch. ${pagesRead + 1}"
                     }
                 Button(
-                    onClick = { Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show() },
+                    onClick = {
+                        val chapters = chapterList
+                        if (chapters.isEmpty()) {
+                            Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        val pagesReadSafe = pagesRead.coerceAtLeast(0)
+                        val target =
+                            if (pagesReadSafe <= 0) {
+                                chapters.firstOrNull()?.let { it to 0 }
+                            } else {
+                                var cumulative = 0
+                                val found =
+                                    chapters.firstOrNull { ch ->
+                                        val count = ch.pages ?: 0
+                                        val next = cumulative + count
+                                        val within = count > 0 && pagesReadSafe < next
+                                        if (!within) cumulative = next
+                                        within
+                                    }
+                                if (found != null) {
+                                    val pageInChapter = pagesReadSafe - cumulative
+                                    found to pageInChapter
+                                } else {
+                                    chapters.firstOrNull()?.let { it to pagesReadSafe }
+                                }
+                            }
+                        val chapter = target?.first
+                        val page = target?.second
+                        if (chapter == null || page == null) {
+                            Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        onOpenReader(
+                            chapter.id,
+                            page,
+                            payload.seriesId,
+                            volume.id,
+                            payload.formatId,
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(text = buttonLabel)

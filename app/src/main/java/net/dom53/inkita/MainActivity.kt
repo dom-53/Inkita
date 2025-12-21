@@ -382,6 +382,9 @@ fun InkitaApp(
                         net.dom53.inkita.ui.seriesdetail.VolumeDetailScreenV2(
                             volumeId = volumeId,
                             appPreferences = appPreferences,
+                            onOpenReader = { chapterId, page, sid, vid, fmt ->
+                                navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: 0}")
+                            },
                             onBack = { navController.popBackStack() },
                         )
                     }
