@@ -105,22 +105,18 @@ internal fun ChapterListV2(
                     ?: chapter.range?.takeIf { it.isNotBlank() }
                     ?: "Chapter ${index + 1}"
             Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 CoverImage(
                     coverUrl = coverUrl,
                     context = androidx.compose.ui.platform.LocalContext.current,
                     modifier =
                         Modifier
-                            .width(40.dp)
+                            .width(56.dp)
                             .aspectRatio(2f / 3f),
                 )
-                Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = "Ch. ${index + 1} - $title",
                     style = MaterialTheme.typography.bodyMedium,
