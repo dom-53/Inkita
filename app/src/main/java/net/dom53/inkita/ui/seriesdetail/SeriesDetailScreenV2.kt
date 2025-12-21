@@ -25,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Downloading
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
@@ -442,14 +443,20 @@ fun SeriesDetailScreenV2(
                                         .groupBy { it.volumeId!! }
                                 volumes.forEach { volume ->
                                     val list = grouped[volume.id].orEmpty()
-                                    val total = list.size
                                     val completed =
                                         list.count {
                                             it.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED
                                         }
+                                    val expected =
+                                        volume.pages
+                                            ?.takeIf { it > 0 }
+                                            ?: volume.chapters
+                                                ?.sumOf { it.pages ?: 0 }
+                                                ?.takeIf { it > 0 }
+                                            ?: 0
                                     val state =
                                         when {
-                                            total > 0 && completed >= total -> DownloadVolumeState.Complete
+                                            expected > 0 && completed >= expected -> DownloadVolumeState.Complete
                                             completed > 0 -> DownloadVolumeState.Partial
                                             else -> DownloadVolumeState.None
                                         }
@@ -908,7 +915,8 @@ private fun VolumeGridRow(
                                 .fillMaxWidth()
                                 .aspectRatio(2f / 3f),
                     )
-                    if (downloadStates[volume.id] == DownloadVolumeState.Complete) {
+                    val downloadState = downloadStates[volume.id]
+                    if (downloadState == DownloadVolumeState.Complete || downloadState == DownloadVolumeState.Partial) {
                         Box(
                             modifier =
                                 Modifier
@@ -921,7 +929,12 @@ private fun VolumeGridRow(
                                     .padding(4.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.DownloadDone,
+                                imageVector =
+                                    if (downloadState == DownloadVolumeState.Complete) {
+                                        Icons.Filled.DownloadDone
+                                    } else {
+                                        Icons.Filled.Downloading
+                                    },
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp),

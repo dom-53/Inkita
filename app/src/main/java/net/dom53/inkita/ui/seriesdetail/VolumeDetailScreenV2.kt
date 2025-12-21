@@ -66,7 +66,7 @@ fun VolumeDetailScreenV2(
 ) {
     val context = LocalContext.current
     val downloadDao = remember(context.applicationContext) { InkitaDatabase.getInstance(context.applicationContext).downloadV2Dao() }
-    val chapterDownloadStates = remember { mutableStateMapOf<Int, Boolean>() }
+    val chapterDownloadStates = remember { mutableStateMapOf<Int, ChapterDownloadState>() }
     val payload = remember(volumeId) { VolumeDetailCache.get(volumeId) }
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
@@ -340,12 +340,18 @@ fun VolumeDetailScreenV2(
                         val grouped = items.groupBy { it.chapterId }
                         chapterList.forEach { chapter ->
                             val list = grouped[chapter.id].orEmpty()
-                            val total = list.size
                             val completed =
                                 list.count {
                                     it.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED
                                 }
-                            chapterDownloadStates[chapter.id] = total > 0 && completed >= total
+                            val expected = chapter.pages?.takeIf { it > 0 } ?: 0
+                            val state =
+                                when {
+                                    expected > 0 && completed >= expected -> ChapterDownloadState.Complete
+                                    completed > 0 -> ChapterDownloadState.Partial
+                                    else -> ChapterDownloadState.None
+                                }
+                            chapterDownloadStates[chapter.id] = state
                         }
                     }
                     Row(

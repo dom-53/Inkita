@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Downloading
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -111,7 +112,7 @@ internal fun SectionChip(
 internal fun ChapterListV2(
     chapters: List<net.dom53.inkita.data.api.dto.ChapterDto>,
     config: AppConfig,
-    downloadStates: Map<Int, Boolean> = emptyMap(),
+    downloadStates: Map<Int, ChapterDownloadState> = emptyMap(),
     onChapterClick: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
 ) {
     if (chapters.isEmpty()) return
@@ -147,7 +148,8 @@ internal fun ChapterListV2(
                                 .fillMaxWidth()
                                 .aspectRatio(2f / 3f),
                     )
-                    if (downloadStates[chapter.id] == true) {
+                    val downloadState = downloadStates[chapter.id]
+                    if (downloadState == ChapterDownloadState.Complete || downloadState == ChapterDownloadState.Partial) {
                         Box(
                             modifier =
                                 Modifier
@@ -160,7 +162,12 @@ internal fun ChapterListV2(
                                     .padding(4.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.DownloadDone,
+                                imageVector =
+                                    if (downloadState == ChapterDownloadState.Complete) {
+                                        Icons.Filled.DownloadDone
+                                    } else {
+                                        Icons.Filled.Downloading
+                                    },
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp),
@@ -223,6 +230,12 @@ internal fun ChapterListV2(
             }
         }
     }
+}
+
+internal enum class ChapterDownloadState {
+    None,
+    Partial,
+    Complete,
 }
 
 @Composable
