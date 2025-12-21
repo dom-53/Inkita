@@ -292,31 +292,31 @@ fun InkitaApp(
                     startDestination = MainScreen.Library.route,
                     modifier = Modifier.padding(innerPadding),
                 ) {
-                composable(MainScreen.Library.route) {
-                    LibraryScreen(
-                        seriesRepository = seriesRepository,
-                        collectionsRepository = collectionsRepository,
-                        appPreferences = appPreferences,
-                        cacheManager = cacheManager,
-                        onOpenSeries = { seriesId ->
-                            navController.navigate("series-v1/$seriesId")
-                        },
-                    )
-                }
-                composable(MainScreen.LibraryV2.route) {
-                    LibraryV2Screen(
-                        libraryRepository = libraryRepository,
-                        seriesRepository = seriesRepository,
-                        collectionsRepository = collectionsRepository,
-                        readingListRepository = readingListRepository,
-                        personRepository = personRepository,
-                        appPreferences = appPreferences,
-                        onOpenSeries = { seriesId ->
-                            navController.navigate("series/$seriesId")
-                        },
-                    )
-                }
-                composable(MainScreen.Updates.route) { UpdatesScreen() }
+                    composable(MainScreen.Library.route) {
+                        LibraryScreen(
+                            seriesRepository = seriesRepository,
+                            collectionsRepository = collectionsRepository,
+                            appPreferences = appPreferences,
+                            cacheManager = cacheManager,
+                            onOpenSeries = { seriesId ->
+                                navController.navigate("series-v1/$seriesId")
+                            },
+                        )
+                    }
+                    composable(MainScreen.LibraryV2.route) {
+                        LibraryV2Screen(
+                            libraryRepository = libraryRepository,
+                            seriesRepository = seriesRepository,
+                            collectionsRepository = collectionsRepository,
+                            readingListRepository = readingListRepository,
+                            personRepository = personRepository,
+                            appPreferences = appPreferences,
+                            onOpenSeries = { seriesId ->
+                                navController.navigate("series/$seriesId")
+                            },
+                        )
+                    }
+                    composable(MainScreen.Updates.route) { UpdatesScreen() }
                     composable(MainScreen.History.route) {
                         HistoryScreen(
                             appPreferences = appPreferences,
@@ -356,15 +356,15 @@ fun InkitaApp(
                                     "reader_return",
                                     null,
                                 ).collectAsState(initial = null)
-                    SeriesDetailScreenV2(
-                        seriesId = seriesId,
-                        appPreferences = appPreferences,
-                        onOpenVolume = { volumeId ->
-                            navController.navigate("volume/$volumeId")
-                        },
-                        onBack = { navController.popBackStack() },
-                    )
-                }
+                        SeriesDetailScreenV2(
+                            seriesId = seriesId,
+                            appPreferences = appPreferences,
+                            onOpenVolume = { volumeId ->
+                                navController.navigate("volume/$volumeId")
+                            },
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
                     composable(
                         route = "volume/{volumeId}",
                         arguments = listOf(navArgument("volumeId") { type = NavType.IntType }),

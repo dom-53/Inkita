@@ -7,10 +7,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import net.dom53.inkita.domain.model.Library
 import net.dom53.inkita.domain.model.Collection
-import net.dom53.inkita.domain.model.ReadingList
+import net.dom53.inkita.domain.model.Library
 import net.dom53.inkita.domain.model.Person
+import net.dom53.inkita.domain.model.ReadingList
 import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
 import net.dom53.inkita.domain.repository.PersonRepository
@@ -382,7 +382,6 @@ class LibraryV2ViewModel(
             libraryAccessDenied = false,
         )
 
-
     fun loadMorePeople() {
         val current = _state.value
         if (current.isPeopleLoading || current.isPeopleLoadingMore || !current.canLoadMorePeople) return
@@ -427,15 +426,14 @@ class LibraryV2ViewModel(
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return LibraryV2ViewModel(
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    LibraryV2ViewModel(
                         libraryRepository,
                         seriesRepository,
                         collectionsRepository,
                         readingListRepository,
                         personRepository,
                     ) as T
-                }
             }
     }
 }

@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
@@ -21,17 +21,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import net.dom53.inkita.R
+import net.dom53.inkita.core.storage.AppConfig
+import net.dom53.inkita.ui.common.chapterCoverUrl
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import net.dom53.inkita.core.storage.AppConfig
-import net.dom53.inkita.ui.common.chapterCoverUrl
 
 internal enum class SeriesDetailTab {
     Books,
@@ -39,7 +39,8 @@ internal enum class SeriesDetailTab {
     Specials,
     Related,
     Recommendations,
-    Reviews;
+    Reviews,
+    ;
 
     val label: String
         get() =
@@ -153,15 +154,14 @@ internal fun CoverImage(
     }
 }
 
-internal fun formatHours(value: Float?): String? {
-    return value?.let { String.format(Locale.US, "%.1f h", it) }
-}
+internal fun formatHours(value: Float?): String? = value?.let { String.format(Locale.US, "%.1f h", it) }
 
-internal fun formatHoursDouble(value: Double?): String? {
-    return value?.let { String.format(Locale.US, "%.1f h", it) }
-}
+internal fun formatHoursDouble(value: Double?): String? = value?.let { String.format(Locale.US, "%.1f h", it) }
 
-internal fun formatHoursRange(min: Double?, max: Double?): String? {
+internal fun formatHoursRange(
+    min: Double?,
+    max: Double?,
+): String? {
     if (min == null && max == null) return null
     val minText = min?.let { String.format(Locale.US, "%.1f h", it) }
     val maxText = max?.let { String.format(Locale.US, "%.1f h", it) }
@@ -172,13 +172,12 @@ internal fun formatHoursRange(min: Double?, max: Double?): String? {
     }
 }
 
-internal fun formatCount(value: Long): String {
-    return when {
+internal fun formatCount(value: Long): String =
+    when {
         value >= 1_000_000L -> String.format(Locale.US, "%.1fM", value / 1_000_000f)
         value >= 1_000L -> String.format(Locale.US, "%.0fk", value / 1_000f)
         else -> value.toString()
     }
-}
 
 internal fun formatDate(value: String): String {
     val formatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault())

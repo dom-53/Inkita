@@ -1,19 +1,26 @@
 package net.dom53.inkita.ui.seriesdetail
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Public
@@ -22,9 +29,9 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,27 +45,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import android.widget.Toast
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.size
-import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.storage.AppConfig
+import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.ui.browse.utils.PublicationState
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.stringResource
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
-import net.dom53.inkita.ui.browse.utils.PublicationState
-import android.content.Intent
-import android.net.Uri
 
 @Composable
 fun SeriesDetailScreenV2(
@@ -145,18 +145,18 @@ fun SeriesDetailScreenV2(
                                         .aspectRatio(2f / 3f)
                                         .clickable { coverExpanded = true },
                             )
-                                HeaderInfo(
-                                    seriesId = seriesId,
-                                    series = series,
-                                    metadata = metadata,
-                                    detail = detail,
-                                    context = context,
-                                    clipboardManager = clipboardManager,
-                                    onCopyToast = {
-                                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                )
+                            HeaderInfo(
+                                seriesId = seriesId,
+                                series = series,
+                                metadata = metadata,
+                                detail = detail,
+                                context = context,
+                                clipboardManager = clipboardManager,
+                                onCopyToast = {
+                                    Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         ActionsRowV2(
@@ -176,11 +176,12 @@ fun SeriesDetailScreenV2(
                                 runCatching {
                                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                                 }.onFailure {
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(net.dom53.inkita.R.string.general_unable_to_share),
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.general_unable_to_share),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
                                 }
                             },
                             onShare = {
@@ -200,11 +201,12 @@ fun SeriesDetailScreenV2(
                                         ),
                                     )
                                 }.onFailure {
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(net.dom53.inkita.R.string.general_unable_to_share),
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.general_unable_to_share),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
                                 }
                             },
                         )
@@ -293,7 +295,11 @@ fun SeriesDetailScreenV2(
                 contentAlignment = Alignment.Center,
             ) {
                 CoverImage(
-                    coverUrl = uiState.detail?.series?.id?.let { seriesCoverUrl(config, it) },
+                    coverUrl =
+                        uiState.detail
+                            ?.series
+                            ?.id
+                            ?.let { seriesCoverUrl(config, it) },
                     context = context,
                     modifier =
                         Modifier
@@ -457,11 +463,13 @@ private fun HeaderInfo(
         Text(
             text =
                 "Publication: " +
-                    (metadata?.publicationStatus?.let { status ->
-                        PublicationState.entries.firstOrNull { it.code == status }?.let { state ->
-                            context.getString(state.titleRes)
-                        }
-                    } ?: "-"),
+                    (
+                        metadata?.publicationStatus?.let { status ->
+                            PublicationState.entries.firstOrNull { it.code == status }?.let { state ->
+                                context.getString(state.titleRes)
+                            }
+                        } ?: "-"
+                    ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -491,12 +499,14 @@ private fun HeaderInfo(
         Text(
             text =
                 "Status: " +
-                    (readStateLabel(
-                        context,
-                        unreadCount = detail?.detail?.unreadCount,
-                        totalCount = detail?.detail?.totalCount,
-                        hasProgress = detail?.hasProgress,
-                    ) ?: "-"),
+                    (
+                        readStateLabel(
+                            context,
+                            unreadCount = detail?.detail?.unreadCount,
+                            totalCount = detail?.detail?.totalCount,
+                            hasProgress = detail?.hasProgress,
+                        ) ?: "-"
+                    ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -515,8 +525,8 @@ private fun HeaderInfo(
     }
 }
 
-private fun relatedSeriesCount(related: net.dom53.inkita.data.api.dto.RelatedSeriesDto): Int {
-    return listOf(
+private fun relatedSeriesCount(related: net.dom53.inkita.data.api.dto.RelatedSeriesDto): Int =
+    listOf(
         related.sequels,
         related.prequels,
         related.spinOffs,
@@ -532,7 +542,6 @@ private fun relatedSeriesCount(related: net.dom53.inkita.data.api.dto.RelatedSer
         related.editions,
         related.annuals,
     ).sumOf { it?.size ?: 0 }
-}
 
 private fun readStateLabel(
     context: android.content.Context,

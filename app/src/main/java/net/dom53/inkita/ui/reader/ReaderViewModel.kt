@@ -31,6 +31,7 @@ data class ReaderUiState(
     val pdfPath: String? = null,
 )
 
+@Suppress("VariableNaming", "ktlint:standard:backing-property-naming")
 abstract class BaseReaderViewModel(
     protected val chapterId: Int,
     protected val initialPage: Int,
@@ -137,8 +138,7 @@ abstract class BaseReaderViewModel(
                     if (reader.format == Format.Epub) {
                         updateProgress(initialPage)
                     }
-                }
-                .onFailure { e ->
+                }.onFailure { e ->
                     _state.update { it.copy(isLoading = false, error = e.message ?: "Error loading reader") }
                 }
         }
@@ -189,8 +189,7 @@ abstract class BaseReaderViewModel(
         updateProgress(_state.value.pageIndex, bookScrollId)
     }
 
-    open suspend fun isPageDownloaded(pageIndex: Int): Boolean =
-        runCatching { reader.isPageDownloaded(chapterId, pageIndex) }.getOrDefault(false)
+    open suspend fun isPageDownloaded(pageIndex: Int): Boolean = runCatching { reader.isPageDownloaded(chapterId, pageIndex) }.getOrDefault(false)
 
     protected fun applyLoadResult(
         result: ReaderLoadResult,
@@ -217,13 +216,13 @@ class EpubReaderViewModel(
     volumeId: Int?,
     anonymous: Boolean = false,
 ) : BaseReaderViewModel(
-    chapterId = chapterId,
-    initialPage = initialPage,
-    reader = EpubReader(readerRepository),
-    seriesId = seriesId,
-    volumeId = volumeId,
-    anonymous = anonymous,
-) {
+        chapterId = chapterId,
+        initialPage = initialPage,
+        reader = EpubReader(readerRepository),
+        seriesId = seriesId,
+        volumeId = volumeId,
+        anonymous = anonymous,
+    ) {
     companion object {
         fun provideFactory(
             chapterId: Int,
@@ -257,13 +256,13 @@ class PdfReaderViewModel(
     volumeId: Int?,
     anonymous: Boolean = false,
 ) : BaseReaderViewModel(
-    chapterId = chapterId,
-    initialPage = initialPage,
-    reader = PdfReader(readerRepository),
-    seriesId = seriesId,
-    volumeId = volumeId,
-    anonymous = anonymous,
-) {
+        chapterId = chapterId,
+        initialPage = initialPage,
+        reader = PdfReader(readerRepository),
+        seriesId = seriesId,
+        volumeId = volumeId,
+        anonymous = anonymous,
+    ) {
     override fun loadPage(index: Int) {
         _state.update { it.copy(pageIndex = index) }
         updateProgress(index, totalPagesOverride = _state.value.pageCount)

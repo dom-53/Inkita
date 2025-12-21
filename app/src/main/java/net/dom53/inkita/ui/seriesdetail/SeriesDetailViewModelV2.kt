@@ -77,9 +77,15 @@ class SeriesDetailViewModelV2(
             val want = current.wantToRead == true
             val response =
                 if (want) {
-                    api.removeWantToRead(net.dom53.inkita.data.api.dto.WantToReadDto(listOf(currentSeriesId)))
+                    api.removeWantToRead(
+                        net.dom53.inkita.data.api.dto
+                            .WantToReadDto(listOf(currentSeriesId)),
+                    )
                 } else {
-                    api.addWantToRead(net.dom53.inkita.data.api.dto.WantToReadDto(listOf(currentSeriesId)))
+                    api.addWantToRead(
+                        net.dom53.inkita.data.api.dto
+                            .WantToReadDto(listOf(currentSeriesId)),
+                    )
                 }
             if (!response.isSuccessful) {
                 _state.update { it.copy(error = "Failed to update want-to-read") }

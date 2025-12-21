@@ -1,10 +1,10 @@
 package net.dom53.inkita.data.api
 
-import net.dom53.inkita.data.api.dto.AppUserCollectionDto
 import net.dom53.inkita.data.api.dto.AnnotationDto
+import net.dom53.inkita.data.api.dto.AppUserCollectionDto
+import net.dom53.inkita.data.api.dto.BookmarkDto
 import net.dom53.inkita.data.api.dto.BrowsePersonDto
 import net.dom53.inkita.data.api.dto.BrowsePersonFilterDto
-import net.dom53.inkita.data.api.dto.BookmarkDto
 import net.dom53.inkita.data.api.dto.CollectionDto
 import net.dom53.inkita.data.api.dto.DecodeFilterRequest
 import net.dom53.inkita.data.api.dto.FilterDefinitionDto
@@ -13,9 +13,9 @@ import net.dom53.inkita.data.api.dto.HourEstimateRangeDto
 import net.dom53.inkita.data.api.dto.LanguageDto
 import net.dom53.inkita.data.api.dto.LibraryDto
 import net.dom53.inkita.data.api.dto.NamedDto
-import net.dom53.inkita.data.api.dto.RecentlyAddedItemDto
-import net.dom53.inkita.data.api.dto.ReadingListDto
 import net.dom53.inkita.data.api.dto.RatingDto
+import net.dom53.inkita.data.api.dto.ReadingListDto
+import net.dom53.inkita.data.api.dto.RecentlyAddedItemDto
 import net.dom53.inkita.data.api.dto.SeriesDetailPlusDto
 import net.dom53.inkita.data.api.dto.SeriesDto
 import okhttp3.ResponseBody
@@ -26,6 +26,7 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 import retrofit2.http.Streaming
 
+@Suppress("TooManyFunctions")
 interface KavitaApi {
     @GET("api/Library")
     suspend fun getLibraries(): retrofit2.Response<List<LibraryDto>>

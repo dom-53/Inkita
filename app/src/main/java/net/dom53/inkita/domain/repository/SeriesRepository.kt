@@ -1,8 +1,8 @@
 package net.dom53.inkita.domain.repository
 
+import net.dom53.inkita.domain.model.RecentlyUpdatedSeriesItem
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.domain.model.SeriesDetail
-import net.dom53.inkita.domain.model.RecentlyUpdatedSeriesItem
 import net.dom53.inkita.domain.model.filter.SeriesQuery
 import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
 
