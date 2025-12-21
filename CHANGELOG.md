@@ -3,6 +3,22 @@
 All notable changes to this project will be documented here.
 
 ## Unreleased
+### Added
+- Library V2: Added a new navigation entry and sliding menu with sections (Home, Want To Read, Collections, Reading Lists, Browse People, libraries list) plus data loading from Kavita endpoints with pagination where applicable.
+- Series Detail V2: New screen with summary expand/collapse, chips, metadata layout, action row (collections/want-to-read/web/share), and tabs for Books/Chapters/Specials/Related/Recommendations/Reviews.
+- Volume Detail V2: Dedicated screen with volume metadata, summary expand/collapse, and chapters list; supports deep link from series detail volumes.
+- Reader: Continue reading button now routes into the correct reader using progress data; volume/series continue labels reflect progress and volume/chapter info.
+- UI: Progress overlays on volume/chapters (triangle for unread, progress bar for in-progress).
+
+### Changed
+- DTOs: Completed several Kavita DTOs (SeriesMetadataDto, PersonDto, GenreTagDto, VolumeDto, and related detail DTOs) for Detail V2 data aggregation.
+- Detail data: Added InkitaDetailV2 aggregator and wiring to fetch full series detail payloads and related data.
+- Reader: Remaining time in the overlay updates on page/chapter changes and is rounded to one decimal.
+
+### Fixed
+- Detail V2: Progress and continue point refresh after returning from the reader to avoid stale data.
+- Volume detail: Prevent volume name from being overwritten by API responses that return only the numeric label.
+- Reader: Remaining time refreshes on page changes.
 
 ## v0.2.0-beta.2
 
