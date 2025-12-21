@@ -41,9 +41,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.Orientation
@@ -93,6 +95,7 @@ fun VolumeDetailScreenV2(
     var coverExpanded by remember { mutableStateOf(false) }
     var summaryExpanded by remember { mutableStateOf(false) }
     val offlineMode by appPreferences.offlineModeFlow.collectAsState(initial = false)
+    val haptics = LocalHapticFeedback.current
     var selectedChapter by remember(volumeId) { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
     var selectedChapterIndex by remember(volumeId) { mutableStateOf<Int?>(null) }
     var selectedChapterForDownload by remember(volumeId) { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
@@ -367,6 +370,7 @@ fun VolumeDetailScreenV2(
                                     ).show()
                                 return@ChapterPagesSection
                             }
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             if (isDownloaded) {
                                 scope.launch {
                                     downloadDao.deleteItemsForChapterPage(chapter.id, page)
