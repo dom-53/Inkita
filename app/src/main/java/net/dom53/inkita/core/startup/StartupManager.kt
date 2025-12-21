@@ -74,6 +74,7 @@ object StartupManager {
             CacheManagerImpl(
                 preferences,
                 database.libraryV2Dao(),
+                database.seriesDetailV2Dao(),
                 thumbsDir,
                 appContext.getDatabasePath("inkita.db"),
             )

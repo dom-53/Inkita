@@ -9,6 +9,7 @@ import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
+import net.dom53.inkita.data.local.db.dao.SeriesDetailV2Dao
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.domain.model.SeriesDetail
 import net.dom53.inkita.domain.model.Collection
@@ -24,6 +25,7 @@ import java.io.FileOutputStream
 class CacheManagerImpl(
     private val appPreferences: AppPreferences,
     private val libraryV2Dao: LibraryV2Dao? = null,
+    private val seriesDetailV2Dao: SeriesDetailV2Dao? = null,
     private val thumbnailsDir: File?,
     private val dbFile: File? = null,
 ) : CacheManager {
@@ -248,6 +250,14 @@ class CacheManagerImpl(
             v2Dao.clearAllReadingLists()
             v2Dao.clearAllPersonRefs()
             v2Dao.clearAllPeople()
+        }
+        seriesDetailV2Dao?.let { detailDao ->
+            detailDao.clearVolumeChapterRefs()
+            detailDao.clearChapters()
+            detailDao.clearSeriesVolumeRefs()
+            detailDao.clearVolumes()
+            detailDao.clearRelatedRefs()
+            detailDao.clearSeriesDetails()
         }
         LoggingManager.d("CacheManager", "Cleared database cache")
     }
