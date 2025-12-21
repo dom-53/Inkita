@@ -4,8 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,7 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -52,23 +49,14 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
 import net.dom53.inkita.ui.browse.utils.PublicationState
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import android.content.Intent
 import android.net.Uri
 
@@ -76,6 +64,7 @@ import android.net.Uri
 fun SeriesDetailScreenV2(
     seriesId: Int,
     appPreferences: AppPreferences,
+    onOpenVolume: (Int) -> Unit,
     onBack: () -> Unit,
 ) {
     val viewModel: SeriesDetailViewModelV2 =
@@ -277,6 +266,15 @@ fun SeriesDetailScreenV2(
                                 config = config,
                                 seriesCoverUrl = series?.id?.let { seriesCoverUrl(config, it) },
                                 context = context,
+                                onOpenVolume = { volume ->
+                                    VolumeDetailCache.put(
+                                        VolumeDetailPayload(
+                                            seriesId = seriesId,
+                                            volume = volume,
+                                        ),
+                                    )
+                                    onOpenVolume(volume.id)
+                                },
                             )
                         }
                         Spacer(modifier = Modifier.height(24.dp))
@@ -309,29 +307,6 @@ fun SeriesDetailScreenV2(
     }
 }
 
-
-private fun formatHours(value: Float?): String? {
-    return value?.let { String.format(Locale.US, "%.1f h", it) }
-}
-
-private fun formatCount(value: Long): String {
-    return when {
-        value >= 1_000_000L -> String.format(Locale.US, "%.1fM", value / 1_000_000f)
-        value >= 1_000L -> String.format(Locale.US, "%.0fk", value / 1_000f)
-        else -> value.toString()
-    }
-}
-
-private fun formatDate(value: String): String {
-    val formatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault())
-    val parsed =
-        runCatching { OffsetDateTime.parse(value).toLocalDate() }.getOrNull()
-            ?: runCatching { LocalDateTime.parse(value).toLocalDate() }.getOrNull()
-            ?: runCatching { Instant.parse(value).atZone(ZoneId.systemDefault()).toLocalDate() }.getOrNull()
-    return parsed?.format(formatter) ?: value
-}
-
-
 private fun webUrl(
     config: AppConfig,
     libraryId: Int?,
@@ -340,32 +315,6 @@ private fun webUrl(
     if (!config.isConfigured || libraryId == null) return null
     val base = if (config.serverUrl.endsWith("/")) config.serverUrl.dropLast(1) else config.serverUrl
     return "$base/library/$libraryId/series/$seriesId"
-}
-
-@Composable
-private fun CoverImage(
-    coverUrl: String?,
-    context: android.content.Context,
-    modifier: Modifier = Modifier,
-) {
-    if (coverUrl != null) {
-        AsyncImage(
-            model =
-                ImageRequest
-                    .Builder(context)
-                    .data(coverUrl)
-                    .crossfade(true)
-                    .build(),
-            contentDescription = null,
-            modifier = modifier,
-        )
-    } else {
-        Box(
-            modifier =
-                modifier
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-        )
-    }
 }
 
 @Composable
@@ -430,6 +379,7 @@ private fun VolumeListV2(
     config: AppConfig,
     seriesCoverUrl: String?,
     context: android.content.Context,
+    onOpenVolume: (net.dom53.inkita.data.api.dto.VolumeDto) -> Unit,
 ) {
     if (volumes.isEmpty()) return
     Column(
@@ -439,7 +389,10 @@ private fun VolumeListV2(
         volumes.forEachIndexed { index, volume ->
             val coverUrl = volumeCoverUrl(config, volume.id) ?: seriesCoverUrl
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenVolume(volume) },
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -562,55 +515,6 @@ private fun HeaderInfo(
     }
 }
 
-@Composable
-private fun SectionChip(
-    label: String,
-    count: Int?,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val labelText = if (count != null) "$label $count" else label
-    AssistChip(
-        onClick = onClick,
-        label = { Text(labelText) },
-        colors =
-            androidx.compose.material3.AssistChipDefaults.assistChipColors(
-                containerColor =
-                    if (selected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.surface
-                    },
-                labelColor =
-                    if (selected) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            ),
-    )
-}
-
-private enum class SeriesDetailTab {
-    Books,
-    Chapters,
-    Specials,
-    Related,
-    Recommendations,
-    Reviews;
-
-    val label: String
-        get() =
-            when (this) {
-                Books -> "Books"
-                Chapters -> "Chapters"
-                Specials -> "Specials"
-                Related -> "Related"
-                Recommendations -> "Recommendations"
-                Reviews -> "Reviews"
-            }
-}
-
 private fun relatedSeriesCount(related: net.dom53.inkita.data.api.dto.RelatedSeriesDto): Int {
     return listOf(
         related.sequels,
@@ -629,11 +533,6 @@ private fun relatedSeriesCount(related: net.dom53.inkita.data.api.dto.RelatedSer
         related.annuals,
     ).sumOf { it?.size ?: 0 }
 }
-
-private data class TabItem(
-    val id: SeriesDetailTab,
-    val count: Int,
-)
 
 private fun readStateLabel(
     context: android.content.Context,
@@ -655,84 +554,5 @@ private fun readStateLabel(
         unreadCount <= 0 -> context.resources.getString(net.dom53.inkita.R.string.general_reading_status_completed)
         unreadCount >= totalCount -> context.resources.getString(net.dom53.inkita.R.string.general_reading_status_unread)
         else -> context.resources.getString(net.dom53.inkita.R.string.general_reading_status_in_progress)
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun SummarySectionV2(
-    summary: String?,
-    genres: List<String>,
-    tags: List<String>,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        val summaryText = summary?.ifBlank { null }
-        if (summaryText != null) {
-            Text(
-                text = summaryText,
-                maxLines = if (expanded) Int.MAX_VALUE else 4,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(onClick = onToggle) {
-                    Text(
-                        text =
-                            if (expanded) {
-                                stringResource(id = net.dom53.inkita.R.string.general_less)
-                            } else {
-                                stringResource(id = net.dom53.inkita.R.string.general_more)
-                            },
-                    )
-                }
-            }
-        }
-
-        if (expanded) {
-            ChipGroup(
-                title = stringResource(id = net.dom53.inkita.R.string.general_genres),
-                items = genres,
-            )
-            ChipGroup(
-                title = stringResource(id = net.dom53.inkita.R.string.general_tags),
-                items = tags,
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ChipGroup(
-    title: String,
-    items: List<String>,
-) {
-    val trimmed = items.mapNotNull { it.trim().takeIf { titleText -> titleText.isNotEmpty() } }
-    if (trimmed.isEmpty()) {
-        return
-    }
-    Column(
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            trimmed.forEach { item ->
-                AssistChip(onClick = {}, label = { Text(item) })
-            }
-        }
     }
 }

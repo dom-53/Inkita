@@ -359,9 +359,23 @@ fun InkitaApp(
                     SeriesDetailScreenV2(
                         seriesId = seriesId,
                         appPreferences = appPreferences,
+                        onOpenVolume = { volumeId ->
+                            navController.navigate("volume/$volumeId")
+                        },
                         onBack = { navController.popBackStack() },
                     )
                 }
+                    composable(
+                        route = "volume/{volumeId}",
+                        arguments = listOf(navArgument("volumeId") { type = NavType.IntType }),
+                    ) { entry ->
+                        val volumeId = entry.arguments?.getInt("volumeId") ?: return@composable
+                        net.dom53.inkita.ui.seriesdetail.VolumeDetailScreenV2(
+                            volumeId = volumeId,
+                            appPreferences = appPreferences,
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
                     composable(
                         route = "series-v1/{seriesId}",
                         arguments = listOf(navArgument("seriesId") { type = NavType.IntType }),
