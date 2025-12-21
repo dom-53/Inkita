@@ -480,11 +480,17 @@ fun SeriesDetailScreenV2(
                                 },
                                 onLongPressVolume = { volume ->
                                     scope.launch {
-                                        val total = downloadDao.countItemsForVolume(volume.id)
                                         val completed = downloadDao.countCompletedItemsForVolume(volume.id)
+                                        val expected =
+                                            volume.pages
+                                                ?.takeIf { it > 0 }
+                                                ?: volume.chapters
+                                                    ?.sumOf { it.pages ?: 0 }
+                                                    ?.takeIf { it > 0 }
+                                                ?: 0
                                         downloadVolumeState =
                                             when {
-                                                total > 0 && completed >= total -> DownloadVolumeState.Complete
+                                                expected > 0 && completed >= expected -> DownloadVolumeState.Complete
                                                 completed > 0 -> DownloadVolumeState.Partial
                                                 else -> DownloadVolumeState.None
                                             }
@@ -596,6 +602,12 @@ fun SeriesDetailScreenV2(
                     Text(text = stringResource(bodyRes, volLabel))
                 },
                 confirmButton = {
+                    val confirmRes =
+                        when (downloadVolumeState) {
+                            DownloadVolumeState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_confirm
+                            DownloadVolumeState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_confirm
+                            DownloadVolumeState.None -> net.dom53.inkita.R.string.series_detail_download_volume_confirm
+                        }
                     Button(
                         onClick = {
                             showDownloadVolumeDialog = false
@@ -610,7 +622,7 @@ fun SeriesDetailScreenV2(
                                             context,
                                             context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast),
                                             Toast.LENGTH_SHORT,
-                                    ).show()
+                                        ).show()
                                 }
                                 return@Button
                             }
@@ -671,23 +683,40 @@ fun SeriesDetailScreenV2(
                             }
                         },
                     ) {
-                        val confirmRes =
-                            when (downloadVolumeState) {
-                                DownloadVolumeState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_confirm
-                                DownloadVolumeState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_confirm
-                                DownloadVolumeState.None -> net.dom53.inkita.R.string.series_detail_download_volume_confirm
-                            }
                         Text(stringResource(confirmRes))
                     }
                 },
                 dismissButton = {
-                    Button(
-                        onClick = {
-                            showDownloadVolumeDialog = false
-                            selectedVolume = null
-                        },
-                    ) {
-                        Text(stringResource(net.dom53.inkita.R.string.general_cancel))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (downloadVolumeState == DownloadVolumeState.Partial) {
+                            Button(
+                                onClick = {
+                                    showDownloadVolumeDialog = false
+                                    val volume = volume ?: return@Button
+                                    scope.launch {
+                                        downloadDao.deleteItemsForVolume(volume.id)
+                                        downloadDao.deleteJobsForVolume(volume.id)
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                    }
+                                    selectedVolume = null
+                                },
+                            ) {
+                                Text(stringResource(net.dom53.inkita.R.string.series_detail_remove_volume_confirm))
+                            }
+                        }
+                        Button(
+                            onClick = {
+                                showDownloadVolumeDialog = false
+                                selectedVolume = null
+                            },
+                        ) {
+                            Text(stringResource(net.dom53.inkita.R.string.general_cancel))
+                        }
                     }
                 },
             )
