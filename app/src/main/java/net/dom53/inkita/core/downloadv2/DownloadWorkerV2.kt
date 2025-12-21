@@ -15,29 +15,31 @@ class DownloadWorkerV2(
     override suspend fun doWork(): Result {
         val db = InkitaDatabase.getInstance(applicationContext)
         val dao = db.downloadV2Dao()
-        val job = dao.getJobsByStatus(DownloadJobV2Entity.STATUS_PENDING).firstOrNull() ?: return Result.success()
         val appPreferences = AppPreferences(applicationContext)
-        val strategy =
-            when (job.strategy) {
-                EpubDownloadStrategyV2.FORMAT_EPUB ->
-                    EpubDownloadStrategyV2(
-                        appContext = applicationContext,
-                        downloadDao = dao,
-                        appPreferences = appPreferences,
-                    )
-                else -> null
+        while (true) {
+            val job = dao.getJobsByStatus(DownloadJobV2Entity.STATUS_PENDING).firstOrNull() ?: break
+            val strategy =
+                when (job.strategy) {
+                    EpubDownloadStrategyV2.FORMAT_EPUB ->
+                        EpubDownloadStrategyV2(
+                            appContext = applicationContext,
+                            downloadDao = dao,
+                            appPreferences = appPreferences,
+                        )
+                    else -> null
+                }
+            if (strategy == null) {
+                dao.updateJob(
+                    job.copy(
+                        status = DownloadJobV2Entity.STATUS_FAILED,
+                        updatedAt = System.currentTimeMillis(),
+                        error = "No strategy: ${job.strategy}",
+                    ),
+                )
+                continue
             }
-        if (strategy == null) {
-            dao.updateJob(
-                job.copy(
-                    status = DownloadJobV2Entity.STATUS_FAILED,
-                    updatedAt = System.currentTimeMillis(),
-                    error = "No strategy: ${job.strategy}",
-                ),
-            )
-            return Result.failure()
+            strategy.run(job.id)
         }
-        strategy.run(job.id)
         return Result.success()
     }
 }

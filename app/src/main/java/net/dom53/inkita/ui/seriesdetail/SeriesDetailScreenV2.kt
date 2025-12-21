@@ -181,12 +181,81 @@ fun SeriesDetailScreenV2(
                             text = { Text(stringResource(net.dom53.inkita.R.string.series_download_all)) },
                             onClick = {
                                 showMenu = false
-                                Toast
-                                    .makeText(
-                                        context,
-                                        context.getString(net.dom53.inkita.R.string.general_not_implemented),
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
+                                if (offlineMode) {
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    return@DropdownMenuItem
+                                }
+                                val detail = uiState.detail
+                                val format = Format.fromId(detail?.series?.format)
+                                if (format != Format.Epub) {
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    return@DropdownMenuItem
+                                }
+                                val volumes = detail?.detail?.volumes.orEmpty()
+                                val chaptersWithVolume =
+                                    buildList {
+                                        volumes.forEach { volume ->
+                                            volume.chapters
+                                                ?.forEach { chapter ->
+                                                    add(chapter to (chapter.volumeId ?: volume.id))
+                                                }
+                                        }
+                                        detail?.detail?.chapters
+                                            ?.forEach { chapter ->
+                                                add(chapter to chapter.volumeId)
+                                            }
+                                        detail?.detail?.specials
+                                            ?.forEach { chapter ->
+                                                add(chapter to chapter.volumeId)
+                                            }
+                                        detail?.detail?.storylineChapters
+                                            ?.forEach { chapter ->
+                                                add(chapter to chapter.volumeId)
+                                            }
+                                    }
+                                        .distinctBy { it.first.id }
+                                        .filter { (it.first.pages ?: 0) > 0 }
+                                if (chaptersWithVolume.isEmpty()) {
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.series_detail_pages_unavailable),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    return@DropdownMenuItem
+                                }
+                                scope.launch {
+                                    val sid = detail?.series?.id ?: seriesId
+                                    chaptersWithVolume.forEach { (chapter, volumeId) ->
+                                        val pages = chapter.pages ?: return@forEach
+                                        val request =
+                                            DownloadRequestV2(
+                                                type = DownloadJobV2Entity.TYPE_CHAPTER,
+                                                format = EpubDownloadStrategyV2.FORMAT_EPUB,
+                                                seriesId = sid,
+                                                volumeId = volumeId,
+                                                chapterId = chapter.id,
+                                                pageCount = pages,
+                                            )
+                                        downloadManagerV2.enqueue(request)
+                                    }
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.download_queued),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                }
                             },
                         )
                         DropdownMenuItem(
