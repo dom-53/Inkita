@@ -31,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import coil.request.ImageRequest
 import net.dom53.inkita.R
 import net.dom53.inkita.core.storage.AppConfig
@@ -161,6 +162,7 @@ internal fun CoverImage(
                     .build(),
             contentDescription = null,
             modifier = modifier,
+            contentScale = ContentScale.Crop,
         )
     } else {
         androidx.compose.foundation.layout.Box(
