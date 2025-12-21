@@ -139,6 +139,7 @@ class LibraryV2ViewModel(
         _state.update {
             clearLibrarySelection(clearCollectionSelection(it.copy(selectedSection = LibraryV2Section.Home)))
         }
+        loadHome()
     }
 
     fun selectLibrary(library: Library) {
@@ -201,6 +202,7 @@ class LibraryV2ViewModel(
         if (_state.value.selectedCollectionId == collection.id &&
             _state.value.collectionSeries.isNotEmpty()
         ) {
+            showCollectionSeriesDebugToast(collection.id)
             return
         }
 
@@ -386,7 +388,7 @@ class LibraryV2ViewModel(
 
     private fun ensureWantToRead() {
         val current = _state.value
-        if (current.isWantToReadLoading || current.wantToRead.isNotEmpty()) return
+        if (current.isWantToReadLoading) return
         viewModelScope.launch {
             _state.update { it.copy(isWantToReadLoading = true, wantToReadError = null) }
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
@@ -402,11 +404,15 @@ class LibraryV2ViewModel(
                     LibraryV2CacheKeys.WANT_TO_READ,
                     "",
                 )
+            val hasStateData = current.wantToRead.isNotEmpty()
             val isStale =
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
-            if (cached.isNotEmpty()) {
-                _state.update { it.copy(wantToRead = cached, isWantToReadLoading = true, wantToReadError = null) }
+            val hasAnyData = cached.isNotEmpty() || hasStateData
+            if (hasAnyData) {
+                if (cached.isNotEmpty() && !hasStateData) {
+                    _state.update { it.copy(wantToRead = cached, isWantToReadLoading = true, wantToReadError = null) }
+                }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isWantToReadLoading = false) }
@@ -446,7 +452,7 @@ class LibraryV2ViewModel(
 
     private fun ensureCollections() {
         val current = _state.value
-        if (current.isCollectionsLoading || current.collections.isNotEmpty()) return
+        if (current.isCollectionsLoading) return
         viewModelScope.launch {
             _state.update { it.copy(isCollectionsLoading = true, collectionsError = null) }
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
@@ -457,11 +463,15 @@ class LibraryV2ViewModel(
                 cacheManager.getLibraryV2CollectionsUpdatedAt(
                     LibraryV2CacheKeys.COLLECTIONS,
                 )
+            val hasStateData = current.collections.isNotEmpty()
             val isStale =
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
-            if (cached.isNotEmpty()) {
-                _state.update { it.copy(collections = cached, isCollectionsLoading = true, collectionsError = null) }
+            val hasAnyData = cached.isNotEmpty() || hasStateData
+            if (hasAnyData) {
+                if (cached.isNotEmpty() && !hasStateData) {
+                    _state.update { it.copy(collections = cached, isCollectionsLoading = true, collectionsError = null) }
+                }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isCollectionsLoading = false) }
@@ -500,7 +510,7 @@ class LibraryV2ViewModel(
 
     private fun ensureReadingLists() {
         val current = _state.value
-        if (current.isReadingListsLoading || current.readingLists.isNotEmpty()) return
+        if (current.isReadingListsLoading) return
         viewModelScope.launch {
             _state.update { it.copy(isReadingListsLoading = true, readingListsError = null) }
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
@@ -511,11 +521,15 @@ class LibraryV2ViewModel(
                 cacheManager.getLibraryV2ReadingListsUpdatedAt(
                     LibraryV2CacheKeys.READING_LISTS,
                 )
+            val hasStateData = current.readingLists.isNotEmpty()
             val isStale =
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
-            if (cached.isNotEmpty()) {
-                _state.update { it.copy(readingLists = cached, isReadingListsLoading = true, readingListsError = null) }
+            val hasAnyData = cached.isNotEmpty() || hasStateData
+            if (hasAnyData) {
+                if (cached.isNotEmpty() && !hasStateData) {
+                    _state.update { it.copy(readingLists = cached, isReadingListsLoading = true, readingListsError = null) }
+                }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isReadingListsLoading = false) }
@@ -554,7 +568,7 @@ class LibraryV2ViewModel(
 
     private fun ensurePeople() {
         val current = _state.value
-        if (current.isPeopleLoading || current.people.isNotEmpty()) return
+        if (current.isPeopleLoading) return
         viewModelScope.launch {
             _state.update { it.copy(isPeopleLoading = true, peopleError = null) }
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
@@ -566,18 +580,22 @@ class LibraryV2ViewModel(
                     LibraryV2CacheKeys.BROWSE_PEOPLE,
                     1,
                 )
+            val hasStateData = current.people.isNotEmpty()
             val isStale =
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
-            if (cached.isNotEmpty()) {
-                _state.update {
-                    it.copy(
-                        people = cached,
-                        isPeopleLoading = true,
-                        peopleError = null,
-                        peoplePage = 1,
-                        canLoadMorePeople = cached.size == 50,
-                    )
+            val hasAnyData = cached.isNotEmpty() || hasStateData
+            if (hasAnyData) {
+                if (cached.isNotEmpty() && !hasStateData) {
+                    _state.update {
+                        it.copy(
+                            people = cached,
+                            isPeopleLoading = true,
+                            peopleError = null,
+                            peoplePage = 1,
+                            canLoadMorePeople = cached.size == 50,
+                        )
+                    }
                 }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
                     maybeShowDebugToast(R.string.debug_cache_use)
@@ -717,11 +735,17 @@ class LibraryV2ViewModel(
                     LibraryV2CacheKeys.COLLECTION_SERIES,
                     cacheKey,
                 )
+            val hasStateData = _state.value.collectionSeries.isNotEmpty()
             val isStale =
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
-            if (cached.isNotEmpty()) {
-                _state.update { it.copy(collectionSeries = cached, isCollectionSeriesLoading = true, collectionSeriesError = null) }
+            val hasAnyData = cached.isNotEmpty() || hasStateData
+            if (hasAnyData) {
+                if (cached.isNotEmpty() && !hasStateData) {
+                    _state.update {
+                        it.copy(collectionSeries = cached, isCollectionSeriesLoading = true, collectionSeriesError = null)
+                    }
+                }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isCollectionSeriesLoading = false) }
@@ -766,6 +790,32 @@ class LibraryV2ViewModel(
             appPreferences.appContext.getString(messageRes),
             Toast.LENGTH_SHORT,
         ).show()
+    }
+
+    private fun showCollectionSeriesDebugToast(collectionId: Int) {
+        viewModelScope.launch {
+            val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
+            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
+            val cacheKey = collectionId.toString()
+            val cachedUpdatedAt =
+                cacheManager.getLibraryV2SeriesListUpdatedAt(
+                    LibraryV2CacheKeys.COLLECTION_SERIES,
+                    cacheKey,
+                )
+            val isStale =
+                cachedUpdatedAt == null ||
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+            val message =
+                if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    R.string.debug_cache_use
+                } else if (alwaysRefresh) {
+                    R.string.debug_cache_force_online
+                } else {
+                    R.string.debug_cache_stale_reload
+                }
+            maybeShowDebugToast(message)
+        }
     }
 
     companion object {
