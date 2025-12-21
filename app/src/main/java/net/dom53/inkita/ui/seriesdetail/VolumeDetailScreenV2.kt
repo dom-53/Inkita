@@ -154,11 +154,20 @@ fun VolumeDetailScreenV2(
                     expanded = summaryExpanded,
                     onToggle = { summaryExpanded = !summaryExpanded },
                 )
+                val volText = volumeNumberText(volume)?.let { "Vol. $it" } ?: "Vol."
+                val pagesRead = volume.pagesRead ?: 0
+                val pagesTotal = volume.pages
+                val buttonLabel =
+                    when {
+                        pagesTotal != null && pagesRead >= pagesTotal -> "Re-read"
+                        pagesRead <= 0 -> "Začít číst $volText"
+                        else -> "Pokračovat $volText Ch. ${pagesRead + 1}"
+                    }
                 Button(
                     onClick = { Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(text = "Pokračovat ve čtení")
+                    Text(text = buttonLabel)
                 }
                 val tabs =
                     listOf(

@@ -217,6 +217,12 @@ internal fun formatYear(value: String): String? {
     return parsed?.year?.toString()
 }
 
+internal fun volumeNumberText(volume: net.dom53.inkita.data.api.dto.VolumeDto): String? {
+    val volNumber = volume.minNumber ?: volume.maxNumber
+    if (volNumber == null) return null
+    return if (volNumber % 1f == 0f) volNumber.toInt().toString() else volNumber.toString()
+}
+
 @Composable
 internal fun CollectionDialogV2(
     collections: List<net.dom53.inkita.domain.model.Collection>,

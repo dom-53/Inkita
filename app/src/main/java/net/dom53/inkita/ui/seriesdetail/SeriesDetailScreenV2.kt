@@ -742,11 +742,6 @@ private fun relatedSeriesGroups(
     return groups.filter { it.items.isNotEmpty() }
 }
 
-private fun volumeNumberText(volume: net.dom53.inkita.data.api.dto.VolumeDto): String {
-    val volNumber = volume.minNumber ?: volume.maxNumber
-    if (volNumber == null) return volume.name?.takeIf { it.isNotBlank() } ?: ""
-    return if (volNumber % 1f == 0f) volNumber.toInt().toString() else volNumber.toString()
-}
 
 private fun readStateLabel(
     context: android.content.Context,
