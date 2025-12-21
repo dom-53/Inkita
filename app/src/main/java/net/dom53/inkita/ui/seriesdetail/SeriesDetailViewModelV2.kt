@@ -301,7 +301,11 @@ class SeriesDetailViewModelV2(
                     rating = rating,
                     readerProgress = readerProgress,
                 )
-            val membership = detail.collections?.map { it.id }?.toSet().orEmpty()
+            val membership =
+                detail.collections
+                    ?.map { it.id }
+                    ?.toSet()
+                    .orEmpty()
 
             _state.update {
                 it.copy(

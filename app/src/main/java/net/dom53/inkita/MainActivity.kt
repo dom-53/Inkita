@@ -362,26 +362,26 @@ fun InkitaApp(
                                     "series_refresh",
                                     false,
                                 ).collectAsState(initial = false)
-                    SeriesDetailScreenV2(
-                        seriesId = seriesId,
-                        appPreferences = appPreferences,
-                        collectionsRepository = collectionsRepository,
-                        onOpenReader = { chapterId, page, sid, vid, fmt ->
-                            navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: 0}")
-                        },
-                        onOpenVolume = { volumeId ->
-                            navController.navigate("volume/$volumeId")
-                        },
-                        onOpenSeries = { id ->
-                            navController.navigate("series/$id")
-                        },
-                        readerReturn = readerReturn.value,
-                        onConsumeReaderReturn = { entry.savedStateHandle["reader_return"] = null },
-                        refreshSignal = refreshSignal.value,
-                        onConsumeRefreshSignal = { entry.savedStateHandle["series_refresh"] = false },
-                        onBack = { navController.popBackStack() },
-                    )
-                }
+                        SeriesDetailScreenV2(
+                            seriesId = seriesId,
+                            appPreferences = appPreferences,
+                            collectionsRepository = collectionsRepository,
+                            onOpenReader = { chapterId, page, sid, vid, fmt ->
+                                navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: 0}")
+                            },
+                            onOpenVolume = { volumeId ->
+                                navController.navigate("volume/$volumeId")
+                            },
+                            onOpenSeries = { id ->
+                                navController.navigate("series/$id")
+                            },
+                            readerReturn = readerReturn.value,
+                            onConsumeReaderReturn = { entry.savedStateHandle["reader_return"] = null },
+                            refreshSignal = refreshSignal.value,
+                            onConsumeRefreshSignal = { entry.savedStateHandle["series_refresh"] = false },
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
                     composable(
                         route = "volume/{volumeId}",
                         arguments = listOf(navArgument("volumeId") { type = NavType.IntType }),

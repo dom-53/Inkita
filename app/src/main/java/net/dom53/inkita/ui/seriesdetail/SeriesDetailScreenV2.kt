@@ -3,6 +3,7 @@ package net.dom53.inkita.ui.seriesdetail
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -21,8 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.graphics.Path
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Public
@@ -49,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -176,7 +176,8 @@ fun SeriesDetailScreenV2(
                                 context = context,
                                 clipboardManager = clipboardManager,
                                 onCopyToast = {
-                                        Toast.makeText(
+                                    Toast
+                                        .makeText(
                                             context,
                                             context.getString(net.dom53.inkita.R.string.general_copied_to_clipboard),
                                             Toast.LENGTH_SHORT,
@@ -198,11 +199,12 @@ fun SeriesDetailScreenV2(
                             onOpenWeb = {
                                 val url = webUrl(config, series?.libraryId, seriesId)
                                 if (url == null) {
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(net.dom53.inkita.R.string.series_detail_missing_library_id),
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.series_detail_missing_library_id),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
                                     return@ActionsRowV2
                                 }
                                 runCatching {
@@ -218,9 +220,9 @@ fun SeriesDetailScreenV2(
                             },
                             onShare = {
                                 val url = webUrl(config, series?.libraryId, seriesId)
-                            val title =
-                                series?.name?.ifBlank { null }
-                                    ?: context.getString(net.dom53.inkita.R.string.series_detail_series_fallback, seriesId)
+                                val title =
+                                    series?.name?.ifBlank { null }
+                                        ?: context.getString(net.dom53.inkita.R.string.series_detail_series_fallback, seriesId)
                                 val shareIntent =
                                     Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
@@ -283,11 +285,12 @@ fun SeriesDetailScreenV2(
                                 val sid = detail?.series?.id ?: seriesId
                                 val fmt = detail?.series?.format
                                 if (chapterId == null || volumeId == null) {
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(net.dom53.inkita.R.string.general_not_implemented),
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
                                     return@Button
                                 }
                                 val page =
@@ -377,11 +380,12 @@ fun SeriesDetailScreenV2(
                 onLoadCollections = { viewModel.loadCollections() },
                 onToggle = { collection, add ->
                     if (!config.isConfigured) {
-                        Toast.makeText(
-                            context,
-                            context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
-                            Toast.LENGTH_SHORT,
-                        ).show()
+                        Toast
+                            .makeText(
+                                context,
+                                context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         return@CollectionDialogV2
                     }
                     viewModel.toggleCollection(collection, add)
@@ -461,9 +465,9 @@ private fun RelatedCollectionsSection(
                                     .aspectRatio(2f / 3f),
                         )
                         Text(
-                    text =
-                        item.name?.ifBlank { null }
-                            ?: stringResource(id = net.dom53.inkita.R.string.series_detail_series_fallback, item.id),
+                            text =
+                                item.name?.ifBlank { null }
+                                    ?: stringResource(id = net.dom53.inkita.R.string.series_detail_series_fallback, item.id),
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -810,18 +814,14 @@ private fun HeaderInfo(
     }
 }
 
-private fun relatedSeriesCount(related: net.dom53.inkita.data.api.dto.RelatedSeriesDto): Int {
-    return relatedSeriesGroups(related).sumOf { it.items.size }
-}
+private fun relatedSeriesCount(related: net.dom53.inkita.data.api.dto.RelatedSeriesDto): Int = relatedSeriesGroups(related).sumOf { it.items.size }
 
 private data class RelatedGroupUi(
     val titleRes: Int,
     val items: List<net.dom53.inkita.data.api.dto.SeriesDto>,
 )
 
-private fun relatedSeriesGroups(
-    related: net.dom53.inkita.data.api.dto.RelatedSeriesDto?,
-): List<RelatedGroupUi> {
+private fun relatedSeriesGroups(related: net.dom53.inkita.data.api.dto.RelatedSeriesDto?): List<RelatedGroupUi> {
     if (related == null) return emptyList()
     val groups =
         listOf(
@@ -842,7 +842,6 @@ private fun relatedSeriesGroups(
         )
     return groups.filter { it.items.isNotEmpty() }
 }
-
 
 private fun readStateLabel(
     context: android.content.Context,

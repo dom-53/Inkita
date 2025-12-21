@@ -37,13 +37,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.first
+import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
-import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
-import kotlinx.coroutines.flow.first
 
 @Composable
 fun VolumeDetailScreenV2(
@@ -219,11 +219,12 @@ fun VolumeDetailScreenV2(
                     onClick = {
                         val chapters = chapterList
                         if (chapters.isEmpty()) {
-                            Toast.makeText(
-                                context,
-                                context.getString(net.dom53.inkita.R.string.general_not_implemented),
-                                Toast.LENGTH_SHORT,
-                            ).show()
+                            Toast
+                                .makeText(
+                                    context,
+                                    context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
                             return@Button
                         }
                         val pagesReadSafe = pagesRead.coerceAtLeast(0)
@@ -250,11 +251,12 @@ fun VolumeDetailScreenV2(
                         val chapter = target?.first
                         val page = target?.second
                         if (chapter == null || page == null) {
-                            Toast.makeText(
-                                context,
-                                context.getString(net.dom53.inkita.R.string.general_not_implemented),
-                                Toast.LENGTH_SHORT,
-                            ).show()
+                            Toast
+                                .makeText(
+                                    context,
+                                    context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
                             return@Button
                         }
                         onOpenReader(
