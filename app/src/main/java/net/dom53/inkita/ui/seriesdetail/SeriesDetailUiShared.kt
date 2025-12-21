@@ -107,6 +107,7 @@ internal fun SectionChip(
 internal fun ChapterListV2(
     chapters: List<net.dom53.inkita.data.api.dto.ChapterDto>,
     config: AppConfig,
+    onChapterClick: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
 ) {
     if (chapters.isEmpty()) return
     Row(
@@ -126,7 +127,10 @@ internal fun ChapterListV2(
             val pagesRead = chapter.pagesRead ?: 0
             val pagesTotal = chapter.pages ?: 0
             Column(
-                modifier = Modifier.width(140.dp),
+                modifier =
+                    Modifier
+                        .width(140.dp)
+                        .clickable { onChapterClick(chapter, index) },
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Box {

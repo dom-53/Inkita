@@ -7,6 +7,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -17,9 +19,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.first
 import net.dom53.inkita.core.network.KavitaApiFactory
@@ -62,6 +68,8 @@ fun VolumeDetailScreenV2(
     var coverExpanded by remember { mutableStateOf(false) }
     var summaryExpanded by remember { mutableStateOf(false) }
     val offlineMode by appPreferences.offlineModeFlow.collectAsState(initial = false)
+    var selectedChapter by remember(volumeId) { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
+    var selectedChapterIndex by remember(volumeId) { mutableStateOf<Int?>(null) }
 
     if (payload == null) {
         Box(
@@ -281,7 +289,25 @@ fun VolumeDetailScreenV2(
                     listOf(
                         TabItem(SeriesDetailTab.Books, chapterList.size),
                     ).filter { it.count > 0 }
-                if (tabs.isNotEmpty()) {
+                if (selectedChapter != null) {
+                    ChapterPagesSection(
+                        chapter = selectedChapter,
+                        chapterIndex = selectedChapterIndex ?: 0,
+                        onOpenPage = { chapter, page ->
+                            onOpenReader(
+                                chapter.id,
+                                page,
+                                payload.seriesId,
+                                volume.id,
+                                payload.formatId,
+                            )
+                        },
+                        onBack = {
+                            selectedChapter = null
+                            selectedChapterIndex = null
+                        },
+                    )
+                } else if (tabs.isNotEmpty()) {
                     var selectedTab by remember { mutableStateOf(tabs.first().id) }
                     Row(
                         modifier =
@@ -304,6 +330,10 @@ fun VolumeDetailScreenV2(
                         ChapterListV2(
                             chapters = chapterList,
                             config = config,
+                            onChapterClick = { chapter, index ->
+                                selectedChapter = chapter
+                                selectedChapterIndex = index
+                            },
                         )
                     }
                 }
@@ -330,6 +360,92 @@ fun VolumeDetailScreenV2(
                             .clickable { coverExpanded = false },
                 )
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChapterPagesSection(
+    chapter: net.dom53.inkita.data.api.dto.ChapterDto?,
+    chapterIndex: Int,
+    onOpenPage: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    val title =
+        chapter
+            ?.titleName
+            ?.takeIf { it.isNotBlank() }
+            ?: chapter
+                ?.title
+                ?.takeIf { it.isNotBlank() }
+            ?: chapter
+                ?.range
+                ?.takeIf { it.isNotBlank() }
+            ?: context.getString(net.dom53.inkita.R.string.series_detail_chapter_fallback, chapterIndex + 1)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(Icons.Filled.ArrowBack, contentDescription = null)
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+    val pages = chapter?.pages ?: 0
+    val pagesRead = chapter?.pagesRead ?: 0
+    if (pages <= 0) {
+        Text(
+            text = stringResource(net.dom53.inkita.R.string.series_detail_pages_unavailable),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        repeat(pages) { index ->
+            val isRead = index < pagesRead
+            val isCurrent = pagesRead in 0 until pages && index == pagesRead
+            val containerColor =
+                when {
+                    isRead -> MaterialTheme.colorScheme.secondary
+                    else -> MaterialTheme.colorScheme.surface
+                }
+            val labelColor =
+                when {
+                    isRead -> MaterialTheme.colorScheme.onSecondary
+                    isCurrent -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            val border =
+                if (isCurrent) {
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                } else {
+                    null
+                }
+            AssistChip(
+                onClick = {
+                    chapter?.let { onOpenPage(it, index) }
+                },
+                label = { Text((index + 1).toString()) },
+                border = border,
+                colors =
+                    AssistChipDefaults.assistChipColors(
+                        containerColor = containerColor,
+                        labelColor = labelColor,
+                    ),
+            )
         }
     }
 }

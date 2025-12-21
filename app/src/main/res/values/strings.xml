@@ -104,6 +104,8 @@
     <string name="series_detail_continue_vol_ch">Continue Vol. %1$s Pg. %2$d</string>
     <string name="series_detail_continue_ch">Continue Pg. %1$d</string>
     <string name="series_detail_start_reading">Start reading</string>
+    <string name="series_detail_chapter_fallback">Chapter %1$d</string>
+    <string name="series_detail_pages_unavailable">Pages are not available.</string>
     <string name="series_detail_download_volume_title">Download volume</string>
     <string name="series_detail_download_volume_body">Download %1$s?</string>
     <string name="series_detail_download_volume_confirm">Download</string>
