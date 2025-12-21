@@ -481,7 +481,7 @@ private fun SeriesCard(
     config: AppConfig,
     onOpenSeries: (Int) -> Unit,
 ) {
-    val imageUrl = seriesCoverUrl(config, item.id)
+    val imageUrl = item.localThumbPath ?: seriesCoverUrl(config, item.id)
     Column(
         modifier =
             Modifier

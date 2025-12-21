@@ -25,6 +25,7 @@ import net.dom53.inkita.domain.repository.SeriesRepository
 data class HomeSeriesItem(
     val id: Int,
     val title: String,
+    val localThumbPath: String? = null,
 )
 
 enum class LibraryV2Section {
@@ -259,9 +260,9 @@ class LibraryV2ViewModel(
             if (cachedHasData) {
                 _state.update {
                     it.copy(
-                        onDeck = cachedOnDeck.map { series -> HomeSeriesItem(series.id, series.name) },
-                        recentlyUpdated = cachedUpdated.map { series -> HomeSeriesItem(series.id, series.name) },
-                        recentlyAdded = cachedAdded.map { series -> HomeSeriesItem(series.id, series.name) },
+                        onDeck = cachedOnDeck.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
+                        recentlyUpdated = cachedUpdated.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
+                        recentlyAdded = cachedAdded.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
                         isHomeLoading = true,
                         homeError = null,
                     )
@@ -278,7 +279,7 @@ class LibraryV2ViewModel(
             val onDeck =
                 onDeckResult.getOrDefault(emptyList()).map { series ->
                     val title = series.name.ifBlank { "Series ${series.id}" }
-                    HomeSeriesItem(id = series.id, title = title)
+                    HomeSeriesItem(id = series.id, title = title, localThumbPath = series.localThumbPath)
                 }
             val recentlyUpdated =
                 updatedResult.getOrDefault(emptyList()).mapNotNull { item ->
@@ -287,12 +288,12 @@ class LibraryV2ViewModel(
                         item.seriesName?.ifBlank { null }
                             ?: item.title?.ifBlank { null }
                             ?: "Series $id"
-                    HomeSeriesItem(id = id, title = title)
+                    HomeSeriesItem(id = id, title = title, localThumbPath = null)
                 }
             val recentlyAdded =
                 addedResult.getOrDefault(emptyList()).map { series ->
                     val title = series.name.ifBlank { "Series ${series.id}" }
-                    HomeSeriesItem(id = series.id, title = title)
+                    HomeSeriesItem(id = series.id, title = title, localThumbPath = series.localThumbPath)
                 }
             cacheManager.cacheLibraryV2SeriesList(
                 LibraryV2CacheKeys.HOME_ON_DECK,
