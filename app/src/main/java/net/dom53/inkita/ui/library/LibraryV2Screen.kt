@@ -242,6 +242,15 @@ fun LibraryV2Screen(
             }
         },
     ) {
+        val topTitle =
+            when (uiState.selectedSection) {
+                LibraryV2Section.Home -> "Home"
+                LibraryV2Section.WantToRead -> "Want To Read"
+                LibraryV2Section.Collections -> "Collections"
+                LibraryV2Section.ReadingList -> "Reading List"
+                LibraryV2Section.BrowsePeople -> "Browse People"
+                LibraryV2Section.LibrarySeries -> uiState.selectedLibraryName ?: "Library"
+            }
         val canHandleBack =
             uiState.selectedSection != LibraryV2Section.Home || uiState.selectedCollectionId != null
         if (canHandleBack) {
@@ -250,12 +259,24 @@ fun LibraryV2Screen(
         Column(
             modifier = Modifier.fillMaxSize(),
         ) {
-            IconButton(
-                onClick = {
-                    scope.launch { drawerState.open() }
-                },
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Filled.Menu, contentDescription = null)
+                IconButton(
+                    onClick = {
+                        scope.launch { drawerState.open() }
+                    },
+                ) {
+                    Icon(Icons.Filled.Menu, contentDescription = null)
+                }
+                Text(
+                    text = topTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
             when (uiState.selectedSection) {
                 LibraryV2Section.Home -> {
