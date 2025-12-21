@@ -1,6 +1,7 @@
 package net.dom53.inkita.ui.seriesdetail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -14,10 +15,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -204,6 +211,88 @@ internal fun formatYear(value: String): String? {
             ?: runCatching { LocalDateTime.parse(value).toLocalDate() }.getOrNull()
             ?: runCatching { Instant.parse(value).atZone(ZoneId.systemDefault()).toLocalDate() }.getOrNull()
     return parsed?.year?.toString()
+}
+
+@Composable
+internal fun CollectionDialogV2(
+    collections: List<net.dom53.inkita.domain.model.Collection>,
+    isLoading: Boolean,
+    error: String?,
+    membership: Set<Int>,
+    onDismiss: () -> Unit,
+    onLoadCollections: () -> Unit,
+    onToggle: (net.dom53.inkita.domain.model.Collection, Boolean) -> Unit,
+    onCreateCollection: (String) -> Unit,
+) {
+    var newTitle by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.general_collections)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (isLoading) {
+                    androidx.compose.material3.CircularProgressIndicator()
+                } else {
+                    if (collections.isEmpty()) {
+                        Text(stringResource(R.string.series_detail_no_colls_reload))
+                        TextButton(onClick = onLoadCollections) {
+                            Text(stringResource(R.string.series_detail_load_colls))
+                        }
+                    } else {
+                        collections.forEach { collection ->
+                            val isInCollection = membership.contains(collection.id)
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onToggle(collection, !isInCollection) },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(collection.name)
+                                androidx.compose.material3.Switch(
+                                    checked = isInCollection,
+                                    onCheckedChange = { onToggle(collection, it) },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                androidx.compose.material3.Divider(modifier = Modifier.padding(vertical = 4.dp))
+                Text(stringResource(R.string.general_create_new_coll))
+                OutlinedTextField(
+                    value = newTitle,
+                    onValueChange = { newTitle = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(stringResource(R.string.general_coll_name)) },
+                )
+                Button(
+                    onClick = {
+                        onCreateCollection(newTitle.trim())
+                        newTitle = ""
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = newTitle.isNotBlank(),
+                ) {
+                    Text(stringResource(R.string.general_create_and_add))
+                }
+
+                error?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.general_close))
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

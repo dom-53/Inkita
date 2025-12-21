@@ -30,6 +30,10 @@ data class SeriesDetailUiStateV2(
     val error: String? = null,
     val detail: InkitaDetailV2? = null,
     val showLoadedToast: Boolean = false,
+    val collections: List<net.dom53.inkita.domain.model.Collection> = emptyList(),
+    val isLoadingCollections: Boolean = false,
+    val collectionError: String? = null,
+    val collectionsWithSeries: Set<Int> = emptySet(),
 )
 
 data class InkitaDetailV2(
@@ -52,9 +56,11 @@ data class InkitaDetailV2(
 class SeriesDetailViewModelV2(
     val seriesId: Int,
     private val appPreferences: AppPreferences,
+    private val collectionsRepository: net.dom53.inkita.domain.repository.CollectionsRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SeriesDetailUiStateV2())
     val state: StateFlow<SeriesDetailUiStateV2> = _state
+    private var latestConfig: net.dom53.inkita.core.storage.AppConfig? = null
 
     init {
         load()
@@ -62,6 +68,117 @@ class SeriesDetailViewModelV2(
 
     fun consumeLoadedToast() {
         _state.update { it.copy(showLoadedToast = false) }
+    }
+
+    fun loadCollections() {
+        if (_state.value.isLoadingCollections) return
+        viewModelScope.launch {
+            _state.update { it.copy(isLoadingCollections = true, collectionError = null) }
+            val result = runCatching { collectionsRepository.getCollections() }
+            result
+                .onSuccess { list -> _state.update { it.copy(collections = list) } }
+                .onFailure { e -> _state.update { it.copy(collectionError = e.message ?: "Failed to load collections.") } }
+            _state.update { it.copy(isLoadingCollections = false) }
+        }
+    }
+
+    fun toggleCollection(
+        collection: net.dom53.inkita.domain.model.Collection,
+        add: Boolean,
+    ) {
+        val cfg = latestConfig ?: return
+        viewModelScope.launch {
+            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+            val result =
+                runCatching {
+                    if (add) {
+                        api.addSeriesToCollection(
+                            net.dom53.inkita.data.api.dto.CollectionTagBulkAddDto(
+                                collectionTagId = collection.id,
+                                collectionTagTitle = collection.name,
+                                seriesIds = listOf(seriesId),
+                            ),
+                        )
+                    } else {
+                        api.updateSeriesForCollection(
+                            net.dom53.inkita.data.api.dto.UpdateSeriesForTagDto(
+                                tag =
+                                    net.dom53.inkita.data.api.dto.AppUserCollectionDto(
+                                        id = collection.id,
+                                        title = collection.name,
+                                        promoted = false,
+                                        coverImageLocked = false,
+                                    ),
+                                seriesIdsToRemove = listOf(seriesId),
+                            ),
+                        )
+                    }
+                }
+            result
+                .onSuccess { resp ->
+                    if (resp.isSuccessful) {
+                        refreshCollectionsForSeries()
+                        runCatching { collectionsRepository.getCollections() }
+                            .onSuccess { list -> _state.update { it.copy(collections = list) } }
+                    } else {
+                        _state.update { it.copy(collectionError = "HTTP ${resp.code()} ${resp.message()}") }
+                    }
+                }.onFailure { e ->
+                    _state.update { it.copy(collectionError = e.message ?: "Error updating collection.") }
+                }
+        }
+    }
+
+    fun createCollection(title: String) {
+        if (title.isBlank()) return
+        val cfg = latestConfig ?: return
+        viewModelScope.launch {
+            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+            val response =
+                runCatching {
+                    api.addSeriesToCollection(
+                        net.dom53.inkita.data.api.dto.CollectionTagBulkAddDto(
+                            collectionTagId = 0,
+                            collectionTagTitle = title,
+                            seriesIds = listOf(seriesId),
+                        ),
+                    )
+                }
+            response
+                .onSuccess { resp ->
+                    if (!resp.isSuccessful) {
+                        _state.update { it.copy(collectionError = "HTTP ${resp.code()} ${resp.message()}") }
+                        return@onSuccess
+                    }
+                    runCatching { collectionsRepository.getCollections() }
+                        .onSuccess { list -> _state.update { it.copy(collections = list) } }
+                    refreshCollectionsForSeries()
+                }.onFailure { e ->
+                    _state.update { it.copy(collectionError = e.message ?: "Failed to create collection.") }
+                }
+        }
+    }
+
+    private fun refreshCollectionsForSeries() {
+        val cfg = latestConfig ?: return
+        viewModelScope.launch {
+            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+            runCatching {
+                api.getCollectionsForSeries(seriesId)
+            }.onSuccess { resp ->
+                if (resp.isSuccessful) {
+                    val ids =
+                        resp
+                            .body()
+                            .orEmpty()
+                            .map { it.id }
+                            .toSet()
+                    _state.update { it.copy(collectionsWithSeries = ids) }
+                }
+            }.onFailure { e ->
+                _state.update { it.copy(collectionError = e.message ?: "Failed to load collections.") }
+            }
+        }
     }
 
     fun toggleWantToRead() {
@@ -103,6 +220,7 @@ class SeriesDetailViewModelV2(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             val config = appPreferences.configFlow.first()
+            latestConfig = config
             if (!config.isConfigured) {
                 _state.update { it.copy(isLoading = false, error = "Not configured") }
                 return@launch
@@ -170,6 +288,7 @@ class SeriesDetailViewModelV2(
                     detail = seriesDetail,
                     rating = rating,
                 )
+            val membership = detail.collections?.map { it.id }?.toSet().orEmpty()
 
             _state.update {
                 it.copy(
@@ -177,6 +296,7 @@ class SeriesDetailViewModelV2(
                     error = errors.firstOrNull(),
                     detail = detail,
                     showLoadedToast = true,
+                    collectionsWithSeries = membership,
                 )
             }
         }
@@ -208,11 +328,12 @@ class SeriesDetailViewModelV2(
         fun provideFactory(
             seriesId: Int,
             appPreferences: AppPreferences,
+            collectionsRepository: net.dom53.inkita.domain.repository.CollectionsRepository,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     @Suppress("UNCHECKED_CAST")
-                    return SeriesDetailViewModelV2(seriesId, appPreferences) as T
+                    return SeriesDetailViewModelV2(seriesId, appPreferences, collectionsRepository) as T
                 }
             }
     }

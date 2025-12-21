@@ -66,13 +66,14 @@ import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
 fun SeriesDetailScreenV2(
     seriesId: Int,
     appPreferences: AppPreferences,
+    collectionsRepository: net.dom53.inkita.domain.repository.CollectionsRepository,
     onOpenVolume: (Int) -> Unit,
     onOpenSeries: (Int) -> Unit,
     onBack: () -> Unit,
 ) {
     val viewModel: SeriesDetailViewModelV2 =
         viewModel(
-            factory = SeriesDetailViewModelV2.provideFactory(seriesId, appPreferences),
+            factory = SeriesDetailViewModelV2.provideFactory(seriesId, appPreferences, collectionsRepository),
         )
     val uiState by viewModel.state.collectAsState()
     val context = LocalContext.current
@@ -88,6 +89,7 @@ fun SeriesDetailScreenV2(
     )
     var summaryExpanded by remember { mutableStateOf(false) }
     var coverExpanded by remember { mutableStateOf(false) }
+    var showCollectionDialog by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -168,7 +170,8 @@ fun SeriesDetailScreenV2(
                                 viewModel.toggleWantToRead()
                             },
                             onOpenCollections = {
-                                Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show()
+                                viewModel.loadCollections()
+                                showCollectionDialog = true
                             },
                             onOpenWeb = {
                                 val url = webUrl(config, series?.libraryId, seriesId)
@@ -295,6 +298,32 @@ fun SeriesDetailScreenV2(
                     }
                 }
             }
+        }
+
+        if (showCollectionDialog) {
+            CollectionDialogV2(
+                collections = uiState.collections,
+                isLoading = uiState.isLoadingCollections,
+                error = uiState.collectionError,
+                membership = uiState.collectionsWithSeries,
+                onDismiss = { showCollectionDialog = false },
+                onLoadCollections = { viewModel.loadCollections() },
+                onToggle = { collection, add ->
+                    if (!config.isConfigured) {
+                        Toast.makeText(
+                            context,
+                            context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                        return@CollectionDialogV2
+                    }
+                    viewModel.toggleCollection(collection, add)
+                },
+                onCreateCollection = { title ->
+                    if (title.isBlank() || !config.isConfigured) return@CollectionDialogV2
+                    viewModel.createCollection(title)
+                },
+            )
         }
 
         if (coverExpanded) {

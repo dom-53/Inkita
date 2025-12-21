@@ -359,6 +359,7 @@ fun InkitaApp(
                     SeriesDetailScreenV2(
                         seriesId = seriesId,
                         appPreferences = appPreferences,
+                        collectionsRepository = collectionsRepository,
                         onOpenVolume = { volumeId ->
                             navController.navigate("volume/$volumeId")
                         },
