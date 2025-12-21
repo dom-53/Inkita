@@ -25,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Share
@@ -47,6 +48,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -129,6 +131,7 @@ fun SeriesDetailScreenV2(
     var showDownloadVolumeDialog by remember { mutableStateOf(false) }
     var downloadVolumeState by remember { mutableStateOf(DownloadVolumeState.None) }
     var selectedVolume by remember { mutableStateOf<net.dom53.inkita.data.api.dto.VolumeDto?>(null) }
+    val volumeDownloadStates = remember { mutableStateMapOf<Int, DownloadVolumeState>() }
     val downloadDao =
         remember(context.applicationContext) {
             InkitaDatabase.getInstance(context.applicationContext).downloadV2Dao()
@@ -426,10 +429,25 @@ fun SeriesDetailScreenV2(
                             }
                         }
                         if (selectedTab == SeriesDetailTab.Books) {
+                            val volumes = detail?.detail?.volumes.orEmpty()
+                            LaunchedEffect(volumes) {
+                                volumes.forEach { volume ->
+                                    val total = downloadDao.countItemsForVolume(volume.id)
+                                    val completed = downloadDao.countCompletedItemsForVolume(volume.id)
+                                    val state =
+                                        when {
+                                            total > 0 && completed >= total -> DownloadVolumeState.Complete
+                                            completed > 0 -> DownloadVolumeState.Partial
+                                            else -> DownloadVolumeState.None
+                                        }
+                                    volumeDownloadStates[volume.id] = state
+                                }
+                            }
                             VolumeGridRow(
-                                volumes = detail?.detail?.volumes.orEmpty(),
+                                volumes = volumes,
                                 config = config,
                                 seriesCoverUrl = series?.id?.let { seriesCoverUrl(config, it) },
+                                downloadStates = volumeDownloadStates,
                                 onOpenVolume = { volume ->
                                     VolumeDetailCache.put(
                                         VolumeDetailPayload(
@@ -841,6 +859,7 @@ private fun VolumeGridRow(
     volumes: List<net.dom53.inkita.data.api.dto.VolumeDto>,
     config: AppConfig,
     seriesCoverUrl: String?,
+    downloadStates: Map<Int, DownloadVolumeState>,
     onOpenVolume: (net.dom53.inkita.data.api.dto.VolumeDto) -> Unit,
     onLongPressVolume: (net.dom53.inkita.data.api.dto.VolumeDto) -> Unit,
 ) {
@@ -876,6 +895,26 @@ private fun VolumeGridRow(
                                 .fillMaxWidth()
                                 .aspectRatio(2f / 3f),
                     )
+                    if (downloadStates[volume.id] == DownloadVolumeState.Complete) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(end = 6.dp, bottom = 10.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                                        shape = MaterialTheme.shapes.small,
+                                    )
+                                    .padding(4.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.DownloadDone,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
                     if ((volume.pagesRead ?: 0) == 0) {
                         Canvas(
                             modifier =

@@ -30,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -43,6 +44,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import kotlinx.coroutines.flow.first
+import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
@@ -60,6 +62,8 @@ fun VolumeDetailScreenV2(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val downloadDao = remember(context.applicationContext) { InkitaDatabase.getInstance(context.applicationContext).downloadV2Dao() }
+    val chapterDownloadStates = remember { mutableStateMapOf<Int, Boolean>() }
     val payload = remember(volumeId) { VolumeDetailCache.get(volumeId) }
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
@@ -308,6 +312,13 @@ fun VolumeDetailScreenV2(
                     )
                 } else if (tabs.isNotEmpty()) {
                     var selectedTab by remember { mutableStateOf(tabs.first().id) }
+                    LaunchedEffect(chapterList) {
+                        chapterList.forEach { chapter ->
+                            val total = downloadDao.countItemsForChapter(chapter.id)
+                            val completed = downloadDao.countCompletedItemsForChapter(chapter.id)
+                            chapterDownloadStates[chapter.id] = total > 0 && completed >= total
+                        }
+                    }
                     Row(
                         modifier =
                             Modifier
@@ -329,6 +340,7 @@ fun VolumeDetailScreenV2(
                         ChapterListV2(
                             chapters = chapterList,
                             config = config,
+                            downloadStates = chapterDownloadStates,
                             onChapterClick = { chapter, index ->
                                 selectedChapter = chapter
                                 selectedChapterIndex = index

@@ -15,10 +15,14 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -107,6 +111,7 @@ internal fun SectionChip(
 internal fun ChapterListV2(
     chapters: List<net.dom53.inkita.data.api.dto.ChapterDto>,
     config: AppConfig,
+    downloadStates: Map<Int, Boolean> = emptyMap(),
     onChapterClick: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
 ) {
     if (chapters.isEmpty()) return
@@ -142,6 +147,26 @@ internal fun ChapterListV2(
                                 .fillMaxWidth()
                                 .aspectRatio(2f / 3f),
                     )
+                    if (downloadStates[chapter.id] == true) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(end = 6.dp, bottom = 10.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                                        shape = MaterialTheme.shapes.small,
+                                    )
+                                    .padding(4.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.DownloadDone,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
                     if (pagesRead == 0) {
                         Canvas(
                             modifier =
