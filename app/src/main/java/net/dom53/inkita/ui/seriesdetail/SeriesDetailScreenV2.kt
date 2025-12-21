@@ -74,6 +74,8 @@ fun SeriesDetailScreenV2(
     onOpenSeries: (Int) -> Unit,
     readerReturn: net.dom53.inkita.ui.reader.ReaderReturn? = null,
     onConsumeReaderReturn: () -> Unit = {},
+    refreshSignal: Boolean = false,
+    onConsumeRefreshSignal: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     val viewModel: SeriesDetailViewModelV2 =
@@ -93,6 +95,12 @@ fun SeriesDetailScreenV2(
         if (readerReturn != null) {
             viewModel.reload()
             onConsumeReaderReturn()
+        }
+    }
+    LaunchedEffect(refreshSignal) {
+        if (refreshSignal) {
+            viewModel.reload()
+            onConsumeRefreshSignal()
         }
     }
     val config by appPreferences.configFlow.collectAsState(

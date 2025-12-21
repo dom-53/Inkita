@@ -356,6 +356,12 @@ fun InkitaApp(
                                     "reader_return",
                                     null,
                                 ).collectAsState(initial = null)
+                        val refreshSignal =
+                            entry.savedStateHandle
+                                .getStateFlow<Boolean>(
+                                    "series_refresh",
+                                    false,
+                                ).collectAsState(initial = false)
                     SeriesDetailScreenV2(
                         seriesId = seriesId,
                         appPreferences = appPreferences,
@@ -371,6 +377,8 @@ fun InkitaApp(
                         },
                         readerReturn = readerReturn.value,
                         onConsumeReaderReturn = { entry.savedStateHandle["reader_return"] = null },
+                        refreshSignal = refreshSignal.value,
+                        onConsumeRefreshSignal = { entry.savedStateHandle["series_refresh"] = false },
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -389,11 +397,17 @@ fun InkitaApp(
                             volumeId = volumeId,
                             appPreferences = appPreferences,
                             readerReturn = readerReturn.value,
-                            onConsumeReaderReturn = { entry.savedStateHandle["reader_return"] = null },
+                            onConsumeReaderReturn = {
+                                entry.savedStateHandle["reader_return"] = null
+                                navController.previousBackStackEntry?.savedStateHandle?.set("series_refresh", true)
+                            },
                             onOpenReader = { chapterId, page, sid, vid, fmt ->
                                 navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: 0}")
                             },
-                            onBack = { navController.popBackStack() },
+                            onBack = {
+                                navController.previousBackStackEntry?.savedStateHandle?.set("series_refresh", true)
+                                navController.popBackStack()
+                            },
                         )
                     }
                     composable(
