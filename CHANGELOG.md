@@ -3,6 +3,7 @@
 All notable changes to this project will be documented here.
 
 ## Unreleased
+
 ### Added
 - Library V2: Added a new navigation entry and sliding menu with sections (Home, Want To Read, Collections, Reading Lists, Browse People, libraries list) plus data loading from Kavita endpoints with pagination where applicable.
 - Series Detail V2: New screen with summary expand/collapse, chips, metadata layout, action row (collections/want-to-read/web/share), and tabs for Books/Chapters/Specials/Related/Recommendations/Reviews.
