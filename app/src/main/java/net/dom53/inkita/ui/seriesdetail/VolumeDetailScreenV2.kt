@@ -25,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,14 +39,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
+import kotlinx.coroutines.flow.first
 
 @Composable
 fun VolumeDetailScreenV2(
     volumeId: Int,
     appPreferences: AppPreferences,
+    readerReturn: net.dom53.inkita.ui.reader.ReaderReturn? = null,
+    onConsumeReaderReturn: () -> Unit = {},
     onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -70,7 +75,25 @@ fun VolumeDetailScreenV2(
         return
     }
 
-    val volume = payload.volume
+    var volumeState by remember(volumeId) { mutableStateOf(payload.volume) }
+    LaunchedEffect(readerReturn) {
+        if (readerReturn != null) {
+            val cfg = appPreferences.configFlow.first()
+            if (cfg.isConfigured) {
+                val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+                val resp = api.getVolumeById(volumeId)
+                if (resp.isSuccessful) {
+                    resp.body()?.let { updated ->
+                        volumeState = updated
+                        VolumeDetailCache.put(payload.copy(volume = updated))
+                    }
+                }
+            }
+            onConsumeReaderReturn()
+        }
+    }
+
+    val volume = volumeState
     val coverUrl = volumeCoverUrl(config, volume.id) ?: seriesCoverUrl(config, payload.seriesId)
     val chapterList = volume.chapters.orEmpty()
     val summary = chapterList.firstOrNull { !it.summary.isNullOrBlank() }?.summary

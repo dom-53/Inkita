@@ -379,9 +379,17 @@ fun InkitaApp(
                         arguments = listOf(navArgument("volumeId") { type = NavType.IntType }),
                     ) { entry ->
                         val volumeId = entry.arguments?.getInt("volumeId") ?: return@composable
+                        val readerReturn =
+                            entry.savedStateHandle
+                                .getStateFlow<net.dom53.inkita.ui.reader.ReaderReturn?>(
+                                    "reader_return",
+                                    null,
+                                ).collectAsState(initial = null)
                         net.dom53.inkita.ui.seriesdetail.VolumeDetailScreenV2(
                             volumeId = volumeId,
                             appPreferences = appPreferences,
+                            readerReturn = readerReturn.value,
+                            onConsumeReaderReturn = { entry.savedStateHandle["reader_return"] = null },
                             onOpenReader = { chapterId, page, sid, vid, fmt ->
                                 navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: 0}")
                             },
