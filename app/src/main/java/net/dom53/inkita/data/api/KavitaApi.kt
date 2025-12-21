@@ -1,17 +1,22 @@
 package net.dom53.inkita.data.api
 
 import net.dom53.inkita.data.api.dto.AppUserCollectionDto
+import net.dom53.inkita.data.api.dto.AnnotationDto
 import net.dom53.inkita.data.api.dto.BrowsePersonDto
 import net.dom53.inkita.data.api.dto.BrowsePersonFilterDto
+import net.dom53.inkita.data.api.dto.BookmarkDto
 import net.dom53.inkita.data.api.dto.CollectionDto
 import net.dom53.inkita.data.api.dto.DecodeFilterRequest
 import net.dom53.inkita.data.api.dto.FilterDefinitionDto
 import net.dom53.inkita.data.api.dto.FilterV2Dto
+import net.dom53.inkita.data.api.dto.HourEstimateRangeDto
 import net.dom53.inkita.data.api.dto.LanguageDto
 import net.dom53.inkita.data.api.dto.LibraryDto
 import net.dom53.inkita.data.api.dto.NamedDto
 import net.dom53.inkita.data.api.dto.RecentlyAddedItemDto
 import net.dom53.inkita.data.api.dto.ReadingListDto
+import net.dom53.inkita.data.api.dto.RatingDto
+import net.dom53.inkita.data.api.dto.SeriesDetailPlusDto
 import net.dom53.inkita.data.api.dto.SeriesDto
 import okhttp3.ResponseBody
 import retrofit2.Response
@@ -59,6 +64,12 @@ interface KavitaApi {
         @Query("includePromoted") includePromoted: Boolean = true,
     ): Response<List<AppUserCollectionDto>>
 
+    @GET("api/Collection/all-series")
+    suspend fun getCollectionsForSeriesOwned(
+        @Query("seriesId") seriesId: Int,
+        @Query("ownedOnly") ownedOnly: Boolean = false,
+    ): Response<List<AppUserCollectionDto>>
+
     @POST("api/Series/v2")
     suspend fun getSeriesV2(
         @Body filter: FilterV2Dto,
@@ -95,6 +106,42 @@ interface KavitaApi {
     suspend fun getTimeLeft(
         @Query("seriesId") seriesId: Int,
     ): Response<net.dom53.inkita.data.api.dto.TimeLeftDto>
+
+    @GET("api/reader/time-left")
+    suspend fun getSeriesTimeLeft(
+        @Query("seriesId") seriesId: Int,
+    ): Response<HourEstimateRangeDto>
+
+    @GET("api/reader/has-progress")
+    suspend fun getHasProgress(
+        @Query("seriesId") seriesId: Int,
+    ): Response<Boolean>
+
+    @GET("api/reader/continue-point")
+    suspend fun getContinuePoint(
+        @Query("seriesId") seriesId: Int,
+    ): Response<net.dom53.inkita.data.api.dto.ChapterDto>
+
+    @GET("api/reader/series-bookmarks")
+    suspend fun getSeriesBookmarks(
+        @Query("seriesId") seriesId: Int,
+    ): Response<List<BookmarkDto>>
+
+    @GET("api/Annotation/all-for-series")
+    suspend fun getAnnotationsForSeries(
+        @Query("seriesId") seriesId: Int,
+    ): Response<List<AnnotationDto>>
+
+    @GET("api/Rating/overall-series")
+    suspend fun getOverallSeriesRating(
+        @Query("seriesId") seriesId: Int,
+    ): Response<RatingDto>
+
+    @GET("api/Metadata/series-detail-plus")
+    suspend fun getSeriesDetailPlus(
+        @Query("seriesId") seriesId: Int,
+        @Query("libraryType") libraryType: Int,
+    ): Response<SeriesDetailPlusDto>
 
     @GET("api/Series/metadata")
     suspend fun getSeriesMetadata(
@@ -188,6 +235,16 @@ interface KavitaApi {
         @Query("PageSize") pageSize: Int,
     ): Response<List<SeriesDto>>
 
+    @GET("api/want-to-read")
+    suspend fun hasWantToRead(
+        @Query("seriesId") seriesId: Int,
+    ): Response<Boolean>
+
+    @GET("api/ReadingList/lists-for-series")
+    suspend fun getReadingListsForSeries(
+        @Query("seriesId") seriesId: Int,
+    ): Response<List<ReadingListDto>>
+
     @GET("api/Metadata/tags")
     suspend fun getTagsForLibraries(
         @Query("libraryIds") libraryIds: String,
@@ -268,11 +325,6 @@ interface KavitaApi {
         @Query("volumeId") volumeId: Int,
         @Query("currentChapterId") currentChapterId: Int,
     ): Response<Int>
-
-    @GET("api/reader/continue-point")
-    suspend fun getContinuePoint(
-        @Query("seriesId") seriesId: Int,
-    ): Response<net.dom53.inkita.data.api.dto.ReaderChapterNavDto>
 
     @GET("api/reader/time-left-for-chapter")
     suspend fun getTimeLeftForChapter(

@@ -251,7 +251,14 @@ class ReaderRepositoryImpl(
         runCatching {
             val api = apiOrThrow()
             val resp = api.getContinuePoint(seriesId)
-            if (resp.isSuccessful) resp.body()?.toDomain() else null
+            if (!resp.isSuccessful) return@runCatching null
+            val chapter = resp.body() ?: return@runCatching null
+            ReaderChapterNav(
+                seriesId = seriesId,
+                volumeId = chapter.volumeId,
+                chapterId = chapter.id,
+                pagesRead = chapter.pagesRead,
+            )
         }.getOrNull()
 
     override suspend fun getBookInfo(chapterId: Int): ReaderBookInfo? =

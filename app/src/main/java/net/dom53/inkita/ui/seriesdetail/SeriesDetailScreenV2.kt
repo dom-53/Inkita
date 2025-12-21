@@ -11,16 +11,33 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.widget.Toast
+import net.dom53.inkita.core.storage.AppPreferences
 
 @Composable
 fun SeriesDetailScreenV2(
     seriesId: Int,
+    appPreferences: AppPreferences,
     onBack: () -> Unit,
 ) {
-    viewModel<SeriesDetailViewModelV2>(factory = SeriesDetailViewModelV2.provideFactory(seriesId))
+    val viewModel: SeriesDetailViewModelV2 =
+        viewModel(
+            factory = SeriesDetailViewModelV2.provideFactory(seriesId, appPreferences),
+        )
+    val uiState = viewModel.state.collectAsState()
+    val context = LocalContext.current
+    LaunchedEffect(uiState.value.showLoadedToast) {
+        if (uiState.value.showLoadedToast) {
+            Toast.makeText(context, "Detail data loaded", Toast.LENGTH_SHORT).show()
+            viewModel.consumeLoadedToast()
+        }
+    }
     Column(
         modifier = Modifier.fillMaxSize(),
     ) {

@@ -68,6 +68,7 @@ import net.dom53.inkita.ui.library.LibraryScreen
 import net.dom53.inkita.ui.library.LibraryV2Screen
 import net.dom53.inkita.ui.navigation.MainScreen
 import net.dom53.inkita.ui.reader.ReaderScreen
+import net.dom53.inkita.ui.seriesdetail.SeriesDetailScreen
 import net.dom53.inkita.ui.seriesdetail.SeriesDetailScreenV2
 import net.dom53.inkita.ui.settings.SettingsScreen
 import net.dom53.inkita.ui.theme.InkitaTheme
@@ -298,7 +299,7 @@ fun InkitaApp(
                         appPreferences = appPreferences,
                         cacheManager = cacheManager,
                         onOpenSeries = { seriesId ->
-                            navController.navigate("series/$seriesId")
+                            navController.navigate("series-v1/$seriesId")
                         },
                     )
                 }
@@ -357,9 +358,37 @@ fun InkitaApp(
                                 ).collectAsState(initial = null)
                     SeriesDetailScreenV2(
                         seriesId = seriesId,
+                        appPreferences = appPreferences,
                         onBack = { navController.popBackStack() },
                     )
                 }
+                    composable(
+                        route = "series-v1/{seriesId}",
+                        arguments = listOf(navArgument("seriesId") { type = NavType.IntType }),
+                    ) { entry ->
+                        val seriesId = entry.arguments?.getInt("seriesId") ?: return@composable
+                        val readerReturn =
+                            entry.savedStateHandle
+                                .getStateFlow<net.dom53.inkita.ui.reader.ReaderReturn?>(
+                                    "reader_return",
+                                    null,
+                                ).collectAsState(initial = null)
+                        SeriesDetailScreen(
+                            seriesId = seriesId,
+                            seriesRepository = seriesRepository,
+                            appPreferences = appPreferences,
+                            collectionsRepository = collectionsRepository,
+                            readerRepository = readerRepository,
+                            readerReturn = readerReturn.value,
+                            onConsumeReaderReturn = { entry.savedStateHandle["reader_return"] = null },
+                            onBack = { navController.popBackStack() },
+                            onOpenSeries = { id -> navController.navigate("series-v1/$id") },
+                            onOpenReader = { chapterId, page, sid, vid, fmt ->
+                                navController.navigate("reader/$chapterId?page=${page ?: 0}&sid=$sid&vid=$vid&fmt=${fmt ?: 0}")
+                            },
+                            onOpenDownloads = { navController.navigate(MainScreen.Downloads.route) },
+                        )
+                    }
                     composable("settings/about") {
                         net.dom53.inkita.ui.settings.screens.SettingsAboutScreen(
                             onBack = { navController.popBackStack() },
