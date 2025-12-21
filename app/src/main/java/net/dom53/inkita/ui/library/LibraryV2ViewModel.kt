@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import net.dom53.inkita.core.cache.CacheManager
+import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import net.dom53.inkita.domain.model.Collection
 import net.dom53.inkita.domain.model.Library
 import net.dom53.inkita.domain.model.Person
@@ -78,6 +80,7 @@ class LibraryV2ViewModel(
     private val collectionsRepository: CollectionsRepository,
     private val readingListRepository: ReadingListRepository,
     private val personRepository: PersonRepository,
+    private val cacheManager: CacheManager,
 ) : ViewModel() {
     private val _state = MutableStateFlow(LibraryV2UiState())
     val state: StateFlow<LibraryV2UiState> = _state
@@ -221,6 +224,32 @@ class LibraryV2ViewModel(
     private fun loadHome() {
         viewModelScope.launch {
             _state.update { it.copy(isHomeLoading = true, homeError = null) }
+            val cachedOnDeck =
+                cacheManager.getCachedLibraryV2SeriesList(
+                    LibraryV2CacheKeys.HOME_ON_DECK,
+                    "",
+                )
+            val cachedUpdated =
+                cacheManager.getCachedLibraryV2SeriesList(
+                    LibraryV2CacheKeys.HOME_RECENTLY_UPDATED,
+                    "",
+                )
+            val cachedAdded =
+                cacheManager.getCachedLibraryV2SeriesList(
+                    LibraryV2CacheKeys.HOME_RECENTLY_ADDED,
+                    "",
+                )
+            if (cachedOnDeck.isNotEmpty() || cachedUpdated.isNotEmpty() || cachedAdded.isNotEmpty()) {
+                _state.update {
+                    it.copy(
+                        onDeck = cachedOnDeck.map { series -> HomeSeriesItem(series.id, series.name) },
+                        recentlyUpdated = cachedUpdated.map { series -> HomeSeriesItem(series.id, series.name) },
+                        recentlyAdded = cachedAdded.map { series -> HomeSeriesItem(series.id, series.name) },
+                        isHomeLoading = true,
+                        homeError = null,
+                    )
+                }
+            }
             val onDeckResult = runCatching { seriesRepository.getOnDeckSeries(1, 20, 0) }
             val updatedResult = runCatching { seriesRepository.getRecentlyUpdatedSeries(1, 20) }
             val addedResult = runCatching { seriesRepository.getRecentlyAddedSeries(1, 20) }
@@ -244,6 +273,39 @@ class LibraryV2ViewModel(
                     val title = series.name.ifBlank { "Series ${series.id}" }
                     HomeSeriesItem(id = series.id, title = title)
                 }
+            val updatedSeries =
+                updatedResult.getOrDefault(emptyList()).mapNotNull { item ->
+                    val id = item.seriesId ?: return@mapNotNull null
+                    val title =
+                        item.seriesName?.ifBlank { null }
+                            ?: item.title?.ifBlank { null }
+                            ?: "Series $id"
+                    net.dom53.inkita.domain.model.Series(
+                        id = id,
+                        name = title,
+                        summary = null,
+                        libraryId = null,
+                        format = null,
+                        pages = null,
+                        pagesRead = null,
+                        readState = null,
+                    )
+                }
+            cacheManager.cacheLibraryV2SeriesList(
+                LibraryV2CacheKeys.HOME_ON_DECK,
+                "",
+                onDeckResult.getOrDefault(emptyList()),
+            )
+            cacheManager.cacheLibraryV2SeriesList(
+                LibraryV2CacheKeys.HOME_RECENTLY_ADDED,
+                "",
+                addedResult.getOrDefault(emptyList()),
+            )
+            cacheManager.cacheLibraryV2SeriesList(
+                LibraryV2CacheKeys.HOME_RECENTLY_UPDATED,
+                "",
+                updatedSeries,
+            )
 
             val error =
                 onDeckResult.exceptionOrNull()
@@ -266,6 +328,14 @@ class LibraryV2ViewModel(
         if (current.isWantToReadLoading || current.wantToRead.isNotEmpty()) return
         viewModelScope.launch {
             _state.update { it.copy(isWantToReadLoading = true, wantToReadError = null) }
+            val cached =
+                cacheManager.getCachedLibraryV2SeriesList(
+                    LibraryV2CacheKeys.WANT_TO_READ,
+                    "",
+                )
+            if (cached.isNotEmpty()) {
+                _state.update { it.copy(wantToRead = cached, isWantToReadLoading = true) }
+            }
             val result = runCatching { seriesRepository.getWantToReadSeries(1, 50) }
             _state.update {
                 it.copy(
@@ -273,6 +343,9 @@ class LibraryV2ViewModel(
                     isWantToReadLoading = false,
                     wantToReadError = result.exceptionOrNull()?.message,
                 )
+            }
+            result.getOrNull()?.let { fresh ->
+                cacheManager.cacheLibraryV2SeriesList(LibraryV2CacheKeys.WANT_TO_READ, "", fresh)
             }
         }
     }
@@ -282,6 +355,10 @@ class LibraryV2ViewModel(
         if (current.isCollectionsLoading || current.collections.isNotEmpty()) return
         viewModelScope.launch {
             _state.update { it.copy(isCollectionsLoading = true, collectionsError = null) }
+            val cached = cacheManager.getCachedLibraryV2Collections(LibraryV2CacheKeys.COLLECTIONS)
+            if (cached.isNotEmpty()) {
+                _state.update { it.copy(collections = cached, isCollectionsLoading = true) }
+            }
             val result = runCatching { collectionsRepository.getCollectionsAll(ownedOnly = false) }
             _state.update {
                 it.copy(
@@ -289,6 +366,9 @@ class LibraryV2ViewModel(
                     isCollectionsLoading = false,
                     collectionsError = result.exceptionOrNull()?.message,
                 )
+            }
+            result.getOrNull()?.let { fresh ->
+                cacheManager.cacheLibraryV2Collections(LibraryV2CacheKeys.COLLECTIONS, fresh)
             }
         }
     }
@@ -298,6 +378,10 @@ class LibraryV2ViewModel(
         if (current.isReadingListsLoading || current.readingLists.isNotEmpty()) return
         viewModelScope.launch {
             _state.update { it.copy(isReadingListsLoading = true, readingListsError = null) }
+            val cached = cacheManager.getCachedLibraryV2ReadingLists(LibraryV2CacheKeys.READING_LISTS)
+            if (cached.isNotEmpty()) {
+                _state.update { it.copy(readingLists = cached, isReadingListsLoading = true) }
+            }
             val result = runCatching { readingListRepository.getReadingLists(includePromoted = true, sortByLastModified = false) }
             _state.update {
                 it.copy(
@@ -305,6 +389,9 @@ class LibraryV2ViewModel(
                     isReadingListsLoading = false,
                     readingListsError = result.exceptionOrNull()?.message,
                 )
+            }
+            result.getOrNull()?.let { fresh ->
+                cacheManager.cacheLibraryV2ReadingLists(LibraryV2CacheKeys.READING_LISTS, fresh)
             }
         }
     }
@@ -314,6 +401,17 @@ class LibraryV2ViewModel(
         if (current.isPeopleLoading || current.people.isNotEmpty()) return
         viewModelScope.launch {
             _state.update { it.copy(isPeopleLoading = true, peopleError = null) }
+            val cached = cacheManager.getCachedLibraryV2People(LibraryV2CacheKeys.BROWSE_PEOPLE, 1)
+            if (cached.isNotEmpty()) {
+                _state.update {
+                    it.copy(
+                        people = cached,
+                        isPeopleLoading = true,
+                        peoplePage = 1,
+                        canLoadMorePeople = cached.size == 50,
+                    )
+                }
+            }
             val result = runCatching { personRepository.getBrowsePeople(pageNumber = 1, pageSize = 50) }
             val pageItems = result.getOrDefault(emptyList())
             _state.update {
@@ -324,6 +422,9 @@ class LibraryV2ViewModel(
                     peoplePage = 1,
                     canLoadMorePeople = pageItems.size == 50,
                 )
+            }
+            result.getOrNull()?.let { fresh ->
+                cacheManager.cacheLibraryV2People(LibraryV2CacheKeys.BROWSE_PEOPLE, 1, fresh)
             }
         }
     }
@@ -405,12 +506,27 @@ class LibraryV2ViewModel(
     private fun loadCollectionSeries(collectionId: Int) {
         viewModelScope.launch {
             _state.update { it.copy(isCollectionSeriesLoading = true, collectionSeriesError = null) }
+            val cached =
+                cacheManager.getCachedLibraryV2SeriesList(
+                    LibraryV2CacheKeys.COLLECTION_SERIES,
+                    collectionId.toString(),
+                )
+            if (cached.isNotEmpty()) {
+                _state.update { it.copy(collectionSeries = cached, isCollectionSeriesLoading = true) }
+            }
             val result = runCatching { seriesRepository.getSeriesForCollection(collectionId, 1, 50) }
             _state.update {
                 it.copy(
                     collectionSeries = result.getOrDefault(emptyList()),
                     isCollectionSeriesLoading = false,
                     collectionSeriesError = result.exceptionOrNull()?.message,
+                )
+            }
+            result.getOrNull()?.let { fresh ->
+                cacheManager.cacheLibraryV2SeriesList(
+                    LibraryV2CacheKeys.COLLECTION_SERIES,
+                    collectionId.toString(),
+                    fresh,
                 )
             }
         }
@@ -423,6 +539,7 @@ class LibraryV2ViewModel(
             collectionsRepository: CollectionsRepository,
             readingListRepository: ReadingListRepository,
             personRepository: PersonRepository,
+            cacheManager: CacheManager,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -433,6 +550,7 @@ class LibraryV2ViewModel(
                         collectionsRepository,
                         readingListRepository,
                         personRepository,
+                        cacheManager,
                     ) as T
             }
     }

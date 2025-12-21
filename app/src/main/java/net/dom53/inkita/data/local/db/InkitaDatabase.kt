@@ -9,13 +9,22 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import net.dom53.inkita.data.local.db.dao.DownloadDao
+import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
 import net.dom53.inkita.data.local.db.dao.SeriesDao
 import net.dom53.inkita.data.local.db.entity.CachedBrowseRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedChapterEntity
+import net.dom53.inkita.data.local.db.entity.CachedCollectionRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedCollectionV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedPageEntity
+import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedPersonV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesEntity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedVolumeEntity
 import net.dom53.inkita.data.local.db.entity.DownloadTaskEntity
@@ -26,6 +35,14 @@ import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
         CachedSeriesEntity::class,
         CachedSeriesRefEntity::class,
         CachedBrowseRefEntity::class,
+        CachedSeriesV2Entity::class,
+        CachedSeriesListRefEntity::class,
+        CachedCollectionV2Entity::class,
+        CachedCollectionRefEntity::class,
+        CachedReadingListV2Entity::class,
+        CachedReadingListRefEntity::class,
+        CachedPersonV2Entity::class,
+        CachedPersonRefEntity::class,
         CachedSeriesDetailEntity::class,
         CachedVolumeEntity::class,
         CachedPageEntity::class,
@@ -34,11 +51,13 @@ import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
         DownloadedPageEntity::class,
         net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = false,
 )
 abstract class InkitaDatabase : RoomDatabase() {
     abstract fun seriesDao(): SeriesDao
+
+    abstract fun libraryV2Dao(): LibraryV2Dao
 
     abstract fun readerDao(): ReaderDao
 
@@ -241,6 +260,104 @@ abstract class InkitaDatabase : RoomDatabase() {
                     database.execSQL("ALTER TABLE cached_series_detail ADD COLUMN specialsVolumeIds TEXT")
                 }
             }
+        private val MIGRATION_12_13 =
+            object : Migration(12, 13) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_series_v2(
+                            id INTEGER NOT NULL PRIMARY KEY,
+                            name TEXT NOT NULL,
+                            summary TEXT,
+                            libraryId INTEGER,
+                            format TEXT,
+                            pages INTEGER,
+                            pagesRead INTEGER,
+                            readState TEXT,
+                            minHoursToRead REAL,
+                            maxHoursToRead REAL,
+                            avgHoursToRead REAL,
+                            localThumbPath TEXT,
+                            updatedAt INTEGER NOT NULL
+                        )
+                        """.trimIndent(),
+                    )
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_series_list_refs_v2(
+                            listType TEXT NOT NULL,
+                            listKey TEXT NOT NULL,
+                            seriesId INTEGER NOT NULL,
+                            position INTEGER NOT NULL,
+                            updatedAt INTEGER NOT NULL,
+                            PRIMARY KEY(listType, listKey, seriesId)
+                        )
+                        """.trimIndent(),
+                    )
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_collections_v2(
+                            id INTEGER NOT NULL PRIMARY KEY,
+                            name TEXT NOT NULL,
+                            updatedAt INTEGER NOT NULL
+                        )
+                        """.trimIndent(),
+                    )
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_collection_refs_v2(
+                            listType TEXT NOT NULL,
+                            collectionId INTEGER NOT NULL,
+                            position INTEGER NOT NULL,
+                            updatedAt INTEGER NOT NULL,
+                            PRIMARY KEY(listType, collectionId)
+                        )
+                        """.trimIndent(),
+                    )
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_reading_lists_v2(
+                            id INTEGER NOT NULL PRIMARY KEY,
+                            title TEXT NOT NULL,
+                            itemCount INTEGER,
+                            updatedAt INTEGER NOT NULL
+                        )
+                        """.trimIndent(),
+                    )
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_reading_list_refs_v2(
+                            listType TEXT NOT NULL,
+                            readingListId INTEGER NOT NULL,
+                            position INTEGER NOT NULL,
+                            updatedAt INTEGER NOT NULL,
+                            PRIMARY KEY(listType, readingListId)
+                        )
+                        """.trimIndent(),
+                    )
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_people_v2(
+                            id INTEGER NOT NULL PRIMARY KEY,
+                            name TEXT,
+                            updatedAt INTEGER NOT NULL
+                        )
+                        """.trimIndent(),
+                    )
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_person_refs_v2(
+                            listType TEXT NOT NULL,
+                            page INTEGER NOT NULL,
+                            personId INTEGER NOT NULL,
+                            position INTEGER NOT NULL,
+                            updatedAt INTEGER NOT NULL,
+                            PRIMARY KEY(listType, page, personId)
+                        )
+                        """.trimIndent(),
+                    )
+                }
+            }
 
         fun getInstance(context: Context): InkitaDatabase =
             INSTANCE ?: synchronized(this) {
@@ -261,6 +378,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         MIGRATION_9_10,
                         MIGRATION_10_11,
                         MIGRATION_11_12,
+                        MIGRATION_12_13,
                     ).build()
                     .also { INSTANCE = it }
             }

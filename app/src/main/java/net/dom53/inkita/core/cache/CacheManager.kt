@@ -2,6 +2,9 @@ package net.dom53.inkita.core.cache
 
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.domain.model.SeriesDetail
+import net.dom53.inkita.domain.model.Collection
+import net.dom53.inkita.domain.model.Person
+import net.dom53.inkita.domain.model.ReadingList
 import net.dom53.inkita.domain.model.filter.SeriesQuery
 import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
 
@@ -33,6 +36,42 @@ interface CacheManager {
     ): List<Series>
 
     suspend fun getCachedSeriesDetail(seriesId: Int): SeriesDetail?
+
+    suspend fun cacheLibraryV2SeriesList(
+        listType: String,
+        listKey: String,
+        series: List<Series>,
+    )
+
+    suspend fun getCachedLibraryV2SeriesList(
+        listType: String,
+        listKey: String,
+    ): List<Series>
+
+    suspend fun cacheLibraryV2Collections(
+        listType: String,
+        collections: List<Collection>,
+    )
+
+    suspend fun getCachedLibraryV2Collections(listType: String): List<Collection>
+
+    suspend fun cacheLibraryV2ReadingLists(
+        listType: String,
+        readingLists: List<ReadingList>,
+    )
+
+    suspend fun getCachedLibraryV2ReadingLists(listType: String): List<ReadingList>
+
+    suspend fun cacheLibraryV2People(
+        listType: String,
+        page: Int,
+        people: List<Person>,
+    )
+
+    suspend fun getCachedLibraryV2People(
+        listType: String,
+        page: Int,
+    ): List<Person>
 
     suspend fun clearAllCache()
 

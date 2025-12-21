@@ -310,6 +310,7 @@ fun InkitaApp(
                             collectionsRepository = collectionsRepository,
                             readingListRepository = readingListRepository,
                             personRepository = personRepository,
+                            cacheManager = cacheManager,
                             appPreferences = appPreferences,
                             onOpenSeries = { seriesId ->
                                 navController.navigate("series/$seriesId")

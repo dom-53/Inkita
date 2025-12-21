@@ -6,17 +6,32 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.logging.LoggingManager
+import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
 import net.dom53.inkita.data.local.db.dao.SeriesDao
 import net.dom53.inkita.data.local.db.entity.CachedBrowseRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedCollectionRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedCollectionV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedPersonV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
 import net.dom53.inkita.data.mapper.toCachedChapterEntity
 import net.dom53.inkita.data.mapper.toCachedDetailEntity
 import net.dom53.inkita.data.mapper.toCachedEntity
 import net.dom53.inkita.data.mapper.toCachedVolumeEntity
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.domain.model.SeriesDetail
+import net.dom53.inkita.domain.model.Collection
+import net.dom53.inkita.domain.model.Person
+import net.dom53.inkita.domain.model.ReadingList
+import net.dom53.inkita.domain.model.Format
+import net.dom53.inkita.domain.model.ReadState
 import net.dom53.inkita.domain.model.filter.SeriesQuery
 import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
 import okhttp3.OkHttpClient
@@ -28,6 +43,7 @@ import net.dom53.inkita.data.mapper.toDomain as toDomainLocal
 class CacheManagerImpl(
     private val appPreferences: AppPreferences,
     private val seriesDao: SeriesDao?,
+    private val libraryV2Dao: LibraryV2Dao? = null,
     private val thumbnailsDir: File?,
     private val dbFile: File? = null,
 ) : CacheManager {
@@ -198,6 +214,142 @@ class CacheManagerImpl(
         }
     }
 
+    override suspend fun cacheLibraryV2SeriesList(
+        listType: String,
+        listKey: String,
+        series: List<Series>,
+    ) {
+        val dao = libraryV2Dao ?: return
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return
+        val now = System.currentTimeMillis()
+        val unique = series.distinctBy { it.id }
+        val enriched = enrichThumbnails(unique)
+        dao.upsertSeries(enriched.map { it.toCachedSeriesV2(now) })
+        dao.clearSeriesRefs(listType, listKey)
+        val refs =
+            enriched.mapIndexed { index, item ->
+                CachedSeriesListRefEntity(
+                    listType = listType,
+                    listKey = listKey,
+                    seriesId = item.id,
+                    position = index,
+                    updatedAt = now,
+                )
+            }
+        dao.upsertSeriesRefs(refs)
+    }
+
+    override suspend fun getCachedLibraryV2SeriesList(
+        listType: String,
+        listKey: String,
+    ): List<Series> {
+        val dao = libraryV2Dao ?: return emptyList()
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return emptyList()
+        return dao.getSeriesForList(listType, listKey).map { it.toDomainSeries() }
+    }
+
+    override suspend fun cacheLibraryV2Collections(
+        listType: String,
+        collections: List<Collection>,
+    ) {
+        val dao = libraryV2Dao ?: return
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return
+        val now = System.currentTimeMillis()
+        val unique = collections.distinctBy { it.id }
+        dao.upsertCollections(unique.map { CachedCollectionV2Entity(it.id, it.name, now) })
+        dao.clearCollectionRefs(listType)
+        val refs =
+            unique.mapIndexed { index, item ->
+                CachedCollectionRefEntity(
+                    listType = listType,
+                    collectionId = item.id,
+                    position = index,
+                    updatedAt = now,
+                )
+            }
+        dao.upsertCollectionRefs(refs)
+    }
+
+    override suspend fun getCachedLibraryV2Collections(listType: String): List<Collection> {
+        val dao = libraryV2Dao ?: return emptyList()
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return emptyList()
+        return dao.getCollectionsForList(listType).map { Collection(it.id, it.name) }
+    }
+
+    override suspend fun cacheLibraryV2ReadingLists(
+        listType: String,
+        readingLists: List<ReadingList>,
+    ) {
+        val dao = libraryV2Dao ?: return
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return
+        val now = System.currentTimeMillis()
+        val unique = readingLists.distinctBy { it.id }
+        dao.upsertReadingLists(unique.map { CachedReadingListV2Entity(it.id, it.title, it.itemCount, now) })
+        dao.clearReadingListRefs(listType)
+        val refs =
+            unique.mapIndexed { index, item ->
+                CachedReadingListRefEntity(
+                    listType = listType,
+                    readingListId = item.id,
+                    position = index,
+                    updatedAt = now,
+                )
+            }
+        dao.upsertReadingListRefs(refs)
+    }
+
+    override suspend fun getCachedLibraryV2ReadingLists(listType: String): List<ReadingList> {
+        val dao = libraryV2Dao ?: return emptyList()
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return emptyList()
+        return dao.getReadingListsForList(listType).map { ReadingList(it.id, it.title, it.itemCount) }
+    }
+
+    override suspend fun cacheLibraryV2People(
+        listType: String,
+        page: Int,
+        people: List<Person>,
+    ) {
+        val dao = libraryV2Dao ?: return
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return
+        val now = System.currentTimeMillis()
+        val unique =
+            people.mapNotNull { person ->
+                val id = person.id ?: return@mapNotNull null
+                id to person
+            }.distinctBy { it.first }
+        val entities = unique.map { CachedPersonV2Entity(it.first, it.second.name, now) }
+        dao.upsertPeople(entities)
+        dao.clearPersonRefs(listType, page)
+        val refs =
+            unique.mapIndexed { index, item ->
+                CachedPersonRefEntity(
+                    listType = listType,
+                    page = page,
+                    personId = item.first,
+                    position = index,
+                    updatedAt = now,
+                )
+            }
+        dao.upsertPersonRefs(refs)
+    }
+
+    override suspend fun getCachedLibraryV2People(
+        listType: String,
+        page: Int,
+    ): List<Person> {
+        val dao = libraryV2Dao ?: return emptyList()
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return emptyList()
+        return dao.getPeopleForList(listType, page).map { Person(it.id, it.name) }
+    }
+
     override suspend fun clearAllCache() {
         val dao = seriesDao ?: return
         val p = policy()
@@ -287,8 +439,71 @@ class CacheManagerImpl(
         dao.clearAllVolumes()
         dao.clearAllSeriesDetail()
         dao.clearAllSeries()
+        libraryV2Dao?.let { v2Dao ->
+            v2Dao.clearAllSeriesRefs()
+            v2Dao.clearAllSeries()
+            v2Dao.clearAllCollectionRefs()
+            v2Dao.clearAllCollections()
+            v2Dao.clearAllReadingListRefs()
+            v2Dao.clearAllReadingLists()
+            v2Dao.clearAllPersonRefs()
+            v2Dao.clearAllPeople()
+        }
         LoggingManager.d("CacheManager", "Cleared database cache")
     }
+
+    private fun isLibraryV2CacheAllowed(
+        policy: CachePolicy,
+        listType: String,
+    ): Boolean {
+        if (!policy.globalEnabled || !policy.libraryEnabled) return false
+        return when (listType) {
+            LibraryV2CacheKeys.HOME_ON_DECK,
+            LibraryV2CacheKeys.HOME_RECENTLY_UPDATED,
+            LibraryV2CacheKeys.HOME_RECENTLY_ADDED,
+            -> policy.libraryHomeEnabled
+            LibraryV2CacheKeys.WANT_TO_READ -> policy.libraryWantEnabled
+            LibraryV2CacheKeys.COLLECTIONS,
+            LibraryV2CacheKeys.COLLECTION_SERIES,
+            -> policy.libraryCollectionsEnabled
+            LibraryV2CacheKeys.READING_LISTS -> policy.libraryReadingListsEnabled
+            LibraryV2CacheKeys.BROWSE_PEOPLE -> policy.libraryBrowsePeopleEnabled
+            else -> false
+        }
+    }
+
+    private fun Series.toCachedSeriesV2(updatedAt: Long): CachedSeriesV2Entity =
+        CachedSeriesV2Entity(
+            id = id,
+            name = name,
+            summary = summary,
+            libraryId = libraryId,
+            format = format?.name,
+            pages = pages,
+            pagesRead = pagesRead,
+            readState = readState?.name,
+            minHoursToRead = minHoursToRead,
+            maxHoursToRead = maxHoursToRead,
+            avgHoursToRead = avgHoursToRead,
+            localThumbPath = localThumbPath,
+            updatedAt = updatedAt,
+        )
+
+    private fun CachedSeriesV2Entity.toDomainSeries(): Series =
+        Series(
+            id = id,
+            name = name,
+            summary = summary,
+            libraryId = libraryId,
+            format = format?.let { runCatching { Format.valueOf(it) }.getOrNull() },
+            pages = pages,
+            pagesRead = pagesRead,
+            readState = readState?.let { runCatching { ReadState.valueOf(it) }.getOrNull() },
+            minHoursToRead = minHoursToRead,
+            maxHoursToRead = maxHoursToRead,
+            avgHoursToRead = avgHoursToRead,
+            localThumbPath = localThumbPath,
+        )
 
     private suspend fun downloadThumbnailIfNeeded(
         serverUrl: String,

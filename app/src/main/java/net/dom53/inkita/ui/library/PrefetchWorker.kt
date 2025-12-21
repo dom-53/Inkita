@@ -54,6 +54,7 @@ class PrefetchWorker(
                     prefs,
                     null,
                     null,
+                    null,
                 ).policy()
             if (!cachePolicy.globalEnabled || !cachePolicy.libraryEnabled) {
                 LoggingManager.d(tag, "Cache policy disabled, ending work")
@@ -85,6 +86,7 @@ class PrefetchWorker(
                 CacheManagerImpl(
                     prefs,
                     db.seriesDao(),
+                    db.libraryV2Dao(),
                     File(applicationContext.filesDir, "thumbnails"),
                     applicationContext.getDatabasePath("inkita.db"),
                 )
