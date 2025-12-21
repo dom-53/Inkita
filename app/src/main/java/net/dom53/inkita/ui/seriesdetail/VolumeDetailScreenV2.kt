@@ -7,8 +7,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -23,8 +21,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +39,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import kotlinx.coroutines.flow.first
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.storage.AppConfig
@@ -364,7 +363,6 @@ fun VolumeDetailScreenV2(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChapterPagesSection(
     chapter: net.dom53.inkita.data.api.dto.ChapterDto?,
@@ -409,43 +407,60 @@ private fun ChapterPagesSection(
         )
         return
     }
-    FlowRow(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        val shape = RoundedCornerShape(10.dp)
         repeat(pages) { index ->
             val isRead = index < pagesRead
             val isCurrent = pagesRead in 0 until pages && index == pagesRead
             val containerColor =
-                when {
-                    isRead -> MaterialTheme.colorScheme.secondary
-                    else -> MaterialTheme.colorScheme.surface
+                if (isRead) {
+                    MaterialTheme.colorScheme.surfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.surface
                 }
-            val labelColor =
+            val textColor =
                 when {
-                    isRead -> MaterialTheme.colorScheme.onSecondary
                     isCurrent -> MaterialTheme.colorScheme.primary
+                    isRead -> MaterialTheme.colorScheme.onSurfaceVariant
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
             val border =
-                if (isCurrent) {
-                    BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
-                } else {
-                    null
-                }
-            AssistChip(
-                onClick = {
-                    chapter?.let { onOpenPage(it, index) }
-                },
-                label = { Text((index + 1).toString()) },
-                border = border,
-                colors =
-                    AssistChipDefaults.assistChipColors(
-                        containerColor = containerColor,
-                        labelColor = labelColor,
-                    ),
-            )
+                if (isCurrent) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(shape)
+                        .background(containerColor)
+                        .then(
+                            if (border != null) {
+                                Modifier.border(border, shape)
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .clickable { chapter?.let { onOpenPage(it, index) } }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "${stringResource(net.dom53.inkita.R.string.general_page)} ${index + 1}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = textColor,
+                    modifier = Modifier.width(86.dp),
+                )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = textColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
