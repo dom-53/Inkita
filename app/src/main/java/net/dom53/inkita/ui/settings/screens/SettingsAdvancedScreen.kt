@@ -66,6 +66,11 @@ fun SettingsAdvancedScreen(
     var globalCacheEnabled by remember { mutableStateOf(true) }
     var cacheEnabled by remember { mutableStateOf(false) }
     var browseCacheEnabled by remember { mutableStateOf(false) }
+    var libraryCacheHomeEnabled by remember { mutableStateOf(false) }
+    var libraryCacheWantEnabled by remember { mutableStateOf(false) }
+    var libraryCacheCollectionsEnabled by remember { mutableStateOf(false) }
+    var libraryCacheReadingListsEnabled by remember { mutableStateOf(false) }
+    var libraryCacheBrowsePeopleEnabled by remember { mutableStateOf(false) }
     var cacheTtlMinutes by remember { mutableStateOf(0) }
     var ttlInput by remember { mutableStateOf("0") }
     var useHours by remember { mutableStateOf(false) }
@@ -110,6 +115,21 @@ fun SettingsAdvancedScreen(
     }
     LaunchedEffect(Unit) {
         appPreferences.browseCacheEnabledFlow.collectLatest { browseCacheEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.libraryCacheHomeFlow.collectLatest { libraryCacheHomeEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.libraryCacheWantToReadFlow.collectLatest { libraryCacheWantEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.libraryCacheCollectionsFlow.collectLatest { libraryCacheCollectionsEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.libraryCacheReadingListsFlow.collectLatest { libraryCacheReadingListsEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.libraryCacheBrowsePeopleFlow.collectLatest { libraryCacheBrowsePeopleEnabled = it }
     }
     LaunchedEffect(Unit) {
         appPreferences.cacheRefreshTtlMinutesFlow.collectLatest {
@@ -298,6 +318,64 @@ fun SettingsAdvancedScreen(
                 },
                 enabled = globalCacheEnabled,
             )
+        }
+
+        if (cacheEnabled) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_cache_library_sections_title),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                CacheToggleRow(
+                    title = stringResource(R.string.settings_cache_library_home_title),
+                    subtitle = stringResource(R.string.settings_cache_library_home_subtitle),
+                    checked = libraryCacheHomeEnabled,
+                    enabled = globalCacheEnabled,
+                ) { checked ->
+                    libraryCacheHomeEnabled = checked
+                    scope.launch { appPreferences.setLibraryCacheHomeEnabled(checked) }
+                }
+                CacheToggleRow(
+                    title = stringResource(R.string.settings_cache_library_want_title),
+                    subtitle = stringResource(R.string.settings_cache_library_want_subtitle),
+                    checked = libraryCacheWantEnabled,
+                    enabled = globalCacheEnabled,
+                ) { checked ->
+                    libraryCacheWantEnabled = checked
+                    scope.launch { appPreferences.setLibraryCacheWantToReadEnabled(checked) }
+                }
+                CacheToggleRow(
+                    title = stringResource(R.string.settings_cache_library_collections_title),
+                    subtitle = stringResource(R.string.settings_cache_library_collections_subtitle),
+                    checked = libraryCacheCollectionsEnabled,
+                    enabled = globalCacheEnabled,
+                ) { checked ->
+                    libraryCacheCollectionsEnabled = checked
+                    scope.launch { appPreferences.setLibraryCacheCollectionsEnabled(checked) }
+                }
+                CacheToggleRow(
+                    title = stringResource(R.string.settings_cache_library_reading_lists_title),
+                    subtitle = stringResource(R.string.settings_cache_library_reading_lists_subtitle),
+                    checked = libraryCacheReadingListsEnabled,
+                    enabled = globalCacheEnabled,
+                ) { checked ->
+                    libraryCacheReadingListsEnabled = checked
+                    scope.launch { appPreferences.setLibraryCacheReadingListsEnabled(checked) }
+                }
+                CacheToggleRow(
+                    title = stringResource(R.string.settings_cache_library_browse_people_title),
+                    subtitle = stringResource(R.string.settings_cache_library_browse_people_subtitle),
+                    checked = libraryCacheBrowsePeopleEnabled,
+                    enabled = globalCacheEnabled,
+                ) { checked ->
+                    libraryCacheBrowsePeopleEnabled = checked
+                    scope.launch { appPreferences.setLibraryCacheBrowsePeopleEnabled(checked) }
+                }
+            }
         }
 
         Divider()
@@ -928,6 +1006,37 @@ fun SettingsAdvancedScreen(
                 },
             )
         }
+    }
+}
+
+@Composable
+private fun CacheToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+        )
     }
 }
 

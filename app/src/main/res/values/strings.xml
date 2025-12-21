@@ -282,6 +282,17 @@
     <string name="settings_advanced_section_browse_cache">Browse cache</string>
     <string name="settings_advanced_section_prefetch">Prefetch</string>
     <string name="settings_advanced_section_cache_maintenance">Cache maintenance</string>
+    <string name="settings_cache_library_sections_title">Library V2 sections</string>
+    <string name="settings_cache_library_home_title">Home</string>
+    <string name="settings_cache_library_home_subtitle">Cache Home streams for offline use.</string>
+    <string name="settings_cache_library_want_title">Want to read</string>
+    <string name="settings_cache_library_want_subtitle">Cache want-to-read list for offline use.</string>
+    <string name="settings_cache_library_collections_title">Collections</string>
+    <string name="settings_cache_library_collections_subtitle">Cache collections list and items for offline use.</string>
+    <string name="settings_cache_library_reading_lists_title">Reading lists</string>
+    <string name="settings_cache_library_reading_lists_subtitle">Cache reading lists for offline use.</string>
+    <string name="settings_cache_library_browse_people_title">Browse people</string>
+    <string name="settings_cache_library_browse_people_subtitle">Cache people results for offline use.</string>
     <string name="settings_item_stats">My Statistics</string>
     <string name="settings_item_about">About</string>
     <!-- Kavita  -->

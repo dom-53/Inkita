@@ -74,6 +74,11 @@ class AppPreferences(
         private val KEY_CACHE_ENABLED = booleanPreferencesKey("cache_enabled")
         private val KEY_LIBRARY_CACHE_ENABLED = booleanPreferencesKey("library_cache_enabled")
         private val KEY_BROWSE_CACHE_ENABLED = booleanPreferencesKey("browse_cache_enabled")
+        private val KEY_LIBRARY_CACHE_HOME = booleanPreferencesKey("library_cache_home")
+        private val KEY_LIBRARY_CACHE_WANT = booleanPreferencesKey("library_cache_want")
+        private val KEY_LIBRARY_CACHE_COLLECTIONS = booleanPreferencesKey("library_cache_collections")
+        private val KEY_LIBRARY_CACHE_READING_LISTS = booleanPreferencesKey("library_cache_reading_lists")
+        private val KEY_LIBRARY_CACHE_BROWSE_PEOPLE = booleanPreferencesKey("library_cache_browse_people")
         private val KEY_NOTIF_PROMPT_SHOWN = booleanPreferencesKey("notifications_prompt_shown")
         private val KEY_CACHE_REFRESH_TTL_MIN = intPreferencesKey("cache_refresh_ttl_min")
         private val KEY_LAST_LIBRARY_REFRESH = longPreferencesKey("last_library_refresh")
@@ -158,6 +163,16 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_ENABLED] ?: false }
     val browseCacheEnabledFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_BROWSE_CACHE_ENABLED] ?: false }
+    val libraryCacheHomeFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_HOME] ?: false }
+    val libraryCacheWantToReadFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_WANT] ?: false }
+    val libraryCacheCollectionsFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_COLLECTIONS] ?: false }
+    val libraryCacheReadingListsFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_READING_LISTS] ?: false }
+    val libraryCacheBrowsePeopleFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_BROWSE_PEOPLE] ?: false }
     val offlineModeFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_OFFLINE_MODE] ?: false }
     val cacheRefreshTtlMinutesFlow: Flow<Int> =
@@ -343,6 +358,36 @@ class AppPreferences(
     suspend fun setBrowseCacheEnabled(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[KEY_BROWSE_CACHE_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setLibraryCacheHomeEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LIBRARY_CACHE_HOME] = enabled
+        }
+    }
+
+    suspend fun setLibraryCacheWantToReadEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LIBRARY_CACHE_WANT] = enabled
+        }
+    }
+
+    suspend fun setLibraryCacheCollectionsEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LIBRARY_CACHE_COLLECTIONS] = enabled
+        }
+    }
+
+    suspend fun setLibraryCacheReadingListsEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LIBRARY_CACHE_READING_LISTS] = enabled
+        }
+    }
+
+    suspend fun setLibraryCacheBrowsePeopleEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LIBRARY_CACHE_BROWSE_PEOPLE] = enabled
         }
     }
 

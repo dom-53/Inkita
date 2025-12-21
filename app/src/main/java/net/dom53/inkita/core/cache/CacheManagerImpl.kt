@@ -47,7 +47,21 @@ class CacheManagerImpl(
         val global = appPreferences.cacheEnabledFlow.first()
         val library = appPreferences.libraryCacheEnabledFlow.first()
         val browse = appPreferences.browseCacheEnabledFlow.first()
-        return CachePolicy(globalEnabled = global, libraryEnabled = library, browseEnabled = browse)
+        val libraryHome = appPreferences.libraryCacheHomeFlow.first()
+        val libraryWant = appPreferences.libraryCacheWantToReadFlow.first()
+        val libraryCollections = appPreferences.libraryCacheCollectionsFlow.first()
+        val libraryReadingLists = appPreferences.libraryCacheReadingListsFlow.first()
+        val libraryBrowsePeople = appPreferences.libraryCacheBrowsePeopleFlow.first()
+        return CachePolicy(
+            globalEnabled = global,
+            libraryEnabled = library,
+            browseEnabled = browse,
+            libraryHomeEnabled = libraryHome,
+            libraryWantEnabled = libraryWant,
+            libraryCollectionsEnabled = libraryCollections,
+            libraryReadingListsEnabled = libraryReadingLists,
+            libraryBrowsePeopleEnabled = libraryBrowsePeople,
+        )
     }
 
     override suspend fun enrichThumbnails(series: List<Series>): List<Series> {
