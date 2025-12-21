@@ -35,6 +35,15 @@ interface DownloadV2Dao {
     @Query("SELECT * FROM download_items_v2 WHERE jobId = :jobId ORDER BY id ASC")
     suspend fun getItemsForJob(jobId: Long): List<DownloadedItemV2Entity>
 
+    @Query("SELECT * FROM download_items_v2 WHERE chapterId = :chapterId ORDER BY id ASC")
+    suspend fun getItemsForChapter(chapterId: Int): List<DownloadedItemV2Entity>
+
+    @Query("DELETE FROM download_items_v2 WHERE chapterId = :chapterId AND status != :status")
+    suspend fun deleteItemsForChapterNotStatus(
+        chapterId: Int,
+        status: String = DownloadedItemV2Entity.STATUS_COMPLETED,
+    )
+
     @Query("SELECT * FROM download_items_v2 WHERE status = :status ORDER BY updatedAt DESC")
     fun observeItemsByStatus(status: String): Flow<List<DownloadedItemV2Entity>>
 

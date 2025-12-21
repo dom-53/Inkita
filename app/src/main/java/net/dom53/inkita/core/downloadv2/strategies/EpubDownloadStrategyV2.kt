@@ -44,6 +44,15 @@ class EpubDownloadStrategyV2(
         val chapterId = request.chapterId ?: return -1L
         val pageCount = request.pageCount ?: return -1L
         val now = System.currentTimeMillis()
+        val existing = downloadDao.getItemsForChapter(chapterId)
+        val completedPages =
+            existing
+                .filter { it.status == DownloadedItemV2Entity.STATUS_COMPLETED && it.page != null }
+                .mapNotNull { it.page }
+                .toSet()
+        downloadDao.deleteItemsForChapterNotStatus(chapterId)
+        val missingPages = (0 until pageCount).filter { page -> page !in completedPages }
+        if (missingPages.isEmpty()) return -1L
         val job =
             DownloadJobV2Entity(
                 type = request.type,
@@ -53,7 +62,7 @@ class EpubDownloadStrategyV2(
                 volumeId = volumeId,
                 chapterId = chapterId,
                 status = DownloadJobV2Entity.STATUS_PENDING,
-                totalItems = pageCount,
+                totalItems = missingPages.size,
                 completedItems = 0,
                 priority = request.priority,
                 createdAt = now,
@@ -62,7 +71,7 @@ class EpubDownloadStrategyV2(
             )
         val jobId = downloadDao.insertJob(job)
         val items =
-            (0 until pageCount).map { page ->
+            missingPages.map { page ->
                 DownloadedItemV2Entity(
                     jobId = jobId,
                     type = DownloadedItemV2Entity.TYPE_PAGE,
@@ -118,11 +127,13 @@ class EpubDownloadStrategyV2(
         updateJob(job, DownloadJobV2Entity.STATUS_RUNNING, error = null)
 
         val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
-        val items = downloadDao.getItemsForJob(jobId)
+        val items =
+            downloadDao
+                .getItemsForJob(jobId)
+                .filter { it.status != DownloadedItemV2Entity.STATUS_COMPLETED }
         var completed = job.completedItems ?: 0
         try {
             for (item in items) {
-                if (item.status == DownloadedItemV2Entity.STATUS_COMPLETED) continue
                 val page = item.page ?: continue
                 val htmlResp = api.getBookPage(chapterId, page)
                 if (!htmlResp.isSuccessful) throw HttpException(htmlResp)
