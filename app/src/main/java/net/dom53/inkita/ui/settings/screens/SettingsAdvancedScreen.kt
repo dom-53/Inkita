@@ -75,6 +75,7 @@ fun SettingsAdvancedScreen(
     var cacheStaleHours by remember { mutableStateOf(24) }
     var cacheStaleInput by remember { mutableStateOf("24") }
     var cacheStaleFocused by remember { mutableStateOf(false) }
+    var debugToasts by remember { mutableStateOf(false) }
     var cacheTtlMinutes by remember { mutableStateOf(0) }
     var ttlInput by remember { mutableStateOf("0") }
     var useHours by remember { mutableStateOf(false) }
@@ -122,6 +123,9 @@ fun SettingsAdvancedScreen(
     }
     LaunchedEffect(Unit) {
         appPreferences.cacheAlwaysRefreshFlow.collectLatest { cacheAlwaysRefresh = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.debugToastsFlow.collectLatest { debugToasts = it }
     }
     LaunchedEffect(Unit) {
         appPreferences.cacheStaleHoursFlow.collectLatest {
@@ -219,6 +223,30 @@ fun SettingsAdvancedScreen(
             text = stringResource(R.string.settings_item_advanced),
             style = MaterialTheme.typography.headlineSmall,
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_debug_toasts_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_debug_toasts_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = debugToasts,
+                onCheckedChange = { checked ->
+                    debugToasts = checked
+                    scope.launch { appPreferences.setDebugToasts(checked) }
+                },
+            )
+        }
 
         Text(
             text = stringResource(R.string.settings_advanced_section_global_cache),

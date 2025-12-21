@@ -76,6 +76,7 @@ class AppPreferences(
         private val KEY_BROWSE_CACHE_ENABLED = booleanPreferencesKey("browse_cache_enabled")
         private val KEY_CACHE_ALWAYS_REFRESH = booleanPreferencesKey("cache_always_refresh")
         private val KEY_CACHE_STALE_HOURS = intPreferencesKey("cache_stale_hours")
+        private val KEY_DEBUG_TOASTS = booleanPreferencesKey("debug_toasts")
         private val KEY_LIBRARY_CACHE_HOME = booleanPreferencesKey("library_cache_home")
         private val KEY_LIBRARY_CACHE_WANT = booleanPreferencesKey("library_cache_want")
         private val KEY_LIBRARY_CACHE_COLLECTIONS = booleanPreferencesKey("library_cache_collections")
@@ -169,6 +170,8 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_CACHE_ALWAYS_REFRESH] ?: false }
     val cacheStaleHoursFlow: Flow<Int> =
         context.dataStore.data.map { prefs -> (prefs[KEY_CACHE_STALE_HOURS] ?: 24).coerceIn(1, 168) }
+    val debugToastsFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_DEBUG_TOASTS] ?: false }
     val libraryCacheHomeFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_HOME] ?: false }
     val libraryCacheWantToReadFlow: Flow<Boolean> =
@@ -376,6 +379,12 @@ class AppPreferences(
     suspend fun setCacheStaleHours(hours: Int) {
         context.dataStore.edit { prefs ->
             prefs[KEY_CACHE_STALE_HOURS] = hours.coerceIn(1, 168)
+        }
+    }
+
+    suspend fun setDebugToasts(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_DEBUG_TOASTS] = enabled
         }
     }
 

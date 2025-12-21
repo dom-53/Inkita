@@ -298,6 +298,13 @@
     <string name="settings_cache_stale_hours_label">Cache stale after (hours)</string>
     <string name="settings_cache_stale_hours_hint">If older than this, cache refreshes automatically.</string>
     <string name="settings_cache_units_hours">hours</string>
+    <string name="settings_debug_toasts_title">Debug toasts</string>
+    <string name="settings_debug_toasts_subtitle">Show debug cache decisions as toasts.</string>
+    <string name="debug_cache_use">Use cache</string>
+    <string name="debug_cache_force_online">Force online data</string>
+    <string name="debug_cache_stale_reload">Old cache, reload new data</string>
+    <string name="debug_cache_no_cache">No cache, fetch online</string>
+    <string name="debug_cache_use_fresh">Use fresh data</string>
     <string name="settings_item_stats">My Statistics</string>
     <string name="settings_item_about">About</string>
     <!-- Kavita  -->

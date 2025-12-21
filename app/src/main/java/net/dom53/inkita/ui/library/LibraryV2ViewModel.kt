@@ -1,5 +1,7 @@
 package net.dom53.inkita.ui.library
 
+import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -21,6 +23,7 @@ import net.dom53.inkita.domain.repository.LibraryRepository
 import net.dom53.inkita.domain.repository.PersonRepository
 import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
+import net.dom53.inkita.R
 
 data class HomeSeriesItem(
     val id: Int,
@@ -257,6 +260,7 @@ class LibraryV2ViewModel(
             val isStale =
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+            val showDebugToast = appPreferences.debugToastsFlow.first()
             if (cachedHasData) {
                 _state.update {
                     it.copy(
@@ -268,9 +272,44 @@ class LibraryV2ViewModel(
                     )
                 }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    if (showDebugToast) {
+                        android.widget.Toast
+                            .makeText(
+                                appPreferences.appContext,
+                                appPreferences.appContext.getString(R.string.debug_cache_use),
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                    }
                     _state.update { it.copy(isHomeLoading = false) }
                     return@launch
                 }
+                if (showDebugToast) {
+                    val message =
+                        if (alwaysRefresh) {
+                            R.string.debug_cache_force_online
+                        } else {
+                            R.string.debug_cache_stale_reload
+                        }
+                    android.widget.Toast
+                        .makeText(
+                            appPreferences.appContext,
+                            appPreferences.appContext.getString(message),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                }
+            } else if (showDebugToast) {
+                val message =
+                    if (isOnline) {
+                        R.string.debug_cache_use_fresh
+                    } else {
+                        R.string.debug_cache_no_cache
+                    }
+                android.widget.Toast
+                    .makeText(
+                        appPreferences.appContext,
+                        appPreferences.appContext.getString(message),
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
             }
             val onDeckResult = runCatching { seriesRepository.getOnDeckSeries(1, 20, 0) }
             val updatedResult = runCatching { seriesRepository.getRecentlyUpdatedSeries(1, 20) }
@@ -369,9 +408,25 @@ class LibraryV2ViewModel(
             if (cached.isNotEmpty()) {
                 _state.update { it.copy(wantToRead = cached, isWantToReadLoading = true, wantToReadError = null) }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isWantToReadLoading = false) }
                     return@launch
                 }
+                val message =
+                    if (alwaysRefresh) {
+                        R.string.debug_cache_force_online
+                    } else {
+                        R.string.debug_cache_stale_reload
+                    }
+                maybeShowDebugToast(message)
+            } else {
+                val message =
+                    if (isOnline) {
+                        R.string.debug_cache_use_fresh
+                    } else {
+                        R.string.debug_cache_no_cache
+                    }
+                maybeShowDebugToast(message)
             }
             val result = runCatching { seriesRepository.getWantToReadSeries(1, 50) }
             _state.update {
@@ -408,9 +463,25 @@ class LibraryV2ViewModel(
             if (cached.isNotEmpty()) {
                 _state.update { it.copy(collections = cached, isCollectionsLoading = true, collectionsError = null) }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isCollectionsLoading = false) }
                     return@launch
                 }
+                val message =
+                    if (alwaysRefresh) {
+                        R.string.debug_cache_force_online
+                    } else {
+                        R.string.debug_cache_stale_reload
+                    }
+                maybeShowDebugToast(message)
+            } else {
+                val message =
+                    if (isOnline) {
+                        R.string.debug_cache_use_fresh
+                    } else {
+                        R.string.debug_cache_no_cache
+                    }
+                maybeShowDebugToast(message)
             }
             val result = runCatching { collectionsRepository.getCollectionsAll(ownedOnly = false) }
             _state.update {
@@ -446,9 +517,25 @@ class LibraryV2ViewModel(
             if (cached.isNotEmpty()) {
                 _state.update { it.copy(readingLists = cached, isReadingListsLoading = true, readingListsError = null) }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isReadingListsLoading = false) }
                     return@launch
                 }
+                val message =
+                    if (alwaysRefresh) {
+                        R.string.debug_cache_force_online
+                    } else {
+                        R.string.debug_cache_stale_reload
+                    }
+                maybeShowDebugToast(message)
+            } else {
+                val message =
+                    if (isOnline) {
+                        R.string.debug_cache_use_fresh
+                    } else {
+                        R.string.debug_cache_no_cache
+                    }
+                maybeShowDebugToast(message)
             }
             val result = runCatching { readingListRepository.getReadingLists(includePromoted = true, sortByLastModified = false) }
             _state.update {
@@ -493,9 +580,25 @@ class LibraryV2ViewModel(
                     )
                 }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isPeopleLoading = false) }
                     return@launch
                 }
+                val message =
+                    if (alwaysRefresh) {
+                        R.string.debug_cache_force_online
+                    } else {
+                        R.string.debug_cache_stale_reload
+                    }
+                maybeShowDebugToast(message)
+            } else {
+                val message =
+                    if (isOnline) {
+                        R.string.debug_cache_use_fresh
+                    } else {
+                        R.string.debug_cache_no_cache
+                    }
+                maybeShowDebugToast(message)
             }
             val result = runCatching { personRepository.getBrowsePeople(pageNumber = 1, pageSize = 50) }
             val pageItems = result.getOrDefault(emptyList())
@@ -524,6 +627,13 @@ class LibraryV2ViewModel(
         viewModelScope.launch {
             if (reset) {
                 _state.update { it.copy(isLibrarySeriesLoading = true, librarySeriesError = null) }
+                val message =
+                    if (NetworkUtils.isOnline(appPreferences.appContext)) {
+                        R.string.debug_cache_use_fresh
+                    } else {
+                        R.string.debug_cache_no_cache
+                    }
+                maybeShowDebugToast(message)
             } else {
                 _state.update { it.copy(isLibrarySeriesLoadingMore = true) }
             }
@@ -613,9 +723,25 @@ class LibraryV2ViewModel(
             if (cached.isNotEmpty()) {
                 _state.update { it.copy(collectionSeries = cached, isCollectionSeriesLoading = true, collectionSeriesError = null) }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isCollectionSeriesLoading = false) }
                     return@launch
                 }
+                val message =
+                    if (alwaysRefresh) {
+                        R.string.debug_cache_force_online
+                    } else {
+                        R.string.debug_cache_stale_reload
+                    }
+                maybeShowDebugToast(message)
+            } else {
+                val message =
+                    if (isOnline) {
+                        R.string.debug_cache_use_fresh
+                    } else {
+                        R.string.debug_cache_no_cache
+                    }
+                maybeShowDebugToast(message)
             }
             val result = runCatching { seriesRepository.getSeriesForCollection(collectionId, 1, 50) }
             _state.update {
@@ -631,6 +757,15 @@ class LibraryV2ViewModel(
                 result.getOrDefault(emptyList()),
             )
         }
+    }
+
+    private suspend fun maybeShowDebugToast(@StringRes messageRes: Int) {
+        if (!appPreferences.debugToastsFlow.first()) return
+        Toast.makeText(
+            appPreferences.appContext,
+            appPreferences.appContext.getString(messageRes),
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 
     companion object {
