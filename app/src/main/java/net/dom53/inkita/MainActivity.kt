@@ -360,6 +360,9 @@ fun InkitaApp(
                         seriesId = seriesId,
                         appPreferences = appPreferences,
                         collectionsRepository = collectionsRepository,
+                        onOpenReader = { chapterId, page, sid, vid, fmt ->
+                            navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: 0}")
+                        },
                         onOpenVolume = { volumeId ->
                             navController.navigate("volume/$volumeId")
                         },

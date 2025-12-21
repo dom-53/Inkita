@@ -67,6 +67,7 @@ fun SeriesDetailScreenV2(
     seriesId: Int,
     appPreferences: AppPreferences,
     collectionsRepository: net.dom53.inkita.domain.repository.CollectionsRepository,
+    onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
     onOpenVolume: (Int) -> Unit,
     onOpenSeries: (Int) -> Unit,
     onBack: () -> Unit,
@@ -225,10 +226,11 @@ fun SeriesDetailScreenV2(
                             onToggle = { summaryExpanded = !summaryExpanded },
                         )
                         val continuePoint = detail?.continuePoint
+                        val readerProgress = detail?.readerProgress
                         val continueLabel =
                             if (continuePoint != null && detail?.hasProgress == true) {
                                 val page = (continuePoint.pagesRead ?: 0) + 1
-                                val volId = continuePoint.volumeId
+                                val volId = readerProgress?.volumeId ?: continuePoint.volumeId
                                 val volumeNumber =
                                     detail
                                         ?.detail
@@ -245,7 +247,17 @@ fun SeriesDetailScreenV2(
                             }
                         Button(
                             onClick = {
-                                Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show()
+                                val chapterId = readerProgress?.chapterId ?: continuePoint?.id
+                                val volumeId = readerProgress?.volumeId ?: continuePoint?.volumeId
+                                val sid = detail?.series?.id ?: seriesId
+                                val fmt = detail?.series?.format
+                                if (chapterId == null || volumeId == null) {
+                                    Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                val page =
+                                    readerProgress?.pageNum ?: continuePoint?.pagesRead ?: 0
+                                onOpenReader(chapterId, page, sid, volumeId, fmt)
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) {

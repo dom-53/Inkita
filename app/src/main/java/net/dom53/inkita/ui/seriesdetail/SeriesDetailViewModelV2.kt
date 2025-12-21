@@ -17,6 +17,7 @@ import net.dom53.inkita.data.api.dto.BookmarkDto
 import net.dom53.inkita.data.api.dto.ChapterDto
 import net.dom53.inkita.data.api.dto.HourEstimateRangeDto
 import net.dom53.inkita.data.api.dto.RatingDto
+import net.dom53.inkita.data.api.dto.ReaderProgressDto
 import net.dom53.inkita.data.api.dto.ReadingListDto
 import net.dom53.inkita.data.api.dto.RelatedSeriesDto
 import net.dom53.inkita.data.api.dto.SeriesDetailDto
@@ -51,6 +52,7 @@ data class InkitaDetailV2(
     val related: RelatedSeriesDto?,
     val detail: SeriesDetailDto?,
     val rating: RatingDto?,
+    val readerProgress: ReaderProgressDto?,
 )
 
 class SeriesDetailViewModelV2(
@@ -255,6 +257,12 @@ class SeriesDetailViewModelV2(
             val timeLeft = timeLeftDeferred.await().extract("timeLeft", errors)
             val hasProgress = hasProgressDeferred.await().extract("hasProgress", errors)
             val continuePoint = continuePointDeferred.await().extract("continuePoint", errors)
+            val readerProgress =
+                if (continuePoint != null) {
+                    api.getReaderProgress(continuePoint.id).extract("readerProgress", errors)
+                } else {
+                    null
+                }
             val seriesDetail = seriesDetailDeferred.await().extract("seriesDetail", errors)
             val related = relatedDeferred.await().extract("related", errors)
             val rating = ratingDeferred.await().extract("rating", errors)
@@ -287,6 +295,7 @@ class SeriesDetailViewModelV2(
                     related = related,
                     detail = seriesDetail,
                     rating = rating,
+                    readerProgress = readerProgress,
                 )
             val membership = detail.collections?.map { it.id }?.toSet().orEmpty()
 
