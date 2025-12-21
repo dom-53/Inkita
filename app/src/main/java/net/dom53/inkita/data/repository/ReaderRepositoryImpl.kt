@@ -5,7 +5,7 @@ import android.net.Uri
 import android.os.Environment
 import kotlinx.coroutines.flow.first
 import net.dom53.inkita.core.network.KavitaApiFactory
-import net.dom53.inkita.core.network.NetworkUtils
+import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.sync.ProgressSyncWorker
 import net.dom53.inkita.data.local.db.dao.DownloadDao
@@ -63,7 +63,7 @@ class ReaderRepositoryImpl(
         val cached = readerDao.getPage(chapterId, page)?.html
         val offlineHtml = downloadedHtmlV2 ?: downloadedHtml
 
-        if (!NetworkUtils.isOnline(context) && offlineHtml == null) {
+        if (!isOnlineAllowed() && offlineHtml == null) {
             throw PageNotDownloadedException("Page not downloaded for offline reading")
         }
 
@@ -89,7 +89,7 @@ class ReaderRepositoryImpl(
             } catch (io: IOException) {
                 if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
                 if (cached != null) return ReaderPageResult(cached, false)
-                if (!NetworkUtils.isOnline(context)) throw PageNotDownloadedException("Page not downloaded for offline reading")
+                if (!isOnlineAllowed()) throw PageNotDownloadedException("Page not downloaded for offline reading")
                 throw io
             } catch (e: Exception) {
                 if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
@@ -132,7 +132,7 @@ class ReaderRepositoryImpl(
 
     override suspend fun getProgress(chapterId: Int): ReaderProgress? {
         val local = readerDao.getLocalProgress(chapterId)?.toDomain()
-        if (!NetworkUtils.isOnline(context)) return local
+        if (!isOnlineAllowed()) return local
 
         val api =
             try {
@@ -177,7 +177,7 @@ class ReaderRepositoryImpl(
                 progress
             }
 
-        if (!NetworkUtils.isOnline(context)) {
+        if (!isOnlineAllowed()) {
             readerDao.upsertLocalProgress(progressWithTs.toEntity())
             ProgressSyncWorker.enqueue(context)
             return
@@ -340,7 +340,7 @@ class ReaderRepositoryImpl(
     }
 
     override suspend fun syncLocalProgress() {
-        if (!NetworkUtils.isOnline(context)) return
+        if (!isOnlineAllowed()) return
         val api = runCatching { apiOrThrow() }.getOrElse { return }
         val locals = runCatching { readerDao.getAllLocalProgress() }.getOrDefault(emptyList())
         if (locals.isEmpty()) return
@@ -362,10 +362,19 @@ class ReaderRepositoryImpl(
         }
     }
 
+    override suspend fun getLatestLocalProgress(seriesId: Int): ReaderProgress? {
+        val locals = runCatching { readerDao.getAllLocalProgress() }.getOrDefault(emptyList())
+        val latest =
+            locals
+                .filter { it.seriesId == seriesId }
+                .maxByOrNull { it.lastModifiedUtc }
+        return latest?.toDomain()
+    }
+
     private suspend fun apiOrThrow(): net.dom53.inkita.data.api.KavitaApi {
         val config = appPreferences.configFlow.first()
         check(config.isConfigured) { "Not authenticated" }
-        if (!NetworkUtils.isOnline(context)) throw IOException("Offline")
+        if (!isOnlineAllowed()) throw IOException("Offline")
 
         return KavitaApiFactory.createAuthenticated(
             baseUrl = config.serverUrl,
@@ -389,6 +398,9 @@ class ReaderRepositoryImpl(
         if (path.startsWith("content://")) return true
         return File(path).exists()
     }
+
+    private fun isOnlineAllowed(): Boolean =
+        NetworkMonitor.getInstance(context, appPreferences).status.value.isOnlineAllowed
 
     private fun LocalReaderProgressEntity.toDomain(): ReaderProgress =
         ReaderProgress(

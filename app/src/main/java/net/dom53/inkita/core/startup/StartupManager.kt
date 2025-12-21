@@ -116,6 +116,9 @@ object StartupManager {
                         "online=${status.isOnline} allowed=${status.isOnlineAllowed} type=${status.connectionType} metered=${status.isMetered} roaming=${status.isRoaming} offlineMode=${status.offlineMode}",
                     )
                 }
+                if (status.isOnlineAllowed) {
+                    ProgressSyncWorker.enqueue(appContext)
+                }
             }.launchIn(logScope)
         val readerRepository: ReaderRepository =
             ReaderRepositoryImpl(

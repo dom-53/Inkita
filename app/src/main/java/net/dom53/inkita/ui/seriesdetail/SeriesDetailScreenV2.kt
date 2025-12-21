@@ -86,6 +86,7 @@ fun SeriesDetailScreenV2(
     seriesId: Int,
     appPreferences: AppPreferences,
     collectionsRepository: net.dom53.inkita.domain.repository.CollectionsRepository,
+    readerRepository: net.dom53.inkita.domain.repository.ReaderRepository,
     cacheManager: CacheManager,
     onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
     onOpenVolume: (Int) -> Unit,
@@ -98,7 +99,14 @@ fun SeriesDetailScreenV2(
 ) {
     val viewModel: SeriesDetailViewModelV2 =
         viewModel(
-            factory = SeriesDetailViewModelV2.provideFactory(seriesId, appPreferences, collectionsRepository, cacheManager),
+            factory =
+                SeriesDetailViewModelV2.provideFactory(
+                    seriesId,
+                    appPreferences,
+                    collectionsRepository,
+                    readerRepository,
+                    cacheManager,
+                ),
         )
     val uiState by viewModel.state.collectAsState()
     val context = LocalContext.current

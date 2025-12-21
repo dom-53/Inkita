@@ -27,6 +27,8 @@ import net.dom53.inkita.data.api.dto.SeriesDetailDto
 import net.dom53.inkita.data.api.dto.SeriesDetailPlusDto
 import net.dom53.inkita.data.api.dto.SeriesDto
 import net.dom53.inkita.data.api.dto.SeriesMetadataDto
+import net.dom53.inkita.data.mapper.toDomain
+import net.dom53.inkita.data.mapper.toDto
 import retrofit2.Response
 
 data class SeriesDetailUiStateV2(
@@ -62,6 +64,7 @@ class SeriesDetailViewModelV2(
     val seriesId: Int,
     private val appPreferences: AppPreferences,
     private val collectionsRepository: net.dom53.inkita.domain.repository.CollectionsRepository,
+    private val readerRepository: net.dom53.inkita.domain.repository.ReaderRepository,
     private val cacheManager: CacheManager,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SeriesDetailUiStateV2())
@@ -268,14 +271,15 @@ class SeriesDetailViewModelV2(
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
             if (cachedDetail != null) {
+                val localMerged = applyLocalProgress(cachedDetail, isOnline)
                 val membership =
-                    cachedDetail.collections
+                    localMerged.collections
                         ?.map { it.id }
                         ?.toSet()
                         .orEmpty()
                 _state.update {
                     it.copy(
-                        detail = cachedDetail,
+                        detail = localMerged,
                         collectionsWithSeries = membership,
                         isLoading = true,
                         error = null,
@@ -382,8 +386,9 @@ class SeriesDetailViewModelV2(
                     rating = rating,
                     readerProgress = readerProgress,
                 )
+            val mergedDetail = applyLocalProgress(detail, isOnline)
             val membership =
-                detail.collections
+                mergedDetail.collections
                     ?.map { it.id }
                     ?.toSet()
                     .orEmpty()
@@ -392,15 +397,46 @@ class SeriesDetailViewModelV2(
                 it.copy(
                     isLoading = false,
                     error = errors.firstOrNull(),
-                    detail = detail,
+                    detail = mergedDetail,
                     showLoadedToast = true,
                     collectionsWithSeries = membership,
                 )
             }
             if (canCache) {
-                cacheManager.cacheSeriesDetailV2(seriesId, detail)
+                cacheManager.cacheSeriesDetailV2(seriesId, mergedDetail)
             }
         }
+    }
+
+    private suspend fun applyLocalProgress(
+        detail: InkitaDetailV2,
+        isOnline: Boolean,
+    ): InkitaDetailV2 {
+        val local = readerRepository.getLatestLocalProgress(seriesId) ?: return detail
+        val localProgress =
+            if (local.seriesId == null) {
+                local.copy(seriesId = seriesId)
+            } else {
+                local
+            }
+        val remoteProgress = detail.readerProgress?.toDomain()
+        val shouldOverride =
+            !isOnline ||
+                remoteProgress == null ||
+                localProgress.lastModifiedUtcMillis > remoteProgress.lastModifiedUtcMillis
+        if (!shouldOverride) return detail
+        val chapter =
+            ChapterDto(
+                id = localProgress.chapterId,
+                pagesRead = localProgress.page,
+                volumeId = localProgress.volumeId,
+            )
+        val dto: ReaderProgressDto = localProgress.toDto()
+        return detail.copy(
+            hasProgress = true,
+            continuePoint = chapter,
+            readerProgress = dto,
+        )
     }
 
     private fun <T> Response<T>.extract(
@@ -430,12 +466,19 @@ class SeriesDetailViewModelV2(
             seriesId: Int,
             appPreferences: AppPreferences,
             collectionsRepository: net.dom53.inkita.domain.repository.CollectionsRepository,
+            readerRepository: net.dom53.inkita.domain.repository.ReaderRepository,
             cacheManager: CacheManager,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     @Suppress("UNCHECKED_CAST")
-                    return SeriesDetailViewModelV2(seriesId, appPreferences, collectionsRepository, cacheManager) as T
+                    return SeriesDetailViewModelV2(
+                        seriesId,
+                        appPreferences,
+                        collectionsRepository,
+                        readerRepository,
+                        cacheManager,
+                    ) as T
                 }
             }
     }
