@@ -10,8 +10,10 @@ import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
 import net.dom53.inkita.data.local.db.dao.SeriesDetailV2Dao
-import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedCollectionRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedCollectionV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.domain.model.SeriesDetail
 import net.dom53.inkita.domain.model.Collection
@@ -170,11 +172,30 @@ class CacheManagerImpl(
         listType: String,
         collections: List<Collection>,
     ) {
-        // Skeleton only; no-op.
+        val dao = libraryV2Dao ?: return
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return
+        val now = System.currentTimeMillis()
+        val unique = collections.distinctBy { it.id }
+        dao.upsertCollections(unique.map { CachedCollectionV2Entity(it.id, it.name, now) })
+        dao.clearCollectionRefs(listType)
+        val refs =
+            unique.mapIndexed { index, item ->
+                CachedCollectionRefEntity(
+                    listType = listType,
+                    collectionId = item.id,
+                    position = index,
+                    updatedAt = now,
+                )
+            }
+        dao.upsertCollectionRefs(refs)
     }
 
     override suspend fun getCachedLibraryV2Collections(listType: String): List<Collection> {
-        return emptyList()
+        val dao = libraryV2Dao ?: return emptyList()
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return emptyList()
+        return dao.getCollectionsForList(listType).map { Collection(it.id, it.name) }
     }
 
     override suspend fun cacheLibraryV2ReadingLists(
@@ -307,6 +328,9 @@ class CacheManagerImpl(
             LibraryV2CacheKeys.HOME_RECENTLY_ADDED,
             -> policy.libraryHomeEnabled
             LibraryV2CacheKeys.WANT_TO_READ -> policy.libraryWantEnabled
+            LibraryV2CacheKeys.COLLECTIONS,
+            LibraryV2CacheKeys.COLLECTION_SERIES,
+            -> policy.libraryCollectionsEnabled
             else -> false
         }
     }

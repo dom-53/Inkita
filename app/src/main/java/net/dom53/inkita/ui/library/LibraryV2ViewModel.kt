@@ -394,6 +394,25 @@ class LibraryV2ViewModel(
         if (current.isCollectionsLoading || current.collections.isNotEmpty()) return
         viewModelScope.launch {
             _state.update { it.copy(isCollectionsLoading = true, collectionsError = null) }
+            val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
+            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
+            val cached = cacheManager.getCachedLibraryV2Collections(LibraryV2CacheKeys.COLLECTIONS)
+            val cachedUpdatedAt =
+                cacheManager.getLibraryV2SeriesListUpdatedAt(
+                    LibraryV2CacheKeys.COLLECTIONS,
+                    "",
+                )
+            val isStale =
+                cachedUpdatedAt == null ||
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+            if (cached.isNotEmpty()) {
+                _state.update { it.copy(collections = cached, isCollectionsLoading = true, collectionsError = null) }
+                if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    _state.update { it.copy(isCollectionsLoading = false) }
+                    return@launch
+                }
+            }
             val result = runCatching { collectionsRepository.getCollectionsAll(ownedOnly = false) }
             _state.update {
                 it.copy(
@@ -402,6 +421,10 @@ class LibraryV2ViewModel(
                     collectionsError = result.exceptionOrNull()?.message,
                 )
             }
+            cacheManager.cacheLibraryV2Collections(
+                LibraryV2CacheKeys.COLLECTIONS,
+                result.getOrDefault(emptyList()),
+            )
         }
     }
 
@@ -517,6 +540,30 @@ class LibraryV2ViewModel(
     private fun loadCollectionSeries(collectionId: Int) {
         viewModelScope.launch {
             _state.update { it.copy(isCollectionSeriesLoading = true, collectionSeriesError = null) }
+            val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
+            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
+            val cacheKey = collectionId.toString()
+            val cached =
+                cacheManager.getCachedLibraryV2SeriesList(
+                    LibraryV2CacheKeys.COLLECTION_SERIES,
+                    cacheKey,
+                )
+            val cachedUpdatedAt =
+                cacheManager.getLibraryV2SeriesListUpdatedAt(
+                    LibraryV2CacheKeys.COLLECTION_SERIES,
+                    cacheKey,
+                )
+            val isStale =
+                cachedUpdatedAt == null ||
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+            if (cached.isNotEmpty()) {
+                _state.update { it.copy(collectionSeries = cached, isCollectionSeriesLoading = true, collectionSeriesError = null) }
+                if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    _state.update { it.copy(isCollectionSeriesLoading = false) }
+                    return@launch
+                }
+            }
             val result = runCatching { seriesRepository.getSeriesForCollection(collectionId, 1, 50) }
             _state.update {
                 it.copy(
@@ -525,6 +572,11 @@ class LibraryV2ViewModel(
                     collectionSeriesError = result.exceptionOrNull()?.message,
                 )
             }
+            cacheManager.cacheLibraryV2SeriesList(
+                LibraryV2CacheKeys.COLLECTION_SERIES,
+                cacheKey,
+                result.getOrDefault(emptyList()),
+            )
         }
     }
 
