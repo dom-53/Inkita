@@ -3,6 +3,7 @@ package net.dom53.inkita.ui.seriesdetail
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -114,6 +115,7 @@ internal fun ChapterListV2(
     config: AppConfig,
     downloadStates: Map<Int, ChapterDownloadState> = emptyMap(),
     onChapterClick: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
+    onChapterLongPress: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
 ) {
     if (chapters.isEmpty()) return
     Row(
@@ -136,7 +138,10 @@ internal fun ChapterListV2(
                 modifier =
                     Modifier
                         .width(140.dp)
-                        .clickable { onChapterClick(chapter, index) },
+                        .combinedClickable(
+                            onClick = { onChapterClick(chapter, index) },
+                            onLongClick = { onChapterLongPress(chapter, index) },
+                        ),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Box {

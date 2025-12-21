@@ -91,6 +91,12 @@ interface DownloadV2Dao {
     @Query("DELETE FROM download_jobs_v2 WHERE volumeId = :volumeId")
     suspend fun deleteJobsForVolume(volumeId: Int)
 
+    @Query("DELETE FROM download_items_v2 WHERE chapterId = :chapterId")
+    suspend fun deleteItemsForChapter(chapterId: Int)
+
+    @Query("DELETE FROM download_jobs_v2 WHERE chapterId = :chapterId")
+    suspend fun deleteJobsForChapter(chapterId: Int)
+
     @Query(
         """
         SELECT COUNT(*) FROM download_items_v2
