@@ -306,6 +306,7 @@ class CacheManagerImpl(
             LibraryV2CacheKeys.HOME_RECENTLY_UPDATED,
             LibraryV2CacheKeys.HOME_RECENTLY_ADDED,
             -> policy.libraryHomeEnabled
+            LibraryV2CacheKeys.WANT_TO_READ -> policy.libraryWantEnabled
             else -> false
         }
     }

@@ -350,6 +350,29 @@ class LibraryV2ViewModel(
         if (current.isWantToReadLoading || current.wantToRead.isNotEmpty()) return
         viewModelScope.launch {
             _state.update { it.copy(isWantToReadLoading = true, wantToReadError = null) }
+            val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
+            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
+            val cached =
+                cacheManager.getCachedLibraryV2SeriesList(
+                    LibraryV2CacheKeys.WANT_TO_READ,
+                    "",
+                )
+            val cachedUpdatedAt =
+                cacheManager.getLibraryV2SeriesListUpdatedAt(
+                    LibraryV2CacheKeys.WANT_TO_READ,
+                    "",
+                )
+            val isStale =
+                cachedUpdatedAt == null ||
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+            if (cached.isNotEmpty()) {
+                _state.update { it.copy(wantToRead = cached, isWantToReadLoading = true, wantToReadError = null) }
+                if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    _state.update { it.copy(isWantToReadLoading = false) }
+                    return@launch
+                }
+            }
             val result = runCatching { seriesRepository.getWantToReadSeries(1, 50) }
             _state.update {
                 it.copy(
@@ -358,6 +381,11 @@ class LibraryV2ViewModel(
                     wantToReadError = result.exceptionOrNull()?.message,
                 )
             }
+            cacheManager.cacheLibraryV2SeriesList(
+                LibraryV2CacheKeys.WANT_TO_READ,
+                "",
+                result.getOrDefault(emptyList()),
+            )
         }
     }
 
