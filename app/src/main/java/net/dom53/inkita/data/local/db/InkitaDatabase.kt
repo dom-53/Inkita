@@ -11,9 +11,6 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import net.dom53.inkita.data.local.db.dao.DownloadDao
 import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
-import net.dom53.inkita.data.local.db.dao.SeriesDao
-import net.dom53.inkita.data.local.db.entity.CachedBrowseRefEntity
-import net.dom53.inkita.data.local.db.entity.CachedChapterEntity
 import net.dom53.inkita.data.local.db.entity.CachedCollectionRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedCollectionV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedPageEntity
@@ -21,20 +18,13 @@ import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedPersonV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
-import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailEntity
-import net.dom53.inkita.data.local.db.entity.CachedSeriesEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
-import net.dom53.inkita.data.local.db.entity.CachedSeriesRefEntity
-import net.dom53.inkita.data.local.db.entity.CachedVolumeEntity
 import net.dom53.inkita.data.local.db.entity.DownloadTaskEntity
 import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
 
 @Database(
     entities = [
-        CachedSeriesEntity::class,
-        CachedSeriesRefEntity::class,
-        CachedBrowseRefEntity::class,
         CachedSeriesV2Entity::class,
         CachedSeriesListRefEntity::class,
         CachedCollectionV2Entity::class,
@@ -43,20 +33,15 @@ import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
         CachedReadingListRefEntity::class,
         CachedPersonV2Entity::class,
         CachedPersonRefEntity::class,
-        CachedSeriesDetailEntity::class,
-        CachedVolumeEntity::class,
         CachedPageEntity::class,
-        CachedChapterEntity::class,
         DownloadTaskEntity::class,
         DownloadedPageEntity::class,
         net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = false,
 )
 abstract class InkitaDatabase : RoomDatabase() {
-    abstract fun seriesDao(): SeriesDao
-
     abstract fun libraryV2Dao(): LibraryV2Dao
 
     abstract fun readerDao(): ReaderDao
@@ -75,7 +60,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         """
                         CREATE TABLE IF NOT EXISTS cached_series_refs(
                             tabType TEXT NOT NULL,
-                            collectionId INTEGER NOT NULL DEFAULT ${CachedSeriesRefEntity.NO_COLLECTION},
+                            collectionId INTEGER NOT NULL DEFAULT -1,
                             seriesId INTEGER NOT NULL,
                             updatedAt INTEGER NOT NULL,
                             PRIMARY KEY(tabType, collectionId, seriesId)
@@ -358,6 +343,17 @@ abstract class InkitaDatabase : RoomDatabase() {
                     )
                 }
             }
+        private val MIGRATION_13_14 =
+            object : Migration(13, 14) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL("DROP TABLE IF EXISTS cached_series")
+                    database.execSQL("DROP TABLE IF EXISTS cached_series_refs")
+                    database.execSQL("DROP TABLE IF EXISTS cached_browse_refs")
+                    database.execSQL("DROP TABLE IF EXISTS cached_series_detail")
+                    database.execSQL("DROP TABLE IF EXISTS cached_volumes")
+                    database.execSQL("DROP TABLE IF EXISTS cached_chapters")
+                }
+            }
 
         fun getInstance(context: Context): InkitaDatabase =
             INSTANCE ?: synchronized(this) {
@@ -379,6 +375,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         MIGRATION_10_11,
                         MIGRATION_11_12,
                         MIGRATION_12_13,
+                        MIGRATION_13_14,
                     ).build()
                     .also { INSTANCE = it }
             }

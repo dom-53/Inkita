@@ -73,7 +73,6 @@ object StartupManager {
         val cacheManager =
             CacheManagerImpl(
                 preferences,
-                database.seriesDao(),
                 database.libraryV2Dao(),
                 thumbsDir,
                 appContext.getDatabasePath("inkita.db"),

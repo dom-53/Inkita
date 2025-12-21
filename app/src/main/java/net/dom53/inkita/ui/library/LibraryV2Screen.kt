@@ -71,7 +71,6 @@ import kotlinx.coroutines.launch
 import net.dom53.inkita.R
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
-import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
 import net.dom53.inkita.domain.repository.PersonRepository
@@ -91,7 +90,6 @@ fun LibraryV2Screen(
     collectionsRepository: CollectionsRepository,
     readingListRepository: ReadingListRepository,
     personRepository: PersonRepository,
-    cacheManager: CacheManager,
     appPreferences: AppPreferences,
     onOpenSeries: (Int) -> Unit,
 ) {
@@ -104,7 +102,6 @@ fun LibraryV2Screen(
                     collectionsRepository,
                     readingListRepository,
                     personRepository,
-                    cacheManager,
                 ),
         )
     val uiState by viewModel.state.collectAsState()
