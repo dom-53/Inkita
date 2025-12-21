@@ -124,7 +124,7 @@ fun SeriesDetailScreenV2(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = "Loading...",
+                            text = stringResource(id = net.dom53.inkita.R.string.general_loading),
                             style = MaterialTheme.typography.titleMedium,
                         )
                     }
@@ -136,7 +136,7 @@ fun SeriesDetailScreenV2(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = uiState.error ?: "Error",
+                            text = uiState.error ?: stringResource(id = net.dom53.inkita.R.string.general_error),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -176,7 +176,11 @@ fun SeriesDetailScreenV2(
                                 context = context,
                                 clipboardManager = clipboardManager,
                                 onCopyToast = {
-                                    Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.general_copied_to_clipboard),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
                                 },
                                 modifier = Modifier.weight(1f),
                             )
@@ -194,7 +198,11 @@ fun SeriesDetailScreenV2(
                             onOpenWeb = {
                                 val url = webUrl(config, series?.libraryId, seriesId)
                                 if (url == null) {
-                                    Toast.makeText(context, "Missing library id", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(net.dom53.inkita.R.string.series_detail_missing_library_id),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
                                     return@ActionsRowV2
                                 }
                                 runCatching {
@@ -210,7 +218,9 @@ fun SeriesDetailScreenV2(
                             },
                             onShare = {
                                 val url = webUrl(config, series?.libraryId, seriesId)
-                                val title = series?.name?.ifBlank { null } ?: "Series $seriesId"
+                            val title =
+                                series?.name?.ifBlank { null }
+                                    ?: context.getString(net.dom53.inkita.R.string.series_detail_series_fallback, seriesId)
                                 val shareIntent =
                                     Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
@@ -255,12 +265,16 @@ fun SeriesDetailScreenV2(
                                         ?.firstOrNull { it.id == volId }
                                         ?.let { volumeNumberText(it) }
                                 if (volumeNumber != null) {
-                                    "Pokračovat Vol. $volumeNumber Ch. $page"
+                                    stringResource(
+                                        id = net.dom53.inkita.R.string.series_detail_continue_vol_ch,
+                                        volumeNumber,
+                                        page,
+                                    )
                                 } else {
-                                    "Pokračovat Ch. $page"
+                                    stringResource(id = net.dom53.inkita.R.string.series_detail_continue_ch, page)
                                 }
                             } else {
-                                "Začíst číst"
+                                stringResource(id = net.dom53.inkita.R.string.series_detail_start_reading)
                             }
                         Button(
                             onClick = {
@@ -269,7 +283,11 @@ fun SeriesDetailScreenV2(
                                 val sid = detail?.series?.id ?: seriesId
                                 val fmt = detail?.series?.format
                                 if (chapterId == null || volumeId == null) {
-                                    Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
                                     return@Button
                                 }
                                 val page =
@@ -443,13 +461,15 @@ private fun RelatedCollectionsSection(
                                     .aspectRatio(2f / 3f),
                         )
                         Text(
-                            text = item.name?.ifBlank { null } ?: "Series ${item.id}",
+                    text =
+                        item.name?.ifBlank { null }
+                            ?: stringResource(id = net.dom53.inkita.R.string.series_detail_series_fallback, item.id),
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            text = group.title,
+                            text = stringResource(id = group.titleRes),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -488,7 +508,12 @@ private fun RelatedCollectionsSection(
                                 .aspectRatio(2f / 3f),
                     )
                     Text(
-                        text = collection.title?.ifBlank { null } ?: "Collection ${collection.id}",
+                        text =
+                            collection.title?.ifBlank { null }
+                                ?: stringResource(
+                                    id = net.dom53.inkita.R.string.series_detail_collection_fallback,
+                                    collection.id,
+                                ),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -584,7 +609,7 @@ private fun VolumeGridRow(
             val coverUrl = volumeCoverUrl(config, volume.id) ?: seriesCoverUrl
             val title =
                 volume.name?.takeIf { it.isNotBlank() }
-                    ?: "Volume ${index + 1}"
+                    ?: stringResource(id = net.dom53.inkita.R.string.series_detail_volume_fallback, index + 1)
             Column(
                 modifier =
                     Modifier
@@ -652,7 +677,11 @@ private fun VolumeGridRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "Vol. ${index + 1}",
+                    text =
+                        stringResource(
+                            id = net.dom53.inkita.R.string.series_detail_vol_short,
+                            (index + 1).toString(),
+                        ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -676,7 +705,9 @@ private fun HeaderInfo(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        val seriesTitle = series?.name?.ifBlank { null } ?: "Series $seriesId"
+        val seriesTitle =
+            series?.name?.ifBlank { null }
+                ?: context.getString(net.dom53.inkita.R.string.series_detail_series_fallback, seriesId)
         Text(
             text = seriesTitle,
             style = MaterialTheme.typography.titleLarge,
@@ -695,36 +726,43 @@ private fun HeaderInfo(
                 ?.joinToString(", ")
                 ?.ifBlank { null }
         Text(
-            text = "Author: ${writerNames ?: "-"}",
+            text =
+                stringResource(
+                    id = net.dom53.inkita.R.string.series_detail_author_label,
+                    writerNames ?: "-",
+                ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text =
-                "Publication: " +
-                    (
-                        metadata?.publicationStatus?.let { status ->
-                            PublicationState.entries.firstOrNull { it.code == status }?.let { state ->
-                                context.getString(state.titleRes)
-                            }
-                        } ?: "-"
-                    ),
+                stringResource(
+                    id = net.dom53.inkita.R.string.series_detail_publication_label,
+                    metadata?.publicationStatus?.let { status ->
+                        PublicationState.entries.firstOrNull { it.code == status }?.let { state ->
+                            context.getString(state.titleRes)
+                        }
+                    } ?: "-",
+                ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text =
-                "Release year: " +
-                    (metadata?.releaseYear?.toString() ?: "-"),
+                stringResource(
+                    id = net.dom53.inkita.R.string.series_detail_release_year_label,
+                    metadata?.releaseYear?.toString() ?: "-",
+                ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text =
-                "Avg time: " +
-                    (formatHours(series?.avgHoursToRead) ?: "-") +
-                    " / " +
-                    (formatHours(detail?.timeLeft?.avgHours) ?: "-"),
+                stringResource(
+                    id = net.dom53.inkita.R.string.series_detail_avg_time_label,
+                    formatHours(detail?.timeLeft?.avgHours) ?: "-",
+                    formatHours(series?.avgHoursToRead) ?: "-",
+                ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -737,27 +775,35 @@ private fun HeaderInfo(
         )
         Text(
             text =
-                "Status: " +
-                    (
-                        readStateLabel(
-                            context,
-                            unreadCount = detail?.detail?.unreadCount,
-                            totalCount = detail?.detail?.totalCount,
-                            hasProgress = detail?.hasProgress,
-                        ) ?: "-"
-                    ),
+                stringResource(
+                    id = net.dom53.inkita.R.string.series_detail_status_label,
+                    readStateLabel(
+                        context,
+                        unreadCount = detail?.detail?.unreadCount,
+                        totalCount = detail?.detail?.totalCount,
+                        hasProgress = detail?.hasProgress,
+                    ) ?: "-",
+                ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         val lastRead = series?.latestReadDate?.takeIf { it.isNotBlank() }
         val lastUpdated = series?.lastChapterAdded?.takeIf { it.isNotBlank() }
         Text(
-            text = "Last read: ${lastRead?.let { formatDate(it) } ?: "-"}",
+            text =
+                stringResource(
+                    id = net.dom53.inkita.R.string.series_detail_last_read_label,
+                    lastRead?.let { formatDate(it) } ?: "-",
+                ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = "Last update: ${lastUpdated?.let { formatDate(it) } ?: "-"}",
+            text =
+                stringResource(
+                    id = net.dom53.inkita.R.string.series_detail_last_update_label,
+                    lastUpdated?.let { formatDate(it) } ?: "-",
+                ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -769,7 +815,7 @@ private fun relatedSeriesCount(related: net.dom53.inkita.data.api.dto.RelatedSer
 }
 
 private data class RelatedGroupUi(
-    val title: String,
+    val titleRes: Int,
     val items: List<net.dom53.inkita.data.api.dto.SeriesDto>,
 )
 
@@ -779,20 +825,20 @@ private fun relatedSeriesGroups(
     if (related == null) return emptyList()
     val groups =
         listOf(
-            RelatedGroupUi("Sequels", related.sequels.orEmpty()),
-            RelatedGroupUi("Prequels", related.prequels.orEmpty()),
-            RelatedGroupUi("Spin-offs", related.spinOffs.orEmpty()),
-            RelatedGroupUi("Adaptations", related.adaptations.orEmpty()),
-            RelatedGroupUi("Side stories", related.sideStories.orEmpty()),
-            RelatedGroupUi("Characters", related.characters.orEmpty()),
-            RelatedGroupUi("Contains", related.contains.orEmpty()),
-            RelatedGroupUi("Others", related.others.orEmpty()),
-            RelatedGroupUi("Alternative settings", related.alternativeSettings.orEmpty()),
-            RelatedGroupUi("Alternative versions", related.alternativeVersions.orEmpty()),
-            RelatedGroupUi("Doujinshis", related.doujinshis.orEmpty()),
-            RelatedGroupUi("Parent", related.parent.orEmpty()),
-            RelatedGroupUi("Editions", related.editions.orEmpty()),
-            RelatedGroupUi("Annuals", related.annuals.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_sequels, related.sequels.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_prequels, related.prequels.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_spin_offs, related.spinOffs.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_adaptations, related.adaptations.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_side_stories, related.sideStories.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_characters, related.characters.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_contains, related.contains.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_others, related.others.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_alternative_settings, related.alternativeSettings.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_alternative_versions, related.alternativeVersions.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_doujinshis, related.doujinshis.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_parent, related.parent.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_editions, related.editions.orEmpty()),
+            RelatedGroupUi(net.dom53.inkita.R.string.series_detail_related_annuals, related.annuals.orEmpty()),
         )
     return groups.filter { it.items.isNotEmpty() }
 }

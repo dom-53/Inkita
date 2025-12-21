@@ -68,7 +68,7 @@ fun VolumeDetailScreenV2(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = "Volume not found",
+                text = stringResource(id = net.dom53.inkita.R.string.volume_detail_not_found),
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -149,15 +149,20 @@ fun VolumeDetailScreenV2(
                     ) {
                         val title =
                             volume.name?.takeIf { it.isNotBlank() }
-                                ?: "Volume $volumeId"
+                                ?: stringResource(
+                                    id = net.dom53.inkita.R.string.series_detail_volume_fallback,
+                                    volumeId,
+                                )
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Text(
                             text =
-                                "Time: " +
-                                    (formatHoursRangeInt(volume.minHoursToRead, volume.maxHoursToRead) ?: "-"),
+                                stringResource(
+                                    id = net.dom53.inkita.R.string.volume_detail_time_label,
+                                    formatHoursRangeInt(volume.minHoursToRead, volume.maxHoursToRead) ?: "-",
+                                ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -169,7 +174,11 @@ fun VolumeDetailScreenV2(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = "Release year: ${releaseYear ?: "-"}",
+                            text =
+                                stringResource(
+                                    id = net.dom53.inkita.R.string.volume_detail_release_year_label,
+                                    releaseYear ?: "-",
+                                ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -183,20 +192,38 @@ fun VolumeDetailScreenV2(
                     expanded = summaryExpanded,
                     onToggle = { summaryExpanded = !summaryExpanded },
                 )
-                val volText = volumeNumberText(volume)?.let { "Vol. $it" } ?: "Vol."
+                val volText =
+                    volumeNumberText(volume)?.let {
+                        stringResource(id = net.dom53.inkita.R.string.series_detail_vol_short, it)
+                    }
+                        ?: stringResource(id = net.dom53.inkita.R.string.series_detail_vol_short_plain)
                 val pagesRead = volume.pagesRead ?: 0
                 val pagesTotal = volume.pages
                 val buttonLabel =
                     when {
-                        pagesTotal != null && pagesRead >= pagesTotal -> "Re-read"
-                        pagesRead <= 0 -> "Začít číst $volText"
-                        else -> "Pokračovat $volText Ch. ${pagesRead + 1}"
+                        pagesTotal != null && pagesRead >= pagesTotal ->
+                            stringResource(id = net.dom53.inkita.R.string.volume_detail_re_read)
+                        pagesRead <= 0 ->
+                            stringResource(
+                                id = net.dom53.inkita.R.string.volume_detail_start_reading,
+                                volText,
+                            )
+                        else ->
+                            stringResource(
+                                id = net.dom53.inkita.R.string.volume_detail_continue_label,
+                                volText,
+                                pagesRead + 1,
+                            )
                     }
                 Button(
                     onClick = {
                         val chapters = chapterList
                         if (chapters.isEmpty()) {
-                            Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                Toast.LENGTH_SHORT,
+                            ).show()
                             return@Button
                         }
                         val pagesReadSafe = pagesRead.coerceAtLeast(0)
@@ -223,7 +250,11 @@ fun VolumeDetailScreenV2(
                         val chapter = target?.first
                         val page = target?.second
                         if (chapter == null || page == null) {
-                            Toast.makeText(context, "Not implemented yet", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                Toast.LENGTH_SHORT,
+                            ).show()
                             return@Button
                         }
                         onOpenReader(
