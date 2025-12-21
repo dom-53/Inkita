@@ -277,6 +277,11 @@
     <string name="settings_item_security">Security</string>
     <string name="settings_item_kavita">Kavita</string>
     <string name="settings_item_advanced">Advanced</string>
+    <string name="settings_advanced_section_global_cache">Global cache</string>
+    <string name="settings_advanced_section_library_cache">Library cache</string>
+    <string name="settings_advanced_section_browse_cache">Browse cache</string>
+    <string name="settings_advanced_section_prefetch">Prefetch</string>
+    <string name="settings_advanced_section_cache_maintenance">Cache maintenance</string>
     <string name="settings_item_stats">My Statistics</string>
     <string name="settings_item_about">About</string>
     <!-- Kavita  -->

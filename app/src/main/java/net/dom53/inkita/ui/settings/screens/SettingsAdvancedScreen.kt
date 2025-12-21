@@ -185,6 +185,10 @@ fun SettingsAdvancedScreen(
             style = MaterialTheme.typography.headlineSmall,
         )
 
+        Text(
+            text = stringResource(R.string.settings_advanced_section_global_cache),
+            style = MaterialTheme.typography.titleMedium,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -267,6 +271,10 @@ fun SettingsAdvancedScreen(
 
         Divider()
 
+        Text(
+            text = stringResource(R.string.settings_advanced_section_library_cache),
+            style = MaterialTheme.typography.titleMedium,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -292,6 +300,12 @@ fun SettingsAdvancedScreen(
             )
         }
 
+        Divider()
+
+        Text(
+            text = stringResource(R.string.settings_advanced_section_browse_cache),
+            style = MaterialTheme.typography.titleMedium,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -410,6 +424,10 @@ fun SettingsAdvancedScreen(
 
         Divider()
 
+        Text(
+            text = stringResource(R.string.settings_advanced_section_prefetch),
+            style = MaterialTheme.typography.titleMedium,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -651,6 +669,10 @@ fun SettingsAdvancedScreen(
 
         Divider()
 
+        Text(
+            text = stringResource(R.string.settings_advanced_section_cache_maintenance),
+            style = MaterialTheme.typography.titleMedium,
+        )
         Text(
             text =
                 stringResource(
