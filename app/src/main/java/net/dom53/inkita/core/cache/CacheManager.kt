@@ -53,6 +53,15 @@ interface CacheManager {
         listKey: String,
     ): Long?
 
+    suspend fun getLibraryV2CollectionsUpdatedAt(listType: String): Long?
+
+    suspend fun getLibraryV2ReadingListsUpdatedAt(listType: String): Long?
+
+    suspend fun getLibraryV2PeopleUpdatedAt(
+        listType: String,
+        page: Int,
+    ): Long?
+
     suspend fun cacheLibraryV2Collections(
         listType: String,
         collections: List<Collection>,

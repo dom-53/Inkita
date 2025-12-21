@@ -399,9 +399,8 @@ class LibraryV2ViewModel(
             val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
             val cached = cacheManager.getCachedLibraryV2Collections(LibraryV2CacheKeys.COLLECTIONS)
             val cachedUpdatedAt =
-                cacheManager.getLibraryV2SeriesListUpdatedAt(
+                cacheManager.getLibraryV2CollectionsUpdatedAt(
                     LibraryV2CacheKeys.COLLECTIONS,
-                    "",
                 )
             val isStale =
                 cachedUpdatedAt == null ||
@@ -433,6 +432,24 @@ class LibraryV2ViewModel(
         if (current.isReadingListsLoading || current.readingLists.isNotEmpty()) return
         viewModelScope.launch {
             _state.update { it.copy(isReadingListsLoading = true, readingListsError = null) }
+            val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
+            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
+            val cached = cacheManager.getCachedLibraryV2ReadingLists(LibraryV2CacheKeys.READING_LISTS)
+            val cachedUpdatedAt =
+                cacheManager.getLibraryV2ReadingListsUpdatedAt(
+                    LibraryV2CacheKeys.READING_LISTS,
+                )
+            val isStale =
+                cachedUpdatedAt == null ||
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+            if (cached.isNotEmpty()) {
+                _state.update { it.copy(readingLists = cached, isReadingListsLoading = true, readingListsError = null) }
+                if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    _state.update { it.copy(isReadingListsLoading = false) }
+                    return@launch
+                }
+            }
             val result = runCatching { readingListRepository.getReadingLists(includePromoted = true, sortByLastModified = false) }
             _state.update {
                 it.copy(
@@ -441,6 +458,10 @@ class LibraryV2ViewModel(
                     readingListsError = result.exceptionOrNull()?.message,
                 )
             }
+            cacheManager.cacheLibraryV2ReadingLists(
+                LibraryV2CacheKeys.READING_LISTS,
+                result.getOrDefault(emptyList()),
+            )
         }
     }
 
@@ -449,6 +470,33 @@ class LibraryV2ViewModel(
         if (current.isPeopleLoading || current.people.isNotEmpty()) return
         viewModelScope.launch {
             _state.update { it.copy(isPeopleLoading = true, peopleError = null) }
+            val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
+            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
+            val cached = cacheManager.getCachedLibraryV2People(LibraryV2CacheKeys.BROWSE_PEOPLE, 1)
+            val cachedUpdatedAt =
+                cacheManager.getLibraryV2PeopleUpdatedAt(
+                    LibraryV2CacheKeys.BROWSE_PEOPLE,
+                    1,
+                )
+            val isStale =
+                cachedUpdatedAt == null ||
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+            if (cached.isNotEmpty()) {
+                _state.update {
+                    it.copy(
+                        people = cached,
+                        isPeopleLoading = true,
+                        peopleError = null,
+                        peoplePage = 1,
+                        canLoadMorePeople = cached.size == 50,
+                    )
+                }
+                if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    _state.update { it.copy(isPeopleLoading = false) }
+                    return@launch
+                }
+            }
             val result = runCatching { personRepository.getBrowsePeople(pageNumber = 1, pageSize = 50) }
             val pageItems = result.getOrDefault(emptyList())
             _state.update {
@@ -460,6 +508,11 @@ class LibraryV2ViewModel(
                     canLoadMorePeople = pageItems.size == 50,
                 )
             }
+            cacheManager.cacheLibraryV2People(
+                LibraryV2CacheKeys.BROWSE_PEOPLE,
+                1,
+                pageItems,
+            )
         }
     }
 

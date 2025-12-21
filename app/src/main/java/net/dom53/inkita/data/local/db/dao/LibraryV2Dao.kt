@@ -73,6 +73,9 @@ interface LibraryV2Dao {
     )
     suspend fun getCollectionsForList(listType: String): List<CachedCollectionV2Entity>
 
+    @Query("SELECT MAX(updatedAt) FROM cached_collection_refs_v2 WHERE listType = :listType")
+    suspend fun getCollectionsUpdatedAt(listType: String): Long?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertReadingLists(items: List<CachedReadingListV2Entity>)
 
@@ -98,6 +101,9 @@ interface LibraryV2Dao {
     )
     suspend fun getReadingListsForList(listType: String): List<CachedReadingListV2Entity>
 
+    @Query("SELECT MAX(updatedAt) FROM cached_reading_list_refs_v2 WHERE listType = :listType")
+    suspend fun getReadingListsUpdatedAt(listType: String): Long?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertPeople(items: List<CachedPersonV2Entity>)
 
@@ -122,4 +128,12 @@ interface LibraryV2Dao {
         """,
     )
     suspend fun getPeopleForList(listType: String, page: Int): List<CachedPersonV2Entity>
+
+    @Query(
+        """
+        SELECT MAX(updatedAt) FROM cached_person_refs_v2
+        WHERE listType = :listType AND page = :page
+        """,
+    )
+    suspend fun getPeopleUpdatedAt(listType: String, page: Int): Long?
 }

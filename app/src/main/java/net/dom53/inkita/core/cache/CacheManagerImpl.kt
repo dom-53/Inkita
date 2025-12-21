@@ -12,6 +12,10 @@ import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
 import net.dom53.inkita.data.local.db.dao.SeriesDetailV2Dao
 import net.dom53.inkita.data.local.db.entity.CachedCollectionRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedCollectionV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedPersonV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
+import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
 import net.dom53.inkita.domain.model.Series
@@ -168,6 +172,24 @@ class CacheManagerImpl(
         return dao.getSeriesListUpdatedAt(listType, listKey)
     }
 
+    override suspend fun getLibraryV2CollectionsUpdatedAt(listType: String): Long? {
+        val dao = libraryV2Dao ?: return null
+        return dao.getCollectionsUpdatedAt(listType)
+    }
+
+    override suspend fun getLibraryV2ReadingListsUpdatedAt(listType: String): Long? {
+        val dao = libraryV2Dao ?: return null
+        return dao.getReadingListsUpdatedAt(listType)
+    }
+
+    override suspend fun getLibraryV2PeopleUpdatedAt(
+        listType: String,
+        page: Int,
+    ): Long? {
+        val dao = libraryV2Dao ?: return null
+        return dao.getPeopleUpdatedAt(listType, page)
+    }
+
     override suspend fun cacheLibraryV2Collections(
         listType: String,
         collections: List<Collection>,
@@ -202,11 +224,30 @@ class CacheManagerImpl(
         listType: String,
         readingLists: List<ReadingList>,
     ) {
-        // Skeleton only; no-op.
+        val dao = libraryV2Dao ?: return
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return
+        val now = System.currentTimeMillis()
+        val unique = readingLists.distinctBy { it.id }
+        dao.upsertReadingLists(unique.map { CachedReadingListV2Entity(it.id, it.title, it.itemCount, now) })
+        dao.clearReadingListRefs(listType)
+        val refs =
+            unique.mapIndexed { index, item ->
+                CachedReadingListRefEntity(
+                    listType = listType,
+                    readingListId = item.id,
+                    position = index,
+                    updatedAt = now,
+                )
+            }
+        dao.upsertReadingListRefs(refs)
     }
 
     override suspend fun getCachedLibraryV2ReadingLists(listType: String): List<ReadingList> {
-        return emptyList()
+        val dao = libraryV2Dao ?: return emptyList()
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return emptyList()
+        return dao.getReadingListsForList(listType).map { ReadingList(it.id, it.title, it.itemCount) }
     }
 
     override suspend fun cacheLibraryV2People(
@@ -214,14 +255,38 @@ class CacheManagerImpl(
         page: Int,
         people: List<Person>,
     ) {
-        // Skeleton only; no-op.
+        val dao = libraryV2Dao ?: return
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return
+        val now = System.currentTimeMillis()
+        val unique =
+            people.mapNotNull { person ->
+                val id = person.id ?: return@mapNotNull null
+                id to person
+            }.distinctBy { it.first }
+        dao.upsertPeople(unique.map { CachedPersonV2Entity(it.first, it.second.name, now) })
+        dao.clearPersonRefs(listType, page)
+        val refs =
+            unique.mapIndexed { index, item ->
+                CachedPersonRefEntity(
+                    listType = listType,
+                    page = page,
+                    personId = item.first,
+                    position = index,
+                    updatedAt = now,
+                )
+            }
+        dao.upsertPersonRefs(refs)
     }
 
     override suspend fun getCachedLibraryV2People(
         listType: String,
         page: Int,
     ): List<Person> {
-        return emptyList()
+        val dao = libraryV2Dao ?: return emptyList()
+        val p = policy()
+        if (!isLibraryV2CacheAllowed(p, listType)) return emptyList()
+        return dao.getPeopleForList(listType, page).map { Person(it.id, it.name) }
     }
 
     override suspend fun clearAllCache() {
@@ -331,6 +396,8 @@ class CacheManagerImpl(
             LibraryV2CacheKeys.COLLECTIONS,
             LibraryV2CacheKeys.COLLECTION_SERIES,
             -> policy.libraryCollectionsEnabled
+            LibraryV2CacheKeys.READING_LISTS -> policy.libraryReadingListsEnabled
+            LibraryV2CacheKeys.BROWSE_PEOPLE -> policy.libraryBrowsePeopleEnabled
             else -> false
         }
     }
