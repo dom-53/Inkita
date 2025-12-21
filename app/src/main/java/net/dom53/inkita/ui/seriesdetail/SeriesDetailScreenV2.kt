@@ -128,19 +128,21 @@ fun SeriesDetailScreenV2(
     var showMenu by remember { mutableStateOf(false) }
     var showDownloadVolumeDialog by remember { mutableStateOf(false) }
     var selectedVolume by remember { mutableStateOf<net.dom53.inkita.data.api.dto.VolumeDto?>(null) }
+    val downloadDao =
+        remember(context.applicationContext) {
+            InkitaDatabase.getInstance(context.applicationContext).downloadV2Dao()
+        }
     val downloadManagerV2 =
         remember(context.applicationContext) {
-            val db = InkitaDatabase.getInstance(context.applicationContext)
-            val dao = db.downloadV2Dao()
             val strategy =
                 EpubDownloadStrategyV2(
                     appContext = context.applicationContext,
-                    downloadDao = dao,
+                    downloadDao = downloadDao,
                     appPreferences = appPreferences,
                 )
             DownloadManagerV2(
                 appContext = context.applicationContext,
-                downloadDao = dao,
+                downloadDao = downloadDao,
                 strategies = mapOf(strategy.key to strategy),
             )
         }
@@ -182,12 +184,17 @@ fun SeriesDetailScreenV2(
                             text = { Text(stringResource(net.dom53.inkita.R.string.series_clear_downloads)) },
                             onClick = {
                                 showMenu = false
-                                Toast
-                                    .makeText(
-                                        context,
-                                        context.getString(net.dom53.inkita.R.string.general_not_implemented),
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
+                                val sid = uiState.detail?.series?.id ?: seriesId
+                                scope.launch {
+                                    downloadDao.deleteItemsForSeries(sid)
+                                    downloadDao.deleteJobsForSeries(sid)
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                }
                             },
                         )
                     }

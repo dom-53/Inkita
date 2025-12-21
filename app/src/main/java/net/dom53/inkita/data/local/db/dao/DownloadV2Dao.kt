@@ -41,6 +41,12 @@ interface DownloadV2Dao {
     @Query("DELETE FROM download_items_v2 WHERE id = :itemId")
     suspend fun deleteItemById(itemId: Long)
 
+    @Query("DELETE FROM download_items_v2 WHERE jobId IN (SELECT id FROM download_jobs_v2 WHERE seriesId = :seriesId)")
+    suspend fun deleteItemsForSeries(seriesId: Int)
+
+    @Query("DELETE FROM download_jobs_v2 WHERE seriesId = :seriesId")
+    suspend fun deleteJobsForSeries(seriesId: Int)
+
     @Query("DELETE FROM download_items_v2 WHERE jobId = :jobId")
     suspend fun clearItemsForJob(jobId: Long)
 
