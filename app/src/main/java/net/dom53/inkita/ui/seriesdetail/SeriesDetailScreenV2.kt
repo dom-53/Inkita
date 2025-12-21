@@ -107,6 +107,7 @@ fun SeriesDetailScreenV2(
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
+    val offlineMode by appPreferences.offlineModeFlow.collectAsState(initial = false)
     var summaryExpanded by remember { mutableStateOf(false) }
     var coverExpanded by remember { mutableStateOf(false) }
     var showCollectionDialog by remember { mutableStateOf(false) }
@@ -191,6 +192,8 @@ fun SeriesDetailScreenV2(
                         Spacer(modifier = Modifier.height(8.dp))
                         ActionsRowV2(
                             wantToRead = detail?.wantToRead == true,
+                            collectionsEnabled = !offlineMode,
+                            wantToReadEnabled = !offlineMode,
                             onToggleWant = {
                                 viewModel.toggleWantToRead()
                             },
@@ -543,6 +546,8 @@ private fun webUrl(
 @Composable
 private fun ActionsRowV2(
     wantToRead: Boolean,
+    collectionsEnabled: Boolean,
+    wantToReadEnabled: Boolean,
     onToggleWant: () -> Unit,
     onOpenCollections: () -> Unit,
     onOpenWeb: () -> Unit,
@@ -555,6 +560,7 @@ private fun ActionsRowV2(
     ) {
         FilledTonalButton(
             onClick = onOpenCollections,
+            enabled = collectionsEnabled,
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
             colors =
                 ButtonDefaults.filledTonalButtonColors(
@@ -572,6 +578,7 @@ private fun ActionsRowV2(
         }
         FilledTonalButton(
             onClick = onToggleWant,
+            enabled = wantToReadEnabled,
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
             colors =
                 ButtonDefaults.filledTonalButtonColors(
