@@ -127,7 +127,7 @@ fun SeriesDetailScreenV2(
     var showCollectionDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showDownloadVolumeDialog by remember { mutableStateOf(false) }
-    var downloadVolumeIsDownloaded by remember { mutableStateOf(false) }
+    var downloadVolumeState by remember { mutableStateOf(DownloadVolumeState.None) }
     var selectedVolume by remember { mutableStateOf<net.dom53.inkita.data.api.dto.VolumeDto?>(null) }
     val downloadDao =
         remember(context.applicationContext) {
@@ -444,7 +444,12 @@ fun SeriesDetailScreenV2(
                                     scope.launch {
                                         val total = downloadDao.countItemsForVolume(volume.id)
                                         val completed = downloadDao.countCompletedItemsForVolume(volume.id)
-                                        downloadVolumeIsDownloaded = total > 0 && total == completed
+                                        downloadVolumeState =
+                                            when {
+                                                total > 0 && completed >= total -> DownloadVolumeState.Complete
+                                                completed > 0 -> DownloadVolumeState.Partial
+                                                else -> DownloadVolumeState.None
+                                            }
                                         selectedVolume = volume
                                         showDownloadVolumeDialog = true
                                     }
@@ -525,15 +530,13 @@ fun SeriesDetailScreenV2(
                     selectedVolume = null
                 },
                 title = {
-                    Text(
-                        stringResource(
-                            if (downloadVolumeIsDownloaded) {
-                                net.dom53.inkita.R.string.series_detail_remove_volume_title
-                            } else {
-                                net.dom53.inkita.R.string.series_detail_download_volume_title
-                            },
-                        ),
-                    )
+                    val titleRes =
+                        when (downloadVolumeState) {
+                            DownloadVolumeState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_title
+                            DownloadVolumeState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_title
+                            DownloadVolumeState.None -> net.dom53.inkita.R.string.series_detail_download_volume_title
+                        }
+                    Text(stringResource(titleRes))
                 },
                 text = {
                     val volLabel =
@@ -546,17 +549,13 @@ fun SeriesDetailScreenV2(
                                     context.getString(net.dom53.inkita.R.string.series_detail_vol_short, number)
                                 }
                             ?: context.getString(net.dom53.inkita.R.string.series_detail_vol_short_plain)
-                    Text(
-                        text =
-                            stringResource(
-                                if (downloadVolumeIsDownloaded) {
-                                    net.dom53.inkita.R.string.series_detail_remove_volume_body
-                                } else {
-                                    net.dom53.inkita.R.string.series_detail_download_volume_body
-                                },
-                                volLabel,
-                            ),
-                    )
+                    val bodyRes =
+                        when (downloadVolumeState) {
+                            DownloadVolumeState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_body
+                            DownloadVolumeState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_body
+                            DownloadVolumeState.None -> net.dom53.inkita.R.string.series_detail_download_volume_body
+                        }
+                    Text(text = stringResource(bodyRes, volLabel))
                 },
                 confirmButton = {
                     Button(
@@ -564,7 +563,7 @@ fun SeriesDetailScreenV2(
                             showDownloadVolumeDialog = false
                             selectedVolume = null
                             val volume = volume ?: return@Button
-                            if (downloadVolumeIsDownloaded) {
+                            if (downloadVolumeState == DownloadVolumeState.Complete) {
                                 scope.launch {
                                     downloadDao.deleteItemsForVolume(volume.id)
                                     downloadDao.deleteJobsForVolume(volume.id)
@@ -573,7 +572,7 @@ fun SeriesDetailScreenV2(
                                             context,
                                             context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast),
                                             Toast.LENGTH_SHORT,
-                                        ).show()
+                                    ).show()
                                 }
                                 return@Button
                             }
@@ -634,15 +633,13 @@ fun SeriesDetailScreenV2(
                             }
                         },
                     ) {
-                        Text(
-                            stringResource(
-                                if (downloadVolumeIsDownloaded) {
-                                    net.dom53.inkita.R.string.series_detail_remove_volume_confirm
-                                } else {
-                                    net.dom53.inkita.R.string.series_detail_download_volume_confirm
-                                },
-                            ),
-                        )
+                        val confirmRes =
+                            when (downloadVolumeState) {
+                                DownloadVolumeState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_confirm
+                                DownloadVolumeState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_confirm
+                                DownloadVolumeState.None -> net.dom53.inkita.R.string.series_detail_download_volume_confirm
+                            }
+                        Text(stringResource(confirmRes))
                     }
                 },
                 dismissButton = {
@@ -658,6 +655,12 @@ fun SeriesDetailScreenV2(
             )
         }
     }
+}
+
+private enum class DownloadVolumeState {
+    None,
+    Partial,
+    Complete,
 }
 
 @Composable

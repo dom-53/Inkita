@@ -110,6 +110,9 @@
     <string name="series_detail_download_volume_title">Download volume</string>
     <string name="series_detail_download_volume_body">Download %1$s?</string>
     <string name="series_detail_download_volume_confirm">Download</string>
+    <string name="series_detail_resume_volume_title">Continue download</string>
+    <string name="series_detail_resume_volume_body">Continue downloading %1$s?</string>
+    <string name="series_detail_resume_volume_confirm">Continue</string>
     <string name="series_detail_remove_volume_title">Remove downloads</string>
     <string name="series_detail_remove_volume_body">Remove downloads for %1$s?</string>
     <string name="series_detail_remove_volume_confirm">Remove</string>
