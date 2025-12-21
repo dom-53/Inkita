@@ -177,6 +177,7 @@
     <!-- ibrary Screen-->
     <string name="library_empty_want_to_read">You have no titles marked as \'want to read\'.</string>
     <string name="library_empty_reading_list">No reading lists found.</string>
+    <string name="library_no_access">You do not have access to this library.</string>
     <!-- Reader screen-->
     <string name="reader_title">Reader</string>
     <string name="reader_no_previous_chapter">No previous chapter</string>

@@ -40,4 +40,30 @@ class LibraryRepositoryImpl(
         val dtos = response.body() ?: emptyList()
         return dtos.map { it.toDomain() }
     }
+
+    override suspend fun hasLibraryAccess(libraryId: Int): Boolean {
+        val config = appPreferences.configFlow.first()
+
+        if (!config.isConfigured) {
+            return false
+        }
+
+        if (!NetworkUtils.isOnline(context)) {
+            throw IOException("Offline")
+        }
+
+        val api =
+            KavitaApiFactory.createAuthenticated(
+                baseUrl = config.serverUrl,
+                apiKey = config.apiKey,
+            )
+
+        val response = api.hasLibraryAccess(libraryId)
+
+        if (!response.isSuccessful) {
+            throw Exception("Error checking library access: HTTP ${response.code()} ${response.message()}")
+        }
+
+        return response.body() ?: false
+    }
 }

@@ -148,6 +148,11 @@ interface KavitaApi {
     @GET("api/library/libraries")
     suspend fun getLibrariesFilter(): Response<List<LibraryDto>>
 
+    @GET("api/users/has-library-access")
+    suspend fun hasLibraryAccess(
+        @Query("libraryId") libraryId: Int,
+    ): Response<Boolean>
+
     @POST("api/Series/on-deck")
     suspend fun getOnDeckSeries(
         @Query("libraryId") libraryId: Int = 0,

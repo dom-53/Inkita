@@ -28,6 +28,7 @@ enum class LibraryV2Section {
     Collections,
     ReadingList,
     BrowsePeople,
+    LibrarySeries,
 }
 
 data class LibraryV2UiState(
@@ -59,6 +60,15 @@ data class LibraryV2UiState(
     val peoplePage: Int = 1,
     val canLoadMorePeople: Boolean = true,
     val isPeopleLoadingMore: Boolean = false,
+    val selectedLibraryId: Int? = null,
+    val selectedLibraryName: String? = null,
+    val librarySeries: List<net.dom53.inkita.domain.model.Series> = emptyList(),
+    val isLibrarySeriesLoading: Boolean = false,
+    val isLibrarySeriesLoadingMore: Boolean = false,
+    val librarySeriesError: String? = null,
+    val librarySeriesPage: Int = 1,
+    val canLoadMoreLibrarySeries: Boolean = true,
+    val libraryAccessDenied: Boolean = false,
     val selectedSection: LibraryV2Section = LibraryV2Section.Home,
 )
 
@@ -91,6 +101,50 @@ class LibraryV2ViewModel(
         if (section == LibraryV2Section.BrowsePeople) {
             ensurePeople()
         }
+    }
+
+    fun selectLibrary(library: Library) {
+        _state.update {
+            it.copy(
+                selectedSection = LibraryV2Section.LibrarySeries,
+                selectedLibraryId = library.id,
+                selectedLibraryName = library.name,
+                librarySeries = emptyList(),
+                librarySeriesError = null,
+                librarySeriesPage = 1,
+                canLoadMoreLibrarySeries = true,
+                libraryAccessDenied = false,
+            )
+        }
+        viewModelScope.launch {
+            val accessResult = runCatching { libraryRepository.hasLibraryAccess(library.id) }
+            val hasAccess = accessResult.getOrDefault(false)
+            if (!hasAccess) {
+                _state.update {
+                    it.copy(
+                        libraryAccessDenied = true,
+                        isLibrarySeriesLoading = false,
+                        librarySeriesError = if (accessResult.isFailure) accessResult.exceptionOrNull()?.message else null,
+                    )
+                }
+                return@launch
+            }
+            loadLibrarySeries(pageNumber = 1, reset = true)
+        }
+    }
+
+    fun loadMoreLibrarySeries() {
+        val current = _state.value
+        if (
+            current.isLibrarySeriesLoading ||
+            current.isLibrarySeriesLoadingMore ||
+            !current.canLoadMoreLibrarySeries ||
+            current.selectedLibraryId == null
+        ) {
+            return
+        }
+        val nextPage = current.librarySeriesPage + 1
+        loadLibrarySeries(pageNumber = nextPage, reset = false)
     }
 
     fun selectCollection(collection: Collection?) {
@@ -246,6 +300,39 @@ class LibraryV2ViewModel(
             }
         }
     }
+
+    private fun loadLibrarySeries(
+        pageNumber: Int,
+        reset: Boolean,
+    ) {
+        val libraryId = _state.value.selectedLibraryId ?: return
+        viewModelScope.launch {
+            if (reset) {
+                _state.update { it.copy(isLibrarySeriesLoading = true, librarySeriesError = null) }
+            } else {
+                _state.update { it.copy(isLibrarySeriesLoadingMore = true) }
+            }
+            val result = runCatching { seriesRepository.getSeriesForLibrary(libraryId, pageNumber, 25) }
+            val pageItems = result.getOrDefault(emptyList())
+            _state.update {
+                val merged =
+                    if (reset) {
+                        pageItems
+                    } else {
+                        it.librarySeries + pageItems
+                    }
+                it.copy(
+                    librarySeries = merged,
+                    isLibrarySeriesLoading = false,
+                    isLibrarySeriesLoadingMore = false,
+                    librarySeriesError = result.exceptionOrNull()?.message,
+                    librarySeriesPage = if (pageItems.isNotEmpty()) pageNumber else it.librarySeriesPage,
+                    canLoadMoreLibrarySeries = pageItems.size == 25,
+                )
+            }
+        }
+    }
+
 
     fun loadMorePeople() {
         val current = _state.value

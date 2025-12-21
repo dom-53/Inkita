@@ -475,6 +475,64 @@ class SeriesRepositoryImpl(
         return cacheManager.enrichThumbnails(domain)
     }
 
+    override suspend fun getSeriesForLibrary(
+        libraryId: Int,
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<Series> {
+        val config = appPreferences.configFlow.first()
+
+        if (!config.isConfigured) {
+            return emptyList()
+        }
+
+        if (!NetworkUtils.isOnline(context)) {
+            throw IOException("Offline")
+        }
+
+        val api =
+            KavitaApiFactory.createAuthenticated(
+                baseUrl = config.serverUrl,
+                apiKey = config.apiKey,
+            )
+
+        val filter =
+            FilterV2Dto(
+                id = null,
+                name = null,
+                statements =
+                    listOf(
+                        net.dom53.inkita.data.api.dto.FilterStatementDto(
+                            field = 19,
+                            value = libraryId.toString(),
+                            comparison = 0,
+                        ),
+                    ),
+                combination = 1,
+                sortOptions =
+                    SortOptionDto(
+                        sortField = KavitaSortField.SortName.id,
+                        isAscending = true,
+                    ),
+                limitTo = 0,
+            )
+
+        val response =
+            api.getSeriesV2(
+                filter = filter,
+                pageNumber = pageNumber,
+                pageSize = pageSize,
+            )
+
+        if (!response.isSuccessful) {
+            throw Exception("Error loading library series: HTTP ${response.code()} ${response.message()}")
+        }
+
+        val body = response.body().orEmpty()
+        val domain = body.map { it.toDomain() }
+        return cacheManager.enrichThumbnails(domain)
+    }
+
     override suspend fun getCachedSeries(query: SeriesQuery): List<Series> = cacheManager.getCachedSeries(query)
 
     override suspend fun getCachedSeriesForTab(key: LibraryTabCacheKey): List<Series> = cacheManager.getCachedSeriesForTab(key)

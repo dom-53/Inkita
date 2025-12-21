@@ -227,7 +227,15 @@ fun LibraryV2Screen(
                         Spacer(modifier = Modifier.height(12.dp))
                         uiState.libraries.forEach { library ->
                             val label = library.name.ifBlank { "Library ${library.id}" }
-                            DrawerItem(icon = Icons.Filled.LocalLibrary, label = label)
+                            DrawerItem(
+                                icon = Icons.Filled.LocalLibrary,
+                                label = label,
+                                selected = uiState.selectedLibraryId == library.id,
+                                onClick = {
+                                    viewModel.selectLibrary(library)
+                                    scope.launch { drawerState.close() }
+                                },
+                            )
                         }
                     }
                 }
@@ -356,6 +364,19 @@ fun LibraryV2Screen(
                         error = uiState.peopleError,
                         config = config,
                         onLoadMore = { viewModel.loadMorePeople() },
+                    )
+                }
+                LibraryV2Section.LibrarySeries -> {
+                    LibrarySeriesGrid(
+                        title = uiState.selectedLibraryName ?: "Library",
+                        items = uiState.librarySeries,
+                        isLoading = uiState.isLibrarySeriesLoading,
+                        isLoadingMore = uiState.isLibrarySeriesLoadingMore,
+                        error = uiState.librarySeriesError,
+                        accessDenied = uiState.libraryAccessDenied,
+                        config = config,
+                        onLoadMore = { viewModel.loadMoreLibrarySeries() },
+                        onOpenSeries = onOpenSeries,
                     )
                 }
             }
@@ -933,6 +954,117 @@ private fun PersonCard(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+@Composable
+private fun LibrarySeriesGrid(
+    title: String,
+    items: List<net.dom53.inkita.domain.model.Series>,
+    isLoading: Boolean,
+    isLoadingMore: Boolean,
+    error: String?,
+    accessDenied: Boolean,
+    config: AppConfig,
+    onLoadMore: () -> Unit,
+    onOpenSeries: (Int) -> Unit,
+) {
+    val gridState = rememberLazyGridState()
+    LaunchedEffect(gridState) {
+        snapshotFlow {
+            val info = gridState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val total = info.totalItemsCount
+            lastVisible to total
+        }.collect { (lastVisible, total) ->
+            if (total > 0 && lastVisible >= total - 6) {
+                onLoadMore()
+            }
+        }
+    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            when {
+                accessDenied -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.library_no_access),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+
+                isLoading && items.isEmpty() -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                error != null && items.isEmpty() -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(text = error, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                items.isEmpty() -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.general_empty_collection),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+
+                else -> {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        modifier = Modifier.fillMaxSize(),
+                        state = gridState,
+                        contentPadding = PaddingValues(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        gridItems(items, key = { it.id }) { series ->
+                            WantToReadCard(
+                                series = series,
+                                config = config,
+                                onOpenSeries = onOpenSeries,
+                            )
+                        }
+                        if (isLoadingMore) {
+                            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CircularProgressIndicator()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
