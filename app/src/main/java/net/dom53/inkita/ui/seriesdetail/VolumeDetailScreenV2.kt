@@ -61,6 +61,7 @@ fun VolumeDetailScreenV2(
     )
     var coverExpanded by remember { mutableStateOf(false) }
     var summaryExpanded by remember { mutableStateOf(false) }
+    val offlineMode by appPreferences.offlineModeFlow.collectAsState(initial = false)
 
     if (payload == null) {
         Box(
@@ -78,6 +79,10 @@ fun VolumeDetailScreenV2(
     var volumeState by remember(volumeId) { mutableStateOf(payload.volume) }
     LaunchedEffect(readerReturn) {
         if (readerReturn != null) {
+            if (offlineMode) {
+                onConsumeReaderReturn()
+                return@LaunchedEffect
+            }
             val cfg = appPreferences.configFlow.first()
             if (cfg.isConfigured) {
                 val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
@@ -268,6 +273,7 @@ fun VolumeDetailScreenV2(
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = !offlineMode,
                 ) {
                     Text(text = buttonLabel)
                 }
