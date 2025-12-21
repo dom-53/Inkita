@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.ui.browse.utils.PublicationState
 import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
@@ -69,6 +70,7 @@ fun SeriesDetailScreenV2(
     seriesId: Int,
     appPreferences: AppPreferences,
     collectionsRepository: net.dom53.inkita.domain.repository.CollectionsRepository,
+    cacheManager: CacheManager,
     onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
     onOpenVolume: (Int) -> Unit,
     onOpenSeries: (Int) -> Unit,
@@ -80,7 +82,7 @@ fun SeriesDetailScreenV2(
 ) {
     val viewModel: SeriesDetailViewModelV2 =
         viewModel(
-            factory = SeriesDetailViewModelV2.provideFactory(seriesId, appPreferences, collectionsRepository),
+            factory = SeriesDetailViewModelV2.provideFactory(seriesId, appPreferences, collectionsRepository, cacheManager),
         )
     val uiState by viewModel.state.collectAsState()
     val context = LocalContext.current

@@ -51,7 +51,7 @@ import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
         DownloadedPageEntity::class,
         net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = false,
 )
 abstract class InkitaDatabase : RoomDatabase() {
@@ -462,6 +462,24 @@ abstract class InkitaDatabase : RoomDatabase() {
                     )
                 }
             }
+        private val MIGRATION_15_16 =
+            object : Migration(15, 16) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN seriesJson TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN metadataJson TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN detailJson TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN relatedJson TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN ratingJson TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN continuePointJson TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN readerProgressJson TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN timeLeftJson TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN collectionsJson TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN readingListsJson TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN bookmarksJson TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN annotationsJson TEXT")
+                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN seriesDetailPlusJson TEXT")
+                }
+            }
 
         fun getInstance(context: Context): InkitaDatabase =
             INSTANCE ?: synchronized(this) {
@@ -485,6 +503,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         MIGRATION_12_13,
                         MIGRATION_13_14,
                         MIGRATION_14_15,
+                        MIGRATION_15_16,
                     ).build()
                     .also { INSTANCE = it }
             }

@@ -7,6 +7,7 @@ import net.dom53.inkita.domain.model.Person
 import net.dom53.inkita.domain.model.ReadingList
 import net.dom53.inkita.domain.model.filter.SeriesQuery
 import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
+import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 
 interface CacheManager {
     suspend fun policy(): CachePolicy
@@ -86,6 +87,15 @@ interface CacheManager {
         listType: String,
         page: Int,
     ): List<Person>
+
+    suspend fun cacheSeriesDetailV2(
+        seriesId: Int,
+        detail: InkitaDetailV2,
+    )
+
+    suspend fun getCachedSeriesDetailV2(seriesId: Int): InkitaDetailV2?
+
+    suspend fun getSeriesDetailV2UpdatedAt(seriesId: Int): Long?
 
     suspend fun clearAllCache()
 

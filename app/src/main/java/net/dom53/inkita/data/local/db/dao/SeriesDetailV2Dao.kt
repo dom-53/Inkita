@@ -31,6 +31,12 @@ interface SeriesDetailV2Dao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertVolumeChapterRefs(refs: List<CachedVolumeChapterRefEntity>)
 
+    @Query("SELECT * FROM cached_series_detail_v2 WHERE seriesId = :seriesId")
+    suspend fun getSeriesDetail(seriesId: Int): CachedSeriesDetailV2Entity?
+
+    @Query("SELECT updatedAt FROM cached_series_detail_v2 WHERE seriesId = :seriesId")
+    suspend fun getSeriesDetailUpdatedAt(seriesId: Int): Long?
+
     @Query("DELETE FROM cached_series_detail_v2")
     suspend fun clearSeriesDetails()
 

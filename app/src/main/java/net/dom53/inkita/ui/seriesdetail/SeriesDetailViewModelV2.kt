@@ -1,5 +1,6 @@
 package net.dom53.inkita.ui.seriesdetail
 
+import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -9,6 +10,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import net.dom53.inkita.core.cache.CacheManager
+import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.api.dto.AnnotationDto
@@ -59,6 +62,7 @@ class SeriesDetailViewModelV2(
     val seriesId: Int,
     private val appPreferences: AppPreferences,
     private val collectionsRepository: net.dom53.inkita.domain.repository.CollectionsRepository,
+    private val cacheManager: CacheManager,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SeriesDetailUiStateV2())
     val state: StateFlow<SeriesDetailUiStateV2> = _state
@@ -234,10 +238,15 @@ class SeriesDetailViewModelV2(
                 _state.update { it.copy(error = "Failed to update want-to-read") }
                 return@launch
             }
+            val updatedDetail = current.copy(wantToRead = !want)
             _state.update { state ->
                 state.copy(
-                    detail = state.detail?.copy(wantToRead = !want),
+                    detail = updatedDetail,
                 )
+            }
+            val policy = cacheManager.policy()
+            if (policy.globalEnabled && policy.libraryEnabled) {
+                cacheManager.cacheSeriesDetailV2(seriesId, updatedDetail)
             }
         }
     }
@@ -245,9 +254,57 @@ class SeriesDetailViewModelV2(
     private fun load() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
-            if (appPreferences.offlineModeFlow.first()) {
-                _state.update { it.copy(isLoading = false, error = "Offline mode") }
-                return@launch
+            val offlineMode = appPreferences.offlineModeFlow.first()
+            val isOnline = !offlineMode && NetworkUtils.isOnline(appPreferences.appContext)
+            val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
+            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val policy = cacheManager.policy()
+            val canCache = policy.globalEnabled && policy.libraryEnabled
+            val cachedDetail =
+                if (canCache) cacheManager.getCachedSeriesDetailV2(seriesId) else null
+            val cachedUpdatedAt =
+                if (canCache) cacheManager.getSeriesDetailV2UpdatedAt(seriesId) else null
+            val isStale =
+                cachedUpdatedAt == null ||
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+            if (cachedDetail != null) {
+                val membership =
+                    cachedDetail.collections
+                        ?.map { it.id }
+                        ?.toSet()
+                        .orEmpty()
+                _state.update {
+                    it.copy(
+                        detail = cachedDetail,
+                        collectionsWithSeries = membership,
+                        isLoading = true,
+                        error = null,
+                    )
+                }
+                if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    showDebugToast(net.dom53.inkita.R.string.debug_cache_use)
+                    _state.update { it.copy(isLoading = false) }
+                    return@launch
+                }
+                val message =
+                    if (alwaysRefresh) {
+                        net.dom53.inkita.R.string.debug_cache_force_online
+                    } else {
+                        net.dom53.inkita.R.string.debug_cache_stale_reload
+                    }
+                showDebugToast(message)
+            } else {
+                val message =
+                    if (isOnline) {
+                        net.dom53.inkita.R.string.debug_cache_use_fresh
+                    } else {
+                        net.dom53.inkita.R.string.debug_cache_no_cache
+                    }
+                showDebugToast(message)
+                if (!isOnline) {
+                    _state.update { it.copy(isLoading = false, error = "Offline mode") }
+                    return@launch
+                }
             }
             val config = appPreferences.configFlow.first()
             latestConfig = config
@@ -340,6 +397,9 @@ class SeriesDetailViewModelV2(
                     collectionsWithSeries = membership,
                 )
             }
+            if (canCache) {
+                cacheManager.cacheSeriesDetailV2(seriesId, detail)
+            }
         }
     }
 
@@ -370,12 +430,22 @@ class SeriesDetailViewModelV2(
             seriesId: Int,
             appPreferences: AppPreferences,
             collectionsRepository: net.dom53.inkita.domain.repository.CollectionsRepository,
+            cacheManager: CacheManager,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     @Suppress("UNCHECKED_CAST")
-                    return SeriesDetailViewModelV2(seriesId, appPreferences, collectionsRepository) as T
+                    return SeriesDetailViewModelV2(seriesId, appPreferences, collectionsRepository, cacheManager) as T
                 }
             }
+    }
+
+    private suspend fun showDebugToast(messageRes: Int) {
+        if (!appPreferences.debugToastsFlow.first()) return
+        Toast.makeText(
+            appPreferences.appContext,
+            appPreferences.appContext.getString(messageRes),
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 }

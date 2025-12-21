@@ -2,6 +2,9 @@ package net.dom53.inkita.core.cache
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -18,6 +21,19 @@ import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
+import net.dom53.inkita.data.api.dto.AnnotationDto
+import net.dom53.inkita.data.api.dto.AppUserCollectionDto
+import net.dom53.inkita.data.api.dto.BookmarkDto
+import net.dom53.inkita.data.api.dto.ChapterDto
+import net.dom53.inkita.data.api.dto.HourEstimateRangeDto
+import net.dom53.inkita.data.api.dto.RatingDto
+import net.dom53.inkita.data.api.dto.ReaderProgressDto
+import net.dom53.inkita.data.api.dto.ReadingListDto
+import net.dom53.inkita.data.api.dto.RelatedSeriesDto
+import net.dom53.inkita.data.api.dto.SeriesDetailDto
+import net.dom53.inkita.data.api.dto.SeriesDetailPlusDto
+import net.dom53.inkita.data.api.dto.SeriesDto
+import net.dom53.inkita.data.api.dto.SeriesMetadataDto
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.domain.model.SeriesDetail
 import net.dom53.inkita.domain.model.Collection
@@ -28,6 +44,7 @@ import net.dom53.inkita.domain.model.ReadState
 import net.dom53.inkita.domain.model.filter.SeriesQuery
 import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
 import net.dom53.inkita.core.cache.LibraryV2CacheKeys
+import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -51,6 +68,44 @@ class CacheManagerImpl(
         const val MAX_DIM = 512
         const val THUMBNAIL_QUALITY = 85
     }
+
+    private val moshi: Moshi by lazy {
+        Moshi
+            .Builder()
+            .addLast(KotlinJsonAdapterFactory())
+            .build()
+    }
+
+    private val seriesAdapter = moshi.adapter(SeriesDto::class.java)
+    private val metadataAdapter = moshi.adapter(SeriesMetadataDto::class.java)
+    private val detailAdapter = moshi.adapter(SeriesDetailDto::class.java)
+    private val relatedAdapter = moshi.adapter(RelatedSeriesDto::class.java)
+    private val ratingAdapter = moshi.adapter(RatingDto::class.java)
+    private val chapterAdapter = moshi.adapter(ChapterDto::class.java)
+    private val readerProgressAdapter = moshi.adapter(ReaderProgressDto::class.java)
+    private val timeLeftAdapter = moshi.adapter(HourEstimateRangeDto::class.java)
+    private val seriesDetailPlusAdapter = moshi.adapter(SeriesDetailPlusDto::class.java)
+
+    private val readingListAdapter =
+        moshi.adapter<List<ReadingListDto>>(
+            Types.newParameterizedType(List::class.java, ReadingListDto::class.java),
+        )
+    private val stringListAdapter =
+        moshi.adapter<List<String>>(
+            Types.newParameterizedType(List::class.java, String::class.java),
+        )
+    private val collectionsAdapter =
+        moshi.adapter<List<AppUserCollectionDto>>(
+            Types.newParameterizedType(List::class.java, AppUserCollectionDto::class.java),
+        )
+    private val bookmarkAdapter =
+        moshi.adapter<List<BookmarkDto>>(
+            Types.newParameterizedType(List::class.java, BookmarkDto::class.java),
+        )
+    private val annotationAdapter =
+        moshi.adapter<List<AnnotationDto>>(
+            Types.newParameterizedType(List::class.java, AnnotationDto::class.java),
+        )
 
     override suspend fun policy(): CachePolicy {
         val global = appPreferences.cacheEnabledFlow.first()
@@ -289,6 +344,107 @@ class CacheManagerImpl(
         return dao.getPeopleForList(listType, page).map { Person(it.id, it.name) }
     }
 
+    override suspend fun cacheSeriesDetailV2(
+        seriesId: Int,
+        detail: InkitaDetailV2,
+    ) {
+        val dao = seriesDetailV2Dao ?: return
+        val p = policy()
+        if (!p.globalEnabled || !p.libraryEnabled) return
+        val now = System.currentTimeMillis()
+        val metadata = detail.metadata
+        val entity =
+            net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity(
+                seriesId = seriesId,
+                summary = metadata?.summary,
+                publicationStatus = metadata?.publicationStatus,
+                genres = metadata?.genres?.mapNotNull { it.title }?.let { toJsonList(it) },
+                tags = metadata?.tags?.mapNotNull { it.title }?.let { toJsonList(it) },
+                writers = metadata?.writers?.mapNotNull { it.name }?.let { toJsonList(it) },
+                releaseYear = metadata?.releaseYear,
+                wordCount = detail.series?.wordCount,
+                timeLeftMin = detail.timeLeft?.minHours?.toDouble(),
+                timeLeftMax = detail.timeLeft?.maxHours?.toDouble(),
+                timeLeftAvg = detail.timeLeft?.avgHours?.toDouble(),
+                hasProgress = detail.hasProgress,
+                wantToRead = detail.wantToRead,
+                seriesJson = detail.series?.let { seriesAdapter.toJson(it) },
+                metadataJson = metadata?.let { metadataAdapter.toJson(it) },
+                detailJson = detail.detail?.let { detailAdapter.toJson(it) },
+                relatedJson = detail.related?.let { relatedAdapter.toJson(it) },
+                ratingJson = detail.rating?.let { ratingAdapter.toJson(it) },
+                continuePointJson = detail.continuePoint?.let { chapterAdapter.toJson(it) },
+                readerProgressJson = detail.readerProgress?.let { readerProgressAdapter.toJson(it) },
+                timeLeftJson = detail.timeLeft?.let { timeLeftAdapter.toJson(it) },
+                collectionsJson = detail.collections?.let { collectionsAdapter.toJson(it) },
+                readingListsJson = detail.readingLists?.let { readingListAdapter.toJson(it) },
+                bookmarksJson = detail.bookmarks?.let { bookmarkAdapter.toJson(it) },
+                annotationsJson = detail.annotations?.let { annotationAdapter.toJson(it) },
+                seriesDetailPlusJson = detail.seriesDetailPlus?.let { seriesDetailPlusAdapter.toJson(it) },
+                updatedAt = now,
+            )
+        dao.upsertSeriesDetail(entity)
+    }
+
+    override suspend fun getCachedSeriesDetailV2(seriesId: Int): InkitaDetailV2? {
+        val dao = seriesDetailV2Dao ?: return null
+        val p = policy()
+        if (!p.globalEnabled || !p.libraryEnabled) return null
+        val entity = dao.getSeriesDetail(seriesId) ?: return null
+        val series = entity.seriesJson?.let { fromJson(seriesAdapter, it) }
+        val metadata = entity.metadataJson?.let { fromJson(metadataAdapter, it) }
+        val detail = entity.detailJson?.let { fromJson(detailAdapter, it) }
+        val related = entity.relatedJson?.let { fromJson(relatedAdapter, it) }
+        val rating = entity.ratingJson?.let { fromJson(ratingAdapter, it) }
+        val continuePoint = entity.continuePointJson?.let { fromJson(chapterAdapter, it) }
+        val readerProgress = entity.readerProgressJson?.let { fromJson(readerProgressAdapter, it) }
+        val timeLeft =
+            entity.timeLeftJson?.let { fromJson(timeLeftAdapter, it) }
+                ?: if (
+                    entity.timeLeftMin != null ||
+                    entity.timeLeftMax != null ||
+                    entity.timeLeftAvg != null
+                ) {
+                    HourEstimateRangeDto(
+                        minHours = entity.timeLeftMin?.toInt(),
+                        maxHours = entity.timeLeftMax?.toInt(),
+                        avgHours = entity.timeLeftAvg?.toFloat(),
+                    )
+                } else {
+                    null
+                }
+        val collections = entity.collectionsJson?.let { fromJsonList(collectionsAdapter, it) }
+        val readingLists = entity.readingListsJson?.let { fromJsonList(readingListAdapter, it) }
+        val bookmarks = entity.bookmarksJson?.let { fromJsonList(bookmarkAdapter, it) }
+        val annotations = entity.annotationsJson?.let { fromJsonList(annotationAdapter, it) }
+        val seriesDetailPlus = entity.seriesDetailPlusJson?.let { fromJson(seriesDetailPlusAdapter, it) }
+        val fallbackMetadata =
+            metadata ?: buildFallbackMetadata(entity)
+
+        return InkitaDetailV2(
+            series = series,
+            metadata = fallbackMetadata,
+            wantToRead = entity.wantToRead,
+            readingLists = readingLists,
+            collections = collections,
+            bookmarks = bookmarks,
+            annotations = annotations,
+            timeLeft = timeLeft,
+            hasProgress = entity.hasProgress,
+            continuePoint = continuePoint,
+            seriesDetailPlus = seriesDetailPlus,
+            related = related,
+            detail = detail,
+            rating = rating,
+            readerProgress = readerProgress,
+        )
+    }
+
+    override suspend fun getSeriesDetailV2UpdatedAt(seriesId: Int): Long? {
+        val dao = seriesDetailV2Dao ?: return null
+        return dao.getSeriesDetailUpdatedAt(seriesId)
+    }
+
     override suspend fun clearAllCache() {
         val p = policy()
         if (!p.globalEnabled) return
@@ -310,7 +466,16 @@ class CacheManagerImpl(
     }
 
     override suspend fun clearDetails() {
-        // Legacy cache removed; no-op.
+        val p = policy()
+        if (!p.globalEnabled) return
+        seriesDetailV2Dao?.let { detailDao ->
+            detailDao.clearVolumeChapterRefs()
+            detailDao.clearChapters()
+            detailDao.clearSeriesVolumeRefs()
+            detailDao.clearVolumes()
+            detailDao.clearRelatedRefs()
+            detailDao.clearSeriesDetails()
+        }
     }
 
     override suspend fun getCacheSizeBytes(): Long =
@@ -401,6 +566,47 @@ class CacheManagerImpl(
             else -> false
         }
     }
+
+    private fun toJsonList(value: List<String>): String = stringListAdapter.toJson(value)
+
+    private fun buildFallbackMetadata(entity: net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity): SeriesMetadataDto? {
+        if (
+            entity.summary == null &&
+            entity.publicationStatus == null &&
+            entity.releaseYear == null &&
+            entity.genres == null &&
+            entity.tags == null &&
+            entity.writers == null
+        ) {
+            return null
+        }
+        val genres =
+            entity.genres
+                ?.let { fromJsonList(stringListAdapter, it) }
+                ?.mapIndexed { index, name -> net.dom53.inkita.data.api.dto.GenreTagDto(-(index + 1), name) }
+        val tags =
+            entity.tags
+                ?.let { fromJsonList(stringListAdapter, it) }
+                ?.map { name -> net.dom53.inkita.data.api.dto.TagDto(null, name) }
+        val writers =
+            entity.writers
+                ?.let { fromJsonList(stringListAdapter, it) }
+                ?.map { name -> net.dom53.inkita.data.api.dto.PersonDto(name = name) }
+        return SeriesMetadataDto(
+            summary = entity.summary,
+            publicationStatus = entity.publicationStatus,
+            releaseYear = entity.releaseYear,
+            genres = genres,
+            tags = tags,
+            writers = writers,
+        )
+    }
+
+    private fun <T> fromJson(adapter: com.squareup.moshi.JsonAdapter<T>, value: String): T? =
+        runCatching { adapter.fromJson(value) }.getOrNull()
+
+    private fun <T> fromJsonList(adapter: com.squareup.moshi.JsonAdapter<List<T>>, value: String): List<T>? =
+        runCatching { adapter.fromJson(value) }.getOrNull()
 
     private fun Series.toCachedSeriesV2(updatedAt: Long): CachedSeriesV2Entity =
         CachedSeriesV2Entity(
