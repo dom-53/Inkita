@@ -1,9 +1,9 @@
 package net.dom53.inkita.core.downloadv2
 
-import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
-
 interface DownloadStrategyV2 {
-    val format: String
+    val key: String
 
-    suspend fun enqueue(job: DownloadJobV2Entity): DownloadJobV2Entity
+    suspend fun enqueue(request: DownloadRequestV2): Long
+
+    suspend fun run(jobId: Long)
 }

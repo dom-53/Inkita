@@ -43,6 +43,7 @@
     <string name="general_coll_name">Collection name</string>
     <string name="general_create_and_add">Create and add</string>
     <string name="general_offline">Offline</string>
+    <string name="general_offline_mode">Offline mode</string>
     <string name="general_close">Close</string>
     <string name="general_author">Author</string>
     <string name="general_authors">Authors</string>
@@ -109,6 +110,7 @@
     <string name="series_detail_download_volume_title">Download volume</string>
     <string name="series_detail_download_volume_body">Download %1$s?</string>
     <string name="series_detail_download_volume_confirm">Download</string>
+    <string name="download_queued">Download queued</string>
     <string name="series_detail_author_label">Author: %1$s</string>
     <string name="series_detail_publication_label">Publication: %1$s</string>
     <string name="series_detail_release_year_label">Release year: %1$s</string>

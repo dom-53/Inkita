@@ -48,6 +48,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,11 +65,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.cache.CacheManager
+import net.dom53.inkita.core.downloadv2.DownloadManagerV2
+import net.dom53.inkita.core.downloadv2.DownloadRequestV2
+import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
+import net.dom53.inkita.data.local.db.InkitaDatabase
+import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
+import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.ui.browse.utils.PublicationState
 import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
+import kotlinx.coroutines.launch
 
 @Composable
 fun SeriesDetailScreenV2(
@@ -92,6 +100,7 @@ fun SeriesDetailScreenV2(
     val uiState by viewModel.state.collectAsState()
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
     LaunchedEffect(uiState.showLoadedToast) {
         if (uiState.showLoadedToast) {
             viewModel.consumeLoadedToast()
@@ -119,6 +128,22 @@ fun SeriesDetailScreenV2(
     var showMenu by remember { mutableStateOf(false) }
     var showDownloadVolumeDialog by remember { mutableStateOf(false) }
     var selectedVolume by remember { mutableStateOf<net.dom53.inkita.data.api.dto.VolumeDto?>(null) }
+    val downloadManagerV2 =
+        remember(context.applicationContext) {
+            val db = InkitaDatabase.getInstance(context.applicationContext)
+            val dao = db.downloadV2Dao()
+            val strategy =
+                EpubDownloadStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = dao,
+                    appPreferences = appPreferences,
+                )
+            DownloadManagerV2(
+                appContext = context.applicationContext,
+                downloadDao = dao,
+                strategies = mapOf(strategy.key to strategy),
+            )
+        }
     Box(
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -507,12 +532,62 @@ fun SeriesDetailScreenV2(
                         onClick = {
                             showDownloadVolumeDialog = false
                             selectedVolume = null
-                            Toast
-                                .makeText(
-                                    context,
-                                    context.getString(net.dom53.inkita.R.string.general_not_implemented),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
+                            if (offlineMode) {
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                return@Button
+                            }
+                            val detail = uiState.detail
+                            val format = Format.fromId(detail?.series?.format)
+                            if (format != Format.Epub) {
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                return@Button
+                            }
+                            val volume = volume ?: return@Button
+                            val chapters =
+                                volume.chapters
+                                    ?.filter { (it.pages ?: 0) > 0 }
+                                    .orEmpty()
+                            if (chapters.isEmpty()) {
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.getString(net.dom53.inkita.R.string.series_detail_pages_unavailable),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                return@Button
+                            }
+                            scope.launch {
+                                val seriesId = detail?.series?.id ?: seriesId
+                                chapters.forEach { chapter ->
+                                    val pages = chapter.pages ?: return@forEach
+                                    val request =
+                                        DownloadRequestV2(
+                                            type = DownloadJobV2Entity.TYPE_CHAPTER,
+                                            format = EpubDownloadStrategyV2.FORMAT_EPUB,
+                                            seriesId = seriesId,
+                                            volumeId = volume.id,
+                                            chapterId = chapter.id,
+                                            pageCount = pages,
+                                        )
+                                    downloadManagerV2.enqueue(request)
+                                }
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.getString(net.dom53.inkita.R.string.download_queued),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                            }
                         },
                     ) {
                         Text(stringResource(net.dom53.inkita.R.string.series_detail_download_volume_confirm))
