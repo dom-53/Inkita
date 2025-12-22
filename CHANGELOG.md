@@ -31,6 +31,7 @@ All notable changes to this project will be documented here.
 - Downloads V2: Download-all now includes volumes, chapters, specials, and storyline chapters.
 - Settings: Prefetch switches in Advanced are temporarily disabled until the new prefetch pipeline is implemented.
 - Logging: Added verbose logs for Library V2 cache decisions, Series/Volume Detail V2 flows, and Download V2 enqueue/worker events.
+- Downloads: Download settings now use dedicated metered/low-battery preferences; download workers respect those constraints.
 
 ### Fixed
 - Detail V2: Progress and continue point refresh after returning from the reader to avoid stale data.

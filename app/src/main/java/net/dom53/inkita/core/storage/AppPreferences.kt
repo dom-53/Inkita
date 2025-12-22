@@ -96,6 +96,8 @@ class AppPreferences(
         private val KEY_PREFETCH_ALLOW_LOW_BATTERY = booleanPreferencesKey("prefetch_allow_low_battery")
         private val KEY_PREFETCH_COLLECTIONS_ALL = booleanPreferencesKey("prefetch_collections_all")
         private val KEY_PREFETCH_COLLECTION_IDS = stringPreferencesKey("prefetch_collection_ids")
+        private val KEY_DOWNLOAD_ALLOW_METERED = booleanPreferencesKey("download_allow_metered")
+        private val KEY_DOWNLOAD_ALLOW_LOW_BATTERY = booleanPreferencesKey("download_allow_low_battery")
         private val KEY_DOWNLOAD_MAX_CONCURRENT = intPreferencesKey("download_max_concurrent")
         private val KEY_PREFER_OFFLINE_PAGES = booleanPreferencesKey("prefer_offline_pages")
         private val KEY_DOWNLOAD_RETRY_ENABLED = booleanPreferencesKey("download_retry_enabled")
@@ -206,6 +208,10 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_ALLOW_METERED] ?: false }
     val prefetchAllowLowBatteryFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_ALLOW_LOW_BATTERY] ?: false }
+    val downloadAllowMeteredFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_ALLOW_METERED] ?: false }
+    val downloadAllowLowBatteryFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_ALLOW_LOW_BATTERY] ?: false }
     val downloadMaxConcurrentFlow: Flow<Int> =
         context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_MAX_CONCURRENT] ?: 2 }
     val preferOfflinePagesFlow: Flow<Boolean> =
@@ -501,6 +507,18 @@ class AppPreferences(
     suspend fun setPrefetchAllowLowBattery(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[KEY_PREFETCH_ALLOW_LOW_BATTERY] = enabled
+        }
+    }
+
+    suspend fun setDownloadAllowMetered(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_DOWNLOAD_ALLOW_METERED] = enabled
+        }
+    }
+
+    suspend fun setDownloadAllowLowBattery(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_DOWNLOAD_ALLOW_LOW_BATTERY] = enabled
         }
     }
 

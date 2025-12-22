@@ -71,10 +71,10 @@ fun SettingsDownloadScreen(
         }
 
     LaunchedEffect(Unit) {
-        appPreferences.prefetchAllowMeteredFlow.collectLatest { allowMetered = it }
+        appPreferences.downloadAllowMeteredFlow.collectLatest { allowMetered = it }
     }
     LaunchedEffect(Unit) {
-        appPreferences.prefetchAllowLowBatteryFlow.collectLatest { allowLowBattery = it }
+        appPreferences.downloadAllowLowBatteryFlow.collectLatest { allowLowBattery = it }
     }
     LaunchedEffect(Unit) {
         appPreferences.downloadMaxConcurrentFlow.collectLatest { maxConcurrent = it }
@@ -115,7 +115,7 @@ fun SettingsDownloadScreen(
             checked = allowMetered,
             onCheckedChange = {
                 allowMetered = it
-                scope.launch { appPreferences.setPrefetchAllowMetered(it) }
+                scope.launch { appPreferences.setDownloadAllowMetered(it) }
             },
         )
 
@@ -125,7 +125,7 @@ fun SettingsDownloadScreen(
             checked = allowLowBattery,
             onCheckedChange = {
                 allowLowBattery = it
-                scope.launch { appPreferences.setPrefetchAllowLowBattery(it) }
+                scope.launch { appPreferences.setDownloadAllowLowBattery(it) }
             },
         )
 

@@ -275,10 +275,11 @@ class DownloadManager(
 
     /** Build WorkManager constraints based on user settings (metered / battery). */
     private suspend fun buildConstraints(): Constraints {
-        val policy = appPreferences.prefetchPolicy()
+        val allowMetered = appPreferences.downloadAllowMeteredFlow.first()
+        val allowLowBattery = appPreferences.downloadAllowLowBatteryFlow.first()
         return networkMonitor.buildConstraints(
-            allowMetered = policy.allowMetered,
-            requireBatteryNotLow = !policy.allowLowBattery,
+            allowMetered = allowMetered,
+            requireBatteryNotLow = !allowLowBattery,
         )
     }
 

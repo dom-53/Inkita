@@ -1,13 +1,15 @@
 package net.dom53.inkita.core.downloadv2
 
 import android.content.Context
-import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import net.dom53.inkita.core.logging.LoggingManager
+import net.dom53.inkita.core.network.NetworkMonitor
+import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 @Suppress("UnusedPrivateProperty")
 class DownloadManagerV2(
@@ -30,11 +32,23 @@ class DownloadManagerV2(
     }
 
     fun enqueueWorker() {
+        val prefs = AppPreferences(appContext)
+        val monitor = NetworkMonitor.getInstance(appContext, prefs)
+        if (monitor.shouldDeferNetworkWork()) {
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("DownloadManagerV2", "Skipping worker enqueue (offline mode)")
+            }
+            return
+        }
+        val (allowMetered, allowLowBattery) =
+            runBlocking {
+                prefs.downloadAllowMeteredFlow.first() to prefs.downloadAllowLowBatteryFlow.first()
+            }
         val constraints =
-            Constraints
-                .Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
+            monitor.buildConstraints(
+                allowMetered = allowMetered,
+                requireBatteryNotLow = !allowLowBattery,
+            )
         val request =
             OneTimeWorkRequestBuilder<DownloadWorkerV2>()
                 .setConstraints(constraints)
