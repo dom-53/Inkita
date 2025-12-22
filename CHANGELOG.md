@@ -44,6 +44,7 @@ All notable changes to this project will be documented here.
 - Reader: Offline overlays now show page/title data derived from downloaded files when online data is unavailable.
 - Reader: Progress sync now respects Kavita timestamps without timezone and avoids overwriting newer server progress.
 - Downloads V2: Clearing downloaded pages now removes items from the Downloaded tab.
+- Browse: Thumbnail shimmer stays active per-item until the image finishes loading.
 
 ## v0.2.0-beta.2
 
