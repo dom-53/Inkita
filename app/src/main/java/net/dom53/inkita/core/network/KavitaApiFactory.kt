@@ -12,6 +12,8 @@ import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.util.concurrent.TimeUnit
 
 object KavitaApiFactory {
+    private const val DEFAULT_TIMEOUT_SECONDS = 30L
+
     private fun baseRetrofitBuilder(
         baseUrl: String,
         client: OkHttpClient,
@@ -35,10 +37,10 @@ object KavitaApiFactory {
             OkHttpClient
                 .Builder()
                 .addInterceptor(NetworkLoggingInterceptor)
-                .callTimeout(30, TimeUnit.SECONDS)
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
+                .callTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .connectTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .writeTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .build()
 
         val retrofit = baseRetrofitBuilder(baseUrl, client).build()
@@ -65,10 +67,10 @@ object KavitaApiFactory {
                 .Builder()
                 .addInterceptor(apiKeyInterceptor)
                 .addInterceptor(NetworkLoggingInterceptor)
-                .callTimeout(30, TimeUnit.SECONDS)
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
+                .callTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .connectTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .writeTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .build()
 
         val retrofit = baseRetrofitBuilder(baseUrl, client).build()
