@@ -87,6 +87,7 @@ import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
+import net.dom53.inkita.data.mapper.flattenToc
 
 @Composable
 fun SeriesDetailScreenV2(
@@ -151,6 +152,7 @@ fun SeriesDetailScreenV2(
     var selectedVolume by remember { mutableStateOf<net.dom53.inkita.data.api.dto.VolumeDto?>(null) }
     var selectedSpecialChapter by remember { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
     var selectedSpecialIndex by remember { mutableStateOf<Int?>(null) }
+    val specialPageTitleCache = remember(seriesId) { mutableStateMapOf<Int, Map<Int, String>>() }
     val volumeDownloadStates = remember { mutableStateMapOf<Int, DownloadVolumeState>() }
     val downloadDao =
         remember(context.applicationContext) {
@@ -174,6 +176,21 @@ fun SeriesDetailScreenV2(
                 strategies = mapOf(strategy.key to strategy),
             )
         }
+    LaunchedEffect(selectedSpecialChapter?.id, offlineMode, config.serverUrl, config.apiKey) {
+        val chapter = selectedSpecialChapter ?: return@LaunchedEffect
+        if (offlineMode) return@LaunchedEffect
+        val format = Format.fromId(uiState.detail?.series?.format)
+        if (format != Format.Epub) return@LaunchedEffect
+        if (specialPageTitleCache.containsKey(chapter.id)) return@LaunchedEffect
+        if (!config.isConfigured) return@LaunchedEffect
+        val pages = chapter.pages ?: 0
+        if (pages <= 0) return@LaunchedEffect
+        val api = net.dom53.inkita.core.network.KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val tocResponse = api.getBookChapters(chapter.id)
+        if (!tocResponse.isSuccessful) return@LaunchedEffect
+        val tocItems = tocResponse.body().orEmpty().flatMap { flattenToc(it) }
+        specialPageTitleCache[chapter.id] = buildPageTitleMap(context, pages, tocItems)
+    }
     Box(
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -695,6 +712,7 @@ fun SeriesDetailScreenV2(
                                     chapter = chapter,
                                     chapterIndex = selectedSpecialIndex ?: 0,
                                     downloadedPages = downloadedPages,
+                                    pageTitles = chapter?.id?.let { specialPageTitleCache[it] },
                                     onTogglePageDownload = { target, page, isDownloaded ->
                                         if (offlineMode) {
                                             Toast

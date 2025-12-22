@@ -68,6 +68,7 @@ import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.repository.ReaderRepository
 import net.dom53.inkita.data.api.dto.ReaderProgressDto
+import net.dom53.inkita.data.mapper.flattenToc
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
@@ -99,6 +100,7 @@ fun VolumeDetailScreenV2(
     var selectedChapterDownloadIndex by remember(volumeId) { mutableStateOf<Int?>(null) }
     var showDownloadChapterDialog by remember { mutableStateOf(false) }
     var downloadChapterState by remember { mutableStateOf(ChapterDownloadState.None) }
+    val pageTitleCache = remember(volumeId) { mutableStateMapOf<Int, Map<Int, String>>() }
     val scope = rememberCoroutineScope()
     val selectedChapterId = selectedChapter?.id
     val downloadManagerV2 =
@@ -178,6 +180,20 @@ fun VolumeDetailScreenV2(
                 VolumeDetailCache.put(payload.copy(volume = updated))
             }
         }
+    }
+    LaunchedEffect(selectedChapterId, offlineMode, config.serverUrl, config.apiKey) {
+        val chapter = selectedChapter ?: return@LaunchedEffect
+        if (offlineMode) return@LaunchedEffect
+        if (Format.fromId(payload.formatId) != Format.Epub) return@LaunchedEffect
+        if (pageTitleCache.containsKey(chapter.id)) return@LaunchedEffect
+        if (!config.isConfigured) return@LaunchedEffect
+        val pages = chapter.pages ?: 0
+        if (pages <= 0) return@LaunchedEffect
+        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val tocResponse = api.getBookChapters(chapter.id)
+        if (!tocResponse.isSuccessful) return@LaunchedEffect
+        val tocItems = tocResponse.body().orEmpty().flatMap { flattenToc(it) }
+        pageTitleCache[chapter.id] = buildPageTitleMap(context, pages, tocItems)
     }
 
     val volume = volumeState
@@ -381,6 +397,7 @@ fun VolumeDetailScreenV2(
                         chapter = selectedChapter,
                         chapterIndex = selectedChapterIndex ?: 0,
                         downloadedPages = downloadedPages,
+                        pageTitles = selectedChapter?.id?.let { pageTitleCache[it] },
                         onTogglePageDownload = { chapter, page, isDownloaded ->
                             if (offlineMode) {
                                 Toast

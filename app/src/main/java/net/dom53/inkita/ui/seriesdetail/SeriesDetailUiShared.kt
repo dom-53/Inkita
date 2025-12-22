@@ -65,9 +65,11 @@ import coil.request.ImageRequest
 import kotlin.math.roundToInt
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.offset
+import android.content.Context
 import net.dom53.inkita.R
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.ui.common.chapterCoverUrl
+import net.dom53.inkita.data.mapper.TocItem
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
@@ -269,6 +271,7 @@ internal fun ChapterPagesSection(
     chapter: net.dom53.inkita.data.api.dto.ChapterDto?,
     chapterIndex: Int,
     downloadedPages: Set<Int>,
+    pageTitles: Map<Int, String>?,
     onTogglePageDownload: (net.dom53.inkita.data.api.dto.ChapterDto, Int, Boolean) -> Unit,
     onUpdateProgress: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit,
     onOpenPage: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit,
@@ -430,6 +433,7 @@ internal fun ChapterPagesSection(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    val pageTitle = pageTitles?.get(index)?.takeIf { it.isNotBlank() }
                     Text(
                         text = "${stringResource(net.dom53.inkita.R.string.general_page)} ${index + 1}",
                         style = MaterialTheme.typography.bodyMedium,
@@ -437,7 +441,7 @@ internal fun ChapterPagesSection(
                         modifier = Modifier.width(86.dp),
                     )
                     Text(
-                        text = title,
+                        text = pageTitle ?: title,
                         style = MaterialTheme.typography.bodySmall,
                         color = textColor,
                         maxLines = 1,
@@ -530,6 +534,33 @@ internal fun formatYear(value: String): String? {
             ?: runCatching { LocalDateTime.parse(value).toLocalDate() }.getOrNull()
             ?: runCatching { Instant.parse(value).atZone(ZoneId.systemDefault()).toLocalDate() }.getOrNull()
     return parsed?.year?.toString()
+}
+
+internal fun buildPageTitleMap(
+    context: Context,
+    pagesCount: Int,
+    tocItems: List<TocItem>,
+): Map<Int, String> {
+    if (pagesCount <= 0) return emptyMap()
+    val sorted = tocItems.sortedBy { it.page }
+    if (sorted.isEmpty()) {
+        return (0 until pagesCount).associateWith { idx ->
+            "${context.getString(net.dom53.inkita.R.string.general_page)} ${idx + 1}"
+        }
+    }
+    val result = HashMap<Int, String>(pagesCount)
+    var cursor = 0
+    var currentTitle: String? = null
+    for (pageIndex in 0 until pagesCount) {
+        while (cursor < sorted.size && sorted[cursor].page <= pageIndex) {
+            currentTitle = sorted[cursor].title
+            cursor++
+        }
+        result[pageIndex] =
+            currentTitle?.takeIf { it.isNotBlank() }
+                ?: "${context.getString(net.dom53.inkita.R.string.general_page)} ${pageIndex + 1}"
+    }
+    return result
 }
 
 internal fun volumeNumberText(volume: net.dom53.inkita.data.api.dto.VolumeDto): String? {
