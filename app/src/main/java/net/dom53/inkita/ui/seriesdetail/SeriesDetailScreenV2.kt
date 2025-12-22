@@ -295,6 +295,56 @@ fun SeriesDetailScreenV2(
                                 }
                             },
                         )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(net.dom53.inkita.R.string.general_mark_read)) },
+                            onClick = {
+                                showMenu = false
+                                if (offlineMode) {
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    return@DropdownMenuItem
+                                }
+                                if (!config.isConfigured) {
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    return@DropdownMenuItem
+                                }
+                                viewModel.markSeriesRead(true)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(net.dom53.inkita.R.string.general_mark_unread)) },
+                            onClick = {
+                                showMenu = false
+                                if (offlineMode) {
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    return@DropdownMenuItem
+                                }
+                                if (!config.isConfigured) {
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    return@DropdownMenuItem
+                                }
+                                viewModel.markSeriesRead(false)
+                            },
+                        )
                     }
                 }
             }

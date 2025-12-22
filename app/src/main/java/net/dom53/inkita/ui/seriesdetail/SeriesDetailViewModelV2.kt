@@ -20,6 +20,7 @@ import net.dom53.inkita.data.api.dto.AppUserCollectionDto
 import net.dom53.inkita.data.api.dto.BookmarkDto
 import net.dom53.inkita.data.api.dto.ChapterDto
 import net.dom53.inkita.data.api.dto.HourEstimateRangeDto
+import net.dom53.inkita.data.api.dto.MarkSeriesDto
 import net.dom53.inkita.data.api.dto.RatingDto
 import net.dom53.inkita.data.api.dto.ReaderProgressDto
 import net.dom53.inkita.data.api.dto.ReadingListDto
@@ -252,6 +253,51 @@ class SeriesDetailViewModelV2(
             if (policy.globalEnabled && policy.libraryEnabled && policy.libraryDetailsEnabled) {
                 cacheManager.cacheSeriesDetailV2(seriesId, updatedDetail)
             }
+        }
+    }
+
+    fun markSeriesRead(markRead: Boolean) {
+        viewModelScope.launch {
+            val currentSeriesId = _state.value.detail?.series?.id ?: seriesId
+            if (appPreferences.offlineModeFlow.first()) {
+                _state.update { it.copy(error = "Offline mode") }
+                return@launch
+            }
+            val config = appPreferences.configFlow.first()
+            if (!config.isConfigured) {
+                _state.update { it.copy(error = "Not configured") }
+                return@launch
+            }
+            val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+            val response =
+                if (markRead) {
+                    api.markSeriesRead(MarkSeriesDto(currentSeriesId))
+                } else {
+                    api.markSeriesUnread(MarkSeriesDto(currentSeriesId))
+                }
+            if (!response.isSuccessful) {
+                _state.update { it.copy(error = "Failed to update read state") }
+                return@launch
+            }
+            Toast
+                .makeText(
+                    appPreferences.appContext,
+                    appPreferences.appContext.getString(
+                        if (markRead) {
+                            net.dom53.inkita.R.string.general_mark_read
+                        } else {
+                            net.dom53.inkita.R.string.general_mark_unread
+                        },
+                    ),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d(
+                    "SeriesDetailV2",
+                    "Mark series ${if (markRead) "read" else "unread"} id=$currentSeriesId",
+                )
+            }
+            load()
         }
     }
 
