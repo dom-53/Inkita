@@ -419,6 +419,8 @@
     <string name="advanced_cache_stats_volumes">Volumes: %1$d</string>
     <string name="advanced_cache_stats_series_volume_refs">Series volume refs: %1$d</string>
     <string name="advanced_cache_stats_chapters">Chapters: %1$d</string>
+    <string name="advanced_cache_stats_tabs">Tab references: %1$d</string>
+    <string name="advanced_cache_stats_browse">Browse references: %1$d</string>
     <string name="advanced_cache_stats_volume_chapter_refs">Volume chapter refs: %1$d</string>
     <string name="advanced_cache_stats_db_size">DB size: %1$s</string>
     <string name="advanced_cache_stats_thumbnails_count">Thumbnails (count): %1$d</string>
