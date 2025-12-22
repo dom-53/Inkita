@@ -39,6 +39,7 @@ All notable changes to this project will be documented here.
 - Downloads V2: Deduplicate page downloads and avoid re-queuing already downloaded pages.
 - Downloads V2: Queue processing continues beyond the first batch of pending jobs.
 - Reader: Offline overlays now show page/title data derived from downloaded files when online data is unavailable.
+- Reader: Progress sync now respects Kavita timestamps without timezone and avoids overwriting newer server progress.
 
 ## v0.2.0-beta.2
 
