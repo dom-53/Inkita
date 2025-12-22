@@ -357,7 +357,6 @@ fun VolumeDetailScreenV2(
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !offlineMode,
                 ) {
                     Text(text = buttonLabel)
                 }
