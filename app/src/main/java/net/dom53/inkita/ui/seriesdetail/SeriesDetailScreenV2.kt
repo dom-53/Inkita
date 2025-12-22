@@ -735,6 +735,77 @@ fun SeriesDetailScreenV2(
                                             }
                                         }
                                     },
+                                    onUpdateProgress = { target, pageNum ->
+                                        if (offlineMode) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            return@ChapterPagesSection
+                                        }
+                                        if (!config.isConfigured) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            return@ChapterPagesSection
+                                        }
+                                        val libraryId = detail?.series?.libraryId
+                                        if (libraryId == null) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.general_error),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            return@ChapterPagesSection
+                                        }
+                                        val markRead = pageNum > (target.pagesRead ?: 0)
+                                        scope.launch {
+                                            val api =
+                                                net.dom53.inkita.core.network.KavitaApiFactory.createAuthenticated(
+                                                    config.serverUrl,
+                                                    config.apiKey,
+                                                )
+                                            val resp =
+                                                api.setReaderProgress(
+                                                    net.dom53.inkita.data.api.dto.ReaderProgressDto(
+                                                        libraryId = libraryId,
+                                                        seriesId = seriesId,
+                                                        volumeId = target.volumeId,
+                                                        chapterId = target.id,
+                                                        pageNum = pageNum,
+                                                        bookScrollId = null,
+                                                    ),
+                                                )
+                                            if (resp.isSuccessful) {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(
+                                                            if (markRead) {
+                                                                net.dom53.inkita.R.string.general_mark_read
+                                                            } else {
+                                                                net.dom53.inkita.R.string.general_mark_unread
+                                                            },
+                                                        ),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                viewModel.reload()
+                                            } else {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(net.dom53.inkita.R.string.general_error),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                            }
+                                        }
+                                    },
                                     onOpenPage = { target, page ->
                                         if ((offlineMode || !NetworkUtils.isOnline(context)) && !downloadedPages.contains(page)) {
                                             Toast

@@ -30,9 +30,11 @@ import androidx.compose.material.swipeable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Downloading
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -268,6 +270,7 @@ internal fun ChapterPagesSection(
     chapterIndex: Int,
     downloadedPages: Set<Int>,
     onTogglePageDownload: (net.dom53.inkita.data.api.dto.ChapterDto, Int, Boolean) -> Unit,
+    onUpdateProgress: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit,
     onOpenPage: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -334,12 +337,19 @@ internal fun ChapterPagesSection(
             val density = LocalDensity.current
             val swipeDistance = with(density) { 160.dp.toPx() }
             val swipeState = rememberSwipeableState(initialValue = 0)
-            val anchors = remember(swipeDistance) { mapOf(0f to 0, -swipeDistance to 1) }
+            val anchors = remember(swipeDistance) { mapOf(0f to 0, -swipeDistance to -1, swipeDistance to 1) }
             var actionTriggered by remember { mutableStateOf(false) }
             LaunchedEffect(swipeState.currentValue) {
-                if (swipeState.currentValue == 1 && !actionTriggered) {
+                if (swipeState.currentValue != 0 && !actionTriggered) {
                     actionTriggered = true
-                    chapter?.let { onTogglePageDownload(it, index, isDownloaded) }
+                    chapter?.let {
+                        if (swipeState.currentValue == 1) {
+                            val pageNum = if (isRead) index else index + 1
+                            onUpdateProgress(it, pageNum)
+                        } else {
+                            onTogglePageDownload(it, index, isDownloaded)
+                        }
+                    }
                     swipeState.animateTo(0)
                     actionTriggered = false
                 }
@@ -354,16 +364,28 @@ internal fun ChapterPagesSection(
                             thresholds = { _, _ -> FractionalThreshold(0.25f) },
                             orientation = Orientation.Horizontal,
                         ),
-            ) {
-                val icon =
+                ) {
+                val downloadIcon =
                     if (isDownloaded) {
                         Icons.Filled.Delete
                     } else {
                         Icons.Filled.FileDownload
                     }
-                val tint =
+                val downloadTint =
                     if (isDownloaded) {
                         MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                val progressIcon =
+                    if (isRead) {
+                        Icons.Filled.Undo
+                    } else {
+                        Icons.Filled.Done
+                    }
+                val progressTint =
+                    if (isRead) {
+                        MaterialTheme.colorScheme.secondary
                     } else {
                         MaterialTheme.colorScheme.primary
                     }
@@ -372,13 +394,23 @@ internal fun ChapterPagesSection(
                         Modifier
                             .fillMaxSize()
                             .padding(horizontal = 16.dp),
-                    contentAlignment = Alignment.CenterEnd,
                 ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = tint,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = progressIcon,
+                            contentDescription = null,
+                            tint = progressTint,
+                        )
+                        Icon(
+                            imageVector = downloadIcon,
+                            contentDescription = null,
+                            tint = downloadTint,
+                        )
+                    }
                 }
                 Row(
                     modifier =
