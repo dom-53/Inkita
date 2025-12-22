@@ -783,6 +783,8 @@ fun SeriesDetailScreenV2(
                                                     ),
                                                 )
                                             if (resp.isSuccessful) {
+                                                selectedSpecialChapter =
+                                                    target.copy(pagesRead = pageNum)
                                                 Toast
                                                     .makeText(
                                                         context,

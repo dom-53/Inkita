@@ -477,6 +477,8 @@ fun VolumeDetailScreenV2(
                                             pagesRead = updatedPagesRead,
                                         )
                                     volumeState = updatedVolume
+                                    selectedChapter =
+                                        updatedChapters.firstOrNull { it.id == chapter.id }
                                     VolumeDetailCache.put(payload.copy(volume = updatedVolume))
                                     Toast
                                         .makeText(
