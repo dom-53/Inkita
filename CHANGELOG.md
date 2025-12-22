@@ -16,6 +16,12 @@ All notable changes to this project will be documented here.
 - Reader: Prefer offline pages now loads downloaded HTML when available and shows an “Offline data” overlay flag.
 - Series Detail V2: Specials now open into per-page lists (like Volume Detail) with download/reader actions and long-press download dialog.
 - Settings: Added Kavita Images API key field for collection/person cover endpoints.
+- Series Detail V2: Added menu actions to mark series read/unread.
+- Series Detail V2: Volume long-press actions now include mark volume read/unread.
+- Volume Detail V2: Chapter long-press actions now include mark read/unread (progress update).
+- Volume Detail V2: Swipe right on a page updates progress (read/unread); swipe left still downloads/removes.
+- Volume Detail V2 / Specials: Page titles now pull from EPUB TOC (getBookChapters) instead of generic labels.
+- UI: Important update modal now shows once per versionCode.
 
 ### Changed
 - DTOs: Completed several Kavita DTOs (SeriesMetadataDto, PersonDto, GenreTagDto, VolumeDto, and related detail DTOs) for Detail V2 data aggregation.
@@ -24,6 +30,7 @@ All notable changes to this project will be documented here.
 - Downloads V2: Download worker now respects max concurrent downloads and automatic retries/max retry attempts from settings.
 - Downloads V2: Download-all now includes volumes, chapters, specials, and storyline chapters.
 - Settings: Prefetch switches in Advanced are temporarily disabled until the new prefetch pipeline is implemented.
+- Logging: Added verbose logs for Library V2 cache decisions, Series/Volume Detail V2 flows, and Download V2 enqueue/worker events.
 
 ### Fixed
 - Detail V2: Progress and continue point refresh after returning from the reader to avoid stale data.
