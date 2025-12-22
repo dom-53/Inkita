@@ -431,14 +431,14 @@ internal fun ChapterPagesSection(
                             .clickable { chapter?.let { onOpenPage(it, index) } }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     val pageTitle = pageTitles?.get(index)?.takeIf { it.isNotBlank() }
                     Text(
                         text = "${stringResource(net.dom53.inkita.R.string.general_page)} ${index + 1}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = textColor,
-                        modifier = Modifier.width(86.dp),
+                        modifier = Modifier.width(70.dp),
                     )
                     Text(
                         text = pageTitle ?: title,
