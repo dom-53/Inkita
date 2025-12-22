@@ -32,6 +32,8 @@ All notable changes to this project will be documented here.
 - Settings: Prefetch switches in Advanced are temporarily disabled until the new prefetch pipeline is implemented.
 - Logging: Added verbose logs for Library V2 cache decisions, Series/Volume Detail V2 flows, and Download V2 enqueue/worker events.
 - Downloads: Download settings now use dedicated metered/low-battery preferences; download workers respect those constraints.
+- Cache: “Cache stale after” now supports minutes or hours with a 15-minute default.
+- Network: Increased global HTTP timeouts to 30 seconds.
 
 ### Fixed
 - Detail V2: Progress and continue point refresh after returning from the reader to avoid stale data.
@@ -41,6 +43,7 @@ All notable changes to this project will be documented here.
 - Downloads V2: Queue processing continues beyond the first batch of pending jobs.
 - Reader: Offline overlays now show page/title data derived from downloaded files when online data is unavailable.
 - Reader: Progress sync now respects Kavita timestamps without timezone and avoids overwriting newer server progress.
+- Downloads V2: Clearing downloaded pages now removes items from the Downloaded tab.
 
 ## v0.2.0-beta.2
 
