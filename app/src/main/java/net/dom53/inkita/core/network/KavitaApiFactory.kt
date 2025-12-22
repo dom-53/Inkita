@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.converter.scalars.ScalarsConverterFactory
+import java.util.concurrent.TimeUnit
 
 object KavitaApiFactory {
     private fun baseRetrofitBuilder(
@@ -34,6 +35,10 @@ object KavitaApiFactory {
             OkHttpClient
                 .Builder()
                 .addInterceptor(NetworkLoggingInterceptor)
+                .callTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
                 .build()
 
         val retrofit = baseRetrofitBuilder(baseUrl, client).build()
@@ -60,6 +65,10 @@ object KavitaApiFactory {
                 .Builder()
                 .addInterceptor(apiKeyInterceptor)
                 .addInterceptor(NetworkLoggingInterceptor)
+                .callTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
                 .build()
 
         val retrofit = baseRetrofitBuilder(baseUrl, client).build()
