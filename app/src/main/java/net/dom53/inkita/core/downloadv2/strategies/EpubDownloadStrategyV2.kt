@@ -25,6 +25,11 @@ import java.io.IOException
 import java.security.MessageDigest
 import java.util.regex.Pattern
 
+/**
+ * EPUB download strategy that fetches HTML pages and rewrites assets to local storage.
+ *
+ * Pages are stored as HTML files and referenced assets are downloaded into a shared assets folder.
+ */
 class EpubDownloadStrategyV2(
     private val appContext: Context,
     private val downloadDao: DownloadV2Dao,
@@ -38,6 +43,9 @@ class EpubDownloadStrategyV2(
             .addInterceptor(NetworkLoggingInterceptor)
             .build()
 
+    /**
+     * Create a job with missing pages only and return its id, or -1 if nothing to download.
+     */
     override suspend fun enqueue(request: DownloadRequestV2): Long {
         val seriesId = request.seriesId ?: return -1L
         val volumeId = request.volumeId
@@ -121,6 +129,9 @@ class EpubDownloadStrategyV2(
         return jobId
     }
 
+    /**
+     * Execute the job: fetch HTML pages, rewrite assets, and update progress.
+     */
     override suspend fun run(jobId: Long) {
         val job = downloadDao.getJob(jobId) ?: return
         if (job.status == DownloadJobV2Entity.STATUS_COMPLETED) return
@@ -231,6 +242,9 @@ class EpubDownloadStrategyV2(
         }
     }
 
+    /**
+     * Persist job status changes.
+     */
     private suspend fun updateJob(
         job: DownloadJobV2Entity,
         status: String,
@@ -246,6 +260,9 @@ class EpubDownloadStrategyV2(
     }
 
     @Suppress("LoopWithTooManyJumpStatements", "MagicNumber")
+    /**
+     * Rewrite image URLs in HTML and download referenced assets locally.
+     */
     private suspend fun rewriteAndDownloadImages(
         html: String,
         assetsDir: File,
@@ -298,6 +315,9 @@ class EpubDownloadStrategyV2(
             Pair(result, totalBytes)
         }
 
+    /**
+     * Download a binary asset and return the local URI + byte size.
+     */
     private suspend fun downloadBinary(
         url: String,
         fileName: String,

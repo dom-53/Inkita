@@ -14,10 +14,16 @@ import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 
+/**
+ * WorkManager worker that processes queued Download V2 jobs with concurrency limits and retry logic.
+ */
 class DownloadWorkerV2(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
+    /**
+     * Pull pending jobs and execute them via their strategy until the queue is empty.
+     */
     override suspend fun doWork(): Result {
         val db = InkitaDatabase.getInstance(applicationContext)
         val dao = db.downloadV2Dao()
@@ -56,6 +62,9 @@ class DownloadWorkerV2(
         return Result.success()
     }
 
+    /**
+     * Execute a single job using its strategy and apply retry rules if needed.
+     */
     private suspend fun runJob(
         job: DownloadJobV2Entity,
         dao: net.dom53.inkita.data.local.db.dao.DownloadV2Dao,
