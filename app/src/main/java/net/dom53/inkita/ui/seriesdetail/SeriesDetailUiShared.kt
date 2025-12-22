@@ -2,6 +2,7 @@ package net.dom53.inkita.ui.seriesdetail
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -19,31 +20,49 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.FractionalThreshold
+import androidx.compose.material.rememberSwipeableState
+import androidx.compose.material.swipeable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Downloading
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import kotlin.math.roundToInt
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.offset
 import net.dom53.inkita.R
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.ui.common.chapterCoverUrl
@@ -240,6 +259,171 @@ internal enum class ChapterDownloadState {
     None,
     Partial,
     Complete,
+}
+
+@OptIn(ExperimentalMaterialApi::class)
+@Composable
+internal fun ChapterPagesSection(
+    chapter: net.dom53.inkita.data.api.dto.ChapterDto?,
+    chapterIndex: Int,
+    downloadedPages: Set<Int>,
+    onTogglePageDownload: (net.dom53.inkita.data.api.dto.ChapterDto, Int, Boolean) -> Unit,
+    onOpenPage: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    val title =
+        chapter
+            ?.titleName
+            ?.takeIf { it.isNotBlank() }
+            ?: chapter
+                ?.title
+                ?.takeIf { it.isNotBlank() }
+            ?: chapter
+                ?.range
+                ?.takeIf { it.isNotBlank() }
+            ?: context.getString(net.dom53.inkita.R.string.series_detail_chapter_fallback, chapterIndex + 1)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(Icons.Filled.ArrowBack, contentDescription = null)
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+    val pages = chapter?.pages ?: 0
+    val pagesRead = chapter?.pagesRead ?: 0
+    if (pages <= 0) {
+        Text(
+            text = stringResource(net.dom53.inkita.R.string.series_detail_pages_unavailable),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        val shape = RoundedCornerShape(10.dp)
+        repeat(pages) { index ->
+            val isRead = index < pagesRead
+            val isCurrent = pagesRead in 0 until pages && index == pagesRead
+            val isDownloaded = downloadedPages.contains(index)
+            val containerColor =
+                if (isRead) {
+                    MaterialTheme.colorScheme.surfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.surface
+                }
+            val textColor =
+                when {
+                    isCurrent -> MaterialTheme.colorScheme.primary
+                    isRead -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            val border =
+                if (isCurrent) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+            val density = LocalDensity.current
+            val swipeDistance = with(density) { 160.dp.toPx() }
+            val swipeState = rememberSwipeableState(initialValue = 0)
+            val anchors = remember(swipeDistance) { mapOf(0f to 0, -swipeDistance to 1) }
+            var actionTriggered by remember { mutableStateOf(false) }
+            LaunchedEffect(swipeState.currentValue) {
+                if (swipeState.currentValue == 1 && !actionTriggered) {
+                    actionTriggered = true
+                    chapter?.let { onTogglePageDownload(it, index, isDownloaded) }
+                    swipeState.animateTo(0)
+                    actionTriggered = false
+                }
+            }
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .swipeable(
+                            state = swipeState,
+                            anchors = anchors,
+                            thresholds = { _, _ -> FractionalThreshold(0.25f) },
+                            orientation = Orientation.Horizontal,
+                        ),
+            ) {
+                val icon =
+                    if (isDownloaded) {
+                        Icons.Filled.Delete
+                    } else {
+                        Icons.Filled.FileDownload
+                    }
+                val tint =
+                    if (isDownloaded) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = tint,
+                    )
+                }
+                Row(
+                    modifier =
+                        Modifier
+                            .offset { IntOffset(swipeState.offset.value.roundToInt(), 0) }
+                            .fillMaxWidth()
+                            .background(containerColor, shape)
+                            .then(
+                                if (border != null) {
+                                    Modifier.border(border, shape)
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .clickable { chapter?.let { onOpenPage(it, index) } }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = "${stringResource(net.dom53.inkita.R.string.general_page)} ${index + 1}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = textColor,
+                        modifier = Modifier.width(86.dp),
+                    )
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = textColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (isDownloaded) {
+                        Icon(
+                            imageVector = Icons.Filled.DownloadDone,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
