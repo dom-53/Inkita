@@ -549,7 +549,7 @@ private fun PlaceholderSeriesGrid(
     gridState: LazyGridState,
     disableThumbnails: Boolean,
 ) {
-    val shimmerProgress = rememberShimmerProgress()
+    val shimmerProgress = rememberShimmerProgress(enabled = true)
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.fillMaxSize(),
@@ -617,7 +617,7 @@ private fun SeriesGrid(
     onLoadMore: () -> Unit,
     onSeriesClick: (Series) -> Unit,
 ) {
-    val shimmerProgress = rememberShimmerProgress()
+    val shimmerProgress = rememberShimmerProgress(enabled = isLoadingMore)
     LaunchedEffect(gridState) {
         snapshotFlow {
             val info = gridState.layoutInfo
@@ -680,9 +680,8 @@ private fun SeriesGrid(
                         ) {
                             when (painter.state) {
                                 is coil.compose.AsyncImagePainter.State.Loading -> {
-                                    ShimmerBox(
+                                    ShimmerBoxAnimated(
                                         modifier = Modifier.matchParentSize(),
-                                        progress = shimmerProgress,
                                     )
                                 }
                                 is coil.compose.AsyncImagePainter.State.Error -> {
@@ -760,7 +759,8 @@ private fun ShimmerBox(
 }
 
 @Composable
-private fun rememberShimmerProgress(): Float {
+private fun rememberShimmerProgress(enabled: Boolean): Float {
+    if (!enabled) return 0f
     val transition = rememberInfiniteTransition(label = "shimmer")
     return transition
         .animateFloat(
@@ -773,6 +773,19 @@ private fun rememberShimmerProgress(): Float {
                 ),
             label = "shimmer_progress",
         ).value
+}
+
+@Composable
+private fun ShimmerBoxAnimated(
+    modifier: Modifier,
+    height: Dp? = null,
+) {
+    val progress = rememberShimmerProgress(enabled = true)
+    ShimmerBox(
+        modifier = modifier,
+        progress = progress,
+        height = height,
+    )
 }
 
 private fun seriesCoverUrl(
