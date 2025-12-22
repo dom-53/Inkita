@@ -386,6 +386,7 @@ fun InkitaApp(
                         net.dom53.inkita.ui.seriesdetail.VolumeDetailScreenV2(
                             volumeId = volumeId,
                             appPreferences = appPreferences,
+                            readerRepository = readerRepository,
                             readerReturn = readerReturn.value,
                             onConsumeReaderReturn = {
                                 entry.savedStateHandle["reader_return"] = null

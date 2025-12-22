@@ -72,6 +72,7 @@ import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.domain.model.Format
+import net.dom53.inkita.domain.repository.ReaderRepository
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
@@ -81,6 +82,7 @@ import kotlin.math.roundToInt
 fun VolumeDetailScreenV2(
     volumeId: Int,
     appPreferences: AppPreferences,
+    readerRepository: ReaderRepository,
     readerReturn: net.dom53.inkita.ui.reader.ReaderReturn? = null,
     onConsumeReaderReturn: () -> Unit = {},
     onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
@@ -136,6 +138,10 @@ fun VolumeDetailScreenV2(
     var volumeState by remember(volumeId) { mutableStateOf(payload.volume) }
     LaunchedEffect(readerReturn) {
         if (readerReturn != null) {
+            applyLocalProgress(volumeState, readerRepository)?.let { updated ->
+                volumeState = updated
+                VolumeDetailCache.put(payload.copy(volume = updated))
+            }
             if (offlineMode) {
                 onConsumeReaderReturn()
                 return@LaunchedEffect
@@ -157,6 +163,14 @@ fun VolumeDetailScreenV2(
                 }
             }
             onConsumeReaderReturn()
+        }
+    }
+    LaunchedEffect(volumeId, offlineMode) {
+        if (offlineMode) {
+            applyLocalProgress(volumeState, readerRepository)?.let { updated ->
+                volumeState = updated
+                VolumeDetailCache.put(payload.copy(volume = updated))
+            }
         }
     }
 
@@ -863,4 +877,33 @@ private fun isItemPathPresent(path: String?): Boolean {
         val normalized = path.removePrefix("file://")
         java.io.File(normalized).exists()
     }
+}
+
+private suspend fun applyLocalProgress(
+    volume: net.dom53.inkita.data.api.dto.VolumeDto,
+    readerRepository: ReaderRepository,
+): net.dom53.inkita.data.api.dto.VolumeDto? {
+    val chapters = volume.chapters.orEmpty()
+    if (chapters.isEmpty()) return null
+    val chapterIds = chapters.map { it.id }.toSet()
+    val local = readerRepository.getLatestLocalProgressForChapters(chapterIds) ?: return null
+    val pageInChapter = local.page ?: 0
+    var cumulative = 0
+    var updatedPagesRead: Int? = null
+    val updatedChapters =
+        chapters.map { ch ->
+            val pages = ch.pages ?: 0
+            if (ch.id == local.chapterId) {
+                updatedPagesRead = (cumulative + pageInChapter).coerceAtLeast(0)
+                ch.copy(pagesRead = pageInChapter)
+            } else {
+                cumulative += pages
+                ch
+            }
+        }
+    if (updatedPagesRead == null) return null
+    return volume.copy(
+        pagesRead = updatedPagesRead,
+        chapters = updatedChapters,
+    )
 }
