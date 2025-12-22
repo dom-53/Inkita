@@ -309,7 +309,7 @@ fun SettingsAdvancedScreen(
                     cacheAlwaysRefresh = checked
                     scope.launch { appPreferences.setCacheAlwaysRefresh(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
 
@@ -340,7 +340,7 @@ fun SettingsAdvancedScreen(
                 label = { Text(stringResource(R.string.settings_cache_stale_hours_label)) },
                 supportingText = { Text(stringResource(R.string.settings_cache_stale_hours_hint)) },
                 singleLine = true,
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
             Text(
                 text = stringResource(R.string.settings_cache_units_hours),
@@ -423,7 +423,7 @@ fun SettingsAdvancedScreen(
                     cacheEnabled = checked
                     scope.launch { appPreferences.setLibraryCacheEnabled(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
 
@@ -714,7 +714,7 @@ fun SettingsAdvancedScreen(
                             prefetchCollectionsAll = true
                             scope.launch { appPreferences.setPrefetchCollectionsAll(true) }
                         },
-                        enabled = globalCacheEnabled,
+                        enabled = false,
                         colors =
                             ButtonDefaults.outlinedButtonColors(
                                 containerColor =
@@ -730,7 +730,7 @@ fun SettingsAdvancedScreen(
                             prefetchCollectionsAll = false
                             scope.launch { appPreferences.setPrefetchCollectionsAll(false) }
                         },
-                        enabled = globalCacheEnabled,
+                        enabled = false,
                         colors =
                             ButtonDefaults.outlinedButtonColors(
                                 containerColor =
@@ -770,7 +770,7 @@ fun SettingsAdvancedScreen(
                                             selectedCollectionIds = next
                                             scope.launch { appPreferences.setPrefetchCollectionIds(next.toList()) }
                                         },
-                                        enabled = globalCacheEnabled,
+                                        enabled = false,
                                     )
                                     Text(collection.name, style = MaterialTheme.typography.bodyMedium)
                                 }
@@ -807,7 +807,7 @@ fun SettingsAdvancedScreen(
                     prefetchDetails = checked
                     scope.launch { appPreferences.setPrefetchDetails(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
 
@@ -832,7 +832,7 @@ fun SettingsAdvancedScreen(
                     prefetchAllowMetered = checked
                     scope.launch { appPreferences.setPrefetchAllowMetered(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
 
@@ -857,7 +857,7 @@ fun SettingsAdvancedScreen(
                     prefetchAllowLowBattery = checked
                     scope.launch { appPreferences.setPrefetchAllowLowBattery(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
 
