@@ -265,7 +265,7 @@ class LibraryV2ViewModel(
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleMinutes * 60L * 1000L
             logCacheDecision(
                 "home",
-                "online=$isOnline cache=${cachedHasData} stale=$isStale refresh=$alwaysRefresh onDeck=${cachedOnDeck.size} updated=${cachedUpdated.size} added=${cachedAdded.size}",
+                "online=$isOnline cache=$cachedHasData stale=$isStale refresh=$alwaysRefresh onDeck=${cachedOnDeck.size} updated=${cachedUpdated.size} added=${cachedAdded.size}",
             )
             val showDebugToast = appPreferences.debugToastsFlow.first()
             if (cachedHasData) {
@@ -325,7 +325,9 @@ class LibraryV2ViewModel(
             val addedResult = runCatching { seriesRepository.getRecentlyAddedSeries(1, 20) }
             logCacheDecision(
                 "home",
-                "fetched onDeck=${onDeckResult.getOrDefault(emptyList()).size} updated=${updatedResult.getOrDefault(emptyList()).size} added=${addedResult.getOrDefault(emptyList()).size}",
+                "fetched onDeck=${onDeckResult.getOrDefault(
+                    emptyList(),
+                ).size} updated=${updatedResult.getOrDefault(emptyList()).size} added=${addedResult.getOrDefault(emptyList()).size}",
             )
 
             val onDeck =
@@ -845,7 +847,10 @@ class LibraryV2ViewModel(
             ).show()
     }
 
-    private fun logCacheDecision(section: String, message: String) {
+    private fun logCacheDecision(
+        section: String,
+        message: String,
+    ) {
         if (!LoggingManager.isDebugEnabled()) return
         LoggingManager.d("LibraryV2Cache", "[$section] $message")
     }

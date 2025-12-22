@@ -63,16 +63,17 @@ import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.data.api.dto.ReaderProgressDto
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
+import net.dom53.inkita.data.mapper.flattenToc
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.repository.ReaderRepository
-import net.dom53.inkita.data.api.dto.ReaderProgressDto
-import net.dom53.inkita.data.mapper.flattenToc
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
 
+@Suppress("CyclomaticComplexMethod")
 @Composable
 fun VolumeDetailScreenV2(
     volumeId: Int,
@@ -592,15 +593,15 @@ fun VolumeDetailScreenV2(
                             },
                             onChapterLongPress = { chapter, index ->
                                 scope.launch {
-                                val completed =
-                                    downloadDao
-                                        .getItemsForChapter(chapter.id)
-                                        .count { item ->
-                                            item.status ==
-                                                net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                                isItemPathPresent(item.localPath)
-                                        }
-                                val expected = chapter.pages?.takeIf { it > 0 } ?: 0
+                                    val completed =
+                                        downloadDao
+                                            .getItemsForChapter(chapter.id)
+                                            .count { item ->
+                                                item.status ==
+                                                    net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                    isItemPathPresent(item.localPath)
+                                            }
+                                    val expected = chapter.pages?.takeIf { it > 0 } ?: 0
                                     if (expected == 0 && completed == 0) {
                                         Toast
                                             .makeText(

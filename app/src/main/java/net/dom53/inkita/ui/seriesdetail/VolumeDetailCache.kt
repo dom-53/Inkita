@@ -1,7 +1,7 @@
 package net.dom53.inkita.ui.seriesdetail
 
-import net.dom53.inkita.data.api.dto.VolumeDto
 import net.dom53.inkita.core.logging.LoggingManager
+import net.dom53.inkita.data.api.dto.VolumeDto
 
 data class VolumeDetailPayload(
     val seriesId: Int,

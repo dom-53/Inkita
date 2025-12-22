@@ -212,106 +212,106 @@ private fun TaskRow(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-        val seriesLabel = task.seriesId?.toString() ?: "-"
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                stringResource(R.string.download_item_title, seriesLabel, labelType),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            DownloadStatusChip(status = task.status)
-        }
-        val chapterLabel = task.chapterId?.toString() ?: "-"
-        val total = task.totalItems ?: 0
-        val pageEnd = if (total > 0) total - 1 else "-"
-        Text(
-            stringResource(R.string.download_item_chapter_pages, chapterLabel, 0, pageEnd),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (task.createdAt > 0) {
+            val seriesLabel = task.seriesId?.toString() ?: "-"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    stringResource(R.string.download_item_created, formatDate(task.createdAt)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    stringResource(R.string.download_item_title, seriesLabel, labelType),
+                    style = MaterialTheme.typography.titleMedium,
                 )
+                DownloadStatusChip(status = task.status)
             }
-            if (task.updatedAt > 0) {
-                Text(
-                    stringResource(R.string.download_item_updated, formatDate(task.updatedAt)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if ((task.totalItems ?: 0) > 0) {
+            val chapterLabel = task.chapterId?.toString() ?: "-"
             val total = task.totalItems ?: 0
-            val progress = task.completedItems ?: 0
-            val pct = (progress * 100f / total).toInt().coerceIn(0, 100)
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                LinearProgressIndicator(
-                    progress = { progress.toFloat() / total.toFloat() },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    stringResource(R.string.download_item_progress, progress, total, pct),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        task.error?.takeIf { it.isNotBlank() }?.let { err ->
+            val pageEnd = if (total > 0) total - 1 else "-"
             Text(
-                stringResource(R.string.download_item_error, err),
-                color = MaterialTheme.colorScheme.error,
+                stringResource(R.string.download_item_chapter_pages, chapterLabel, 0, pageEnd),
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            when (task.status) {
-                DownloadJobV2Entity.STATUS_PENDING,
-                DownloadJobV2Entity.STATUS_RUNNING,
-                -> {
-                    FilledTonalButton(onClick = onPause) {
-                        Text(stringResource(R.string.download_action_pause))
-                    }
-                    OutlinedButton(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
-                        Text(stringResource(R.string.general_cancel))
-                    }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (task.createdAt > 0) {
+                    Text(
+                        stringResource(R.string.download_item_created, formatDate(task.createdAt)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                DownloadJobV2Entity.STATUS_PAUSED -> {
-                    FilledTonalButton(onClick = onResume) {
-                        Text(stringResource(R.string.download_action_resume))
-                    }
-                    OutlinedButton(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
-                        Text(stringResource(R.string.general_cancel))
-                    }
+                if (task.updatedAt > 0) {
+                    Text(
+                        stringResource(R.string.download_item_updated, formatDate(task.updatedAt)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                DownloadJobV2Entity.STATUS_FAILED -> {
-                    FilledTonalButton(onClick = onRetry) {
-                        Text(stringResource(R.string.download_action_retry))
-                    }
-                    OutlinedButton(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
-                        Text(stringResource(R.string.general_cancel))
-                    }
+            }
+            if ((task.totalItems ?: 0) > 0) {
+                val total = task.totalItems ?: 0
+                val progress = task.completedItems ?: 0
+                val pct = (progress * 100f / total).toInt().coerceIn(0, 100)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LinearProgressIndicator(
+                        progress = { progress.toFloat() / total.toFloat() },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        stringResource(R.string.download_item_progress, progress, total, pct),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                DownloadJobV2Entity.STATUS_CANCELED -> {
-                    OutlinedButton(onClick = onClear) {
-                        Text(stringResource(R.string.download_action_clear))
+            }
+            task.error?.takeIf { it.isNotBlank() }?.let { err ->
+                Text(
+                    stringResource(R.string.download_item_error, err),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                when (task.status) {
+                    DownloadJobV2Entity.STATUS_PENDING,
+                    DownloadJobV2Entity.STATUS_RUNNING,
+                    -> {
+                        FilledTonalButton(onClick = onPause) {
+                            Text(stringResource(R.string.download_action_pause))
+                        }
+                        OutlinedButton(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
+                            Text(stringResource(R.string.general_cancel))
+                        }
                     }
+                    DownloadJobV2Entity.STATUS_PAUSED -> {
+                        FilledTonalButton(onClick = onResume) {
+                            Text(stringResource(R.string.download_action_resume))
+                        }
+                        OutlinedButton(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
+                            Text(stringResource(R.string.general_cancel))
+                        }
+                    }
+                    DownloadJobV2Entity.STATUS_FAILED -> {
+                        FilledTonalButton(onClick = onRetry) {
+                            Text(stringResource(R.string.download_action_retry))
+                        }
+                        OutlinedButton(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
+                            Text(stringResource(R.string.general_cancel))
+                        }
+                    }
+                    DownloadJobV2Entity.STATUS_CANCELED -> {
+                        OutlinedButton(onClick = onClear) {
+                            Text(stringResource(R.string.download_action_clear))
+                        }
+                    }
+                    else -> Unit
                 }
-                else -> Unit
             }
         }
-    }
     }
 }
 
@@ -329,46 +329,46 @@ private fun DownloadedRow(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-        Text(
-            stringResource(
-                R.string.download_item_v2_title,
-                page.id,
-                page.chapterId ?: "-",
-                page.page ?: "-",
-            ),
-            style = MaterialTheme.typography.titleMedium,
-        )
-        DownloadStatusChip(status = page.status)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                stringResource(R.string.download_completed_updated, formatDate(page.updatedAt)),
+                stringResource(
+                    R.string.download_item_v2_title,
+                    page.id,
+                    page.chapterId ?: "-",
+                    page.page ?: "-",
+                ),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            DownloadStatusChip(status = page.status)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    stringResource(R.string.download_completed_updated, formatDate(page.updatedAt)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(R.string.download_completed_size, formatBytes(page.bytes ?: 0L)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                page.localPath ?: "-",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                stringResource(R.string.download_completed_size, formatBytes(page.bytes ?: 0L)),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Text(
-            page.localPath ?: "-",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FilledTonalButton(onClick = onOpen) {
-                Text(stringResource(R.string.download_completed_open))
-            }
-            OutlinedButton(onClick = onDelete, modifier = Modifier.padding(start = 8.dp)) {
-                Text(stringResource(R.string.download_completed_delete))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FilledTonalButton(onClick = onOpen) {
+                    Text(stringResource(R.string.download_completed_open))
+                }
+                OutlinedButton(onClick = onDelete, modifier = Modifier.padding(start = 8.dp)) {
+                    Text(stringResource(R.string.download_completed_delete))
+                }
             }
         }
-    }
     }
 }
 

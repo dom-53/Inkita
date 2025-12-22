@@ -418,7 +418,9 @@ class ReaderRepositoryImpl(
     }
 
     private fun isOnlineAllowed(): Boolean =
-        NetworkMonitor.getInstance(context, appPreferences).status.value.isOnlineAllowed
+        NetworkMonitor
+            .getInstance(context, appPreferences)
+            .status.value.isOnlineAllowed
 
     private suspend fun getOfflineBookInfo(chapterId: Int): ReaderBookInfo? {
         val items = downloadV2Dao?.getItemsForChapter(chapterId).orEmpty()

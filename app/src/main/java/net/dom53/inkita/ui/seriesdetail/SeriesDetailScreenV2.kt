@@ -80,6 +80,7 @@ import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.api.dto.MarkVolumeReadDto
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
+import net.dom53.inkita.data.mapper.flattenToc
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.ui.browse.utils.PublicationState
 import net.dom53.inkita.ui.common.chapterCoverUrl
@@ -87,8 +88,8 @@ import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
-import net.dom53.inkita.data.mapper.flattenToc
 
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 @Composable
 fun SeriesDetailScreenV2(
     seriesId: Int,
@@ -185,7 +186,9 @@ fun SeriesDetailScreenV2(
         if (!config.isConfigured) return@LaunchedEffect
         val pages = chapter.pages ?: 0
         if (pages <= 0) return@LaunchedEffect
-        val api = net.dom53.inkita.core.network.KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val api =
+            net.dom53.inkita.core.network.KavitaApiFactory
+                .createAuthenticated(config.serverUrl, config.apiKey)
         val tocResponse = api.getBookChapters(chapter.id)
         if (!tocResponse.isSuccessful) return@LaunchedEffect
         val tocItems = tocResponse.body().orEmpty().flatMap { flattenToc(it) }

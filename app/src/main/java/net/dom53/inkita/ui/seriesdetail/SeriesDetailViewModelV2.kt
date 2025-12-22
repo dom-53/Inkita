@@ -258,7 +258,10 @@ class SeriesDetailViewModelV2(
 
     fun markSeriesRead(markRead: Boolean) {
         viewModelScope.launch {
-            val currentSeriesId = _state.value.detail?.series?.id ?: seriesId
+            val currentSeriesId =
+                _state.value.detail
+                    ?.series
+                    ?.id ?: seriesId
             if (appPreferences.offlineModeFlow.first()) {
                 _state.update { it.copy(error = "Offline mode") }
                 return@launch
@@ -497,13 +500,23 @@ class SeriesDetailViewModelV2(
                 ?: run {
                     val chapterIds =
                         buildSet {
-                            detail.detail?.volumes
+                            detail.detail
+                                ?.volumes
                                 ?.flatMap { it.chapters.orEmpty() }
                                 ?.map { it.id }
                                 ?.let { addAll(it) }
-                            detail.detail?.chapters?.map { it.id }?.let { addAll(it) }
-                            detail.detail?.specials?.map { it.id }?.let { addAll(it) }
-                            detail.detail?.storylineChapters?.map { it.id }?.let { addAll(it) }
+                            detail.detail
+                                ?.chapters
+                                ?.map { it.id }
+                                ?.let { addAll(it) }
+                            detail.detail
+                                ?.specials
+                                ?.map { it.id }
+                                ?.let { addAll(it) }
+                            detail.detail
+                                ?.storylineChapters
+                                ?.map { it.id }
+                                ?.let { addAll(it) }
                         }
                     readerRepository.getLatestLocalProgressForChapters(chapterIds)
                 }

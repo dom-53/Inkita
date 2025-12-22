@@ -18,7 +18,13 @@ private fun String?.toEpochMillis(): Long {
     if (raw.isBlank()) return 0L
     runCatching { return Instant.parse(raw).toEpochMilli() }
     runCatching { return OffsetDateTime.parse(raw).toInstant().toEpochMilli() }
-    runCatching { return LocalDateTime.parse(raw).atZone(ZoneOffset.UTC).toInstant().toEpochMilli() }
+    runCatching {
+        return LocalDateTime
+            .parse(raw)
+            .atZone(ZoneOffset.UTC)
+            .toInstant()
+            .toEpochMilli()
+    }
     return 0L
 }
 
