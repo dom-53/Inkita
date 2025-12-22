@@ -371,6 +371,16 @@ class ReaderRepositoryImpl(
         return latest?.toDomain()
     }
 
+    override suspend fun getLatestLocalProgressForChapters(chapterIds: Set<Int>): ReaderProgress? {
+        if (chapterIds.isEmpty()) return null
+        val locals = runCatching { readerDao.getAllLocalProgress() }.getOrDefault(emptyList())
+        val latest =
+            locals
+                .filter { it.chapterId in chapterIds }
+                .maxByOrNull { it.lastModifiedUtc }
+        return latest?.toDomain()
+    }
+
     private suspend fun apiOrThrow(): net.dom53.inkita.data.api.KavitaApi {
         val config = appPreferences.configFlow.first()
         check(config.isConfigured) { "Not authenticated" }

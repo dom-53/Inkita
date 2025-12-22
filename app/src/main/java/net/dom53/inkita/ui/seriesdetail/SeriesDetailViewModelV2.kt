@@ -412,7 +412,22 @@ class SeriesDetailViewModelV2(
         detail: InkitaDetailV2,
         isOnline: Boolean,
     ): InkitaDetailV2 {
-        val local = readerRepository.getLatestLocalProgress(seriesId) ?: return detail
+        val local =
+            readerRepository.getLatestLocalProgress(seriesId)
+                ?: run {
+                    val chapterIds =
+                        buildSet {
+                            detail.detail?.volumes
+                                ?.flatMap { it.chapters.orEmpty() }
+                                ?.map { it.id }
+                                ?.let { addAll(it) }
+                            detail.detail?.chapters?.map { it.id }?.let { addAll(it) }
+                            detail.detail?.specials?.map { it.id }?.let { addAll(it) }
+                            detail.detail?.storylineChapters?.map { it.id }?.let { addAll(it) }
+                        }
+                    readerRepository.getLatestLocalProgressForChapters(chapterIds)
+                }
+                ?: return detail
         val localProgress =
             if (local.seriesId == null) {
                 local.copy(seriesId = seriesId)
