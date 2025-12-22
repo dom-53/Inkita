@@ -50,6 +50,11 @@ import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
 
+/**
+ * Default cache implementation for legacy (no-op) and V2 cache flows.
+ *
+ * Uses Room DAOs for structured lists and details, and stores thumbnails on disk.
+ */
 class CacheManagerImpl(
     private val appPreferences: AppPreferences,
     private val libraryV2Dao: LibraryV2Dao? = null,
@@ -107,6 +112,7 @@ class CacheManagerImpl(
             Types.newParameterizedType(List::class.java, AnnotationDto::class.java),
         )
 
+    /** Read cache-related preferences and build a policy snapshot. */
     override suspend fun policy(): CachePolicy {
         val global = appPreferences.cacheEnabledFlow.first()
         val library = appPreferences.libraryCacheEnabledFlow.first()
@@ -130,6 +136,7 @@ class CacheManagerImpl(
         )
     }
 
+    /** Resolve and populate local thumbnail paths for a series list. */
     override suspend fun enrichThumbnails(series: List<Series>): List<Series> {
         if (thumbnailsDir == null) return series
         val p = policy()
@@ -147,6 +154,7 @@ class CacheManagerImpl(
         }
     }
 
+    /** Legacy cache entry point kept as no-op for compatibility. */
     override suspend fun cacheTabResults(
         key: LibraryTabCacheKey,
         series: List<Series>,
@@ -154,6 +162,7 @@ class CacheManagerImpl(
         // Legacy cache removed; no-op.
     }
 
+    /** Legacy cache entry point kept as no-op for compatibility. */
     override suspend fun cacheBrowsePage(
         queryKey: String,
         page: Int,
@@ -162,21 +171,27 @@ class CacheManagerImpl(
         // Legacy cache removed; no-op.
     }
 
+    /** Legacy cache entry point kept as no-op for compatibility. */
     override suspend fun cacheSeriesDetail(detail: SeriesDetail) {
         // Legacy cache removed; no-op.
     }
 
+    /** Legacy cache read kept as empty for compatibility. */
     override suspend fun getCachedSeries(query: SeriesQuery): List<Series> = emptyList()
 
+    /** Legacy cache read kept as empty for compatibility. */
     override suspend fun getCachedSeriesForTab(key: LibraryTabCacheKey): List<Series> = emptyList()
 
+    /** Legacy cache read kept as empty for compatibility. */
     override suspend fun getCachedBrowsePage(
         queryKey: String,
         page: Int,
     ): List<Series> = emptyList()
 
+    /** Legacy cache read kept as null for compatibility. */
     override suspend fun getCachedSeriesDetail(seriesId: Int): SeriesDetail? = null
 
+    /** Store a Library V2 series list along with reference ordering. */
     override suspend fun cacheLibraryV2SeriesList(
         listType: String,
         listKey: String,
@@ -206,6 +221,7 @@ class CacheManagerImpl(
         }
     }
 
+    /** Read a cached Library V2 series list by list type and key. */
     override suspend fun getCachedLibraryV2SeriesList(
         listType: String,
         listKey: String,
@@ -220,6 +236,7 @@ class CacheManagerImpl(
         return result
     }
 
+    /** Read the last update timestamp for a Library V2 series list. */
     override suspend fun getLibraryV2SeriesListUpdatedAt(
         listType: String,
         listKey: String,
@@ -228,16 +245,19 @@ class CacheManagerImpl(
         return dao.getSeriesListUpdatedAt(listType, listKey)
     }
 
+    /** Read the last update timestamp for cached collections list. */
     override suspend fun getLibraryV2CollectionsUpdatedAt(listType: String): Long? {
         val dao = libraryV2Dao ?: return null
         return dao.getCollectionsUpdatedAt(listType)
     }
 
+    /** Read the last update timestamp for cached reading lists. */
     override suspend fun getLibraryV2ReadingListsUpdatedAt(listType: String): Long? {
         val dao = libraryV2Dao ?: return null
         return dao.getReadingListsUpdatedAt(listType)
     }
 
+    /** Read the last update timestamp for cached people list. */
     override suspend fun getLibraryV2PeopleUpdatedAt(
         listType: String,
         page: Int,
@@ -246,6 +266,7 @@ class CacheManagerImpl(
         return dao.getPeopleUpdatedAt(listType, page)
     }
 
+    /** Store cached collection list and references. */
     override suspend fun cacheLibraryV2Collections(
         listType: String,
         collections: List<Collection>,
@@ -272,6 +293,7 @@ class CacheManagerImpl(
         }
     }
 
+    /** Read cached collection list. */
     override suspend fun getCachedLibraryV2Collections(listType: String): List<Collection> {
         val dao = libraryV2Dao ?: return emptyList()
         val p = policy()
@@ -283,6 +305,7 @@ class CacheManagerImpl(
         return result
     }
 
+    /** Store cached reading lists and references. */
     override suspend fun cacheLibraryV2ReadingLists(
         listType: String,
         readingLists: List<ReadingList>,
@@ -309,6 +332,7 @@ class CacheManagerImpl(
         }
     }
 
+    /** Read cached reading lists. */
     override suspend fun getCachedLibraryV2ReadingLists(listType: String): List<ReadingList> {
         val dao = libraryV2Dao ?: return emptyList()
         val p = policy()
@@ -320,6 +344,7 @@ class CacheManagerImpl(
         return result
     }
 
+    /** Store cached people list and references for a page. */
     override suspend fun cacheLibraryV2People(
         listType: String,
         page: Int,
@@ -353,6 +378,7 @@ class CacheManagerImpl(
         }
     }
 
+    /** Read cached people list for a page. */
     override suspend fun getCachedLibraryV2People(
         listType: String,
         page: Int,
@@ -367,6 +393,7 @@ class CacheManagerImpl(
         return result
     }
 
+    /** Store the aggregated Series Detail V2 payload. */
     override suspend fun cacheSeriesDetailV2(
         seriesId: Int,
         detail: InkitaDetailV2,
@@ -412,6 +439,7 @@ class CacheManagerImpl(
         }
     }
 
+    /** Read cached Series Detail V2 payload. */
     override suspend fun getCachedSeriesDetailV2(seriesId: Int): InkitaDetailV2? {
         val dao = seriesDetailV2Dao ?: return null
         val p = policy()
@@ -469,11 +497,13 @@ class CacheManagerImpl(
         )
     }
 
+    /** Read the last update timestamp for Series Detail V2. */
     override suspend fun getSeriesDetailV2UpdatedAt(seriesId: Int): Long? {
         val dao = seriesDetailV2Dao ?: return null
         return dao.getSeriesDetailUpdatedAt(seriesId)
     }
 
+    /** Clear all cached data, including thumbnails and DB records. */
     override suspend fun clearAllCache() {
         val p = policy()
         if (!p.globalEnabled) return
@@ -482,18 +512,21 @@ class CacheManagerImpl(
         LoggingManager.d("CacheManager", "Cleared all cached data and thumbnails")
     }
 
+    /** Clear only cached thumbnails. */
     override suspend fun clearThumbnails() {
         val p = policy()
         if (!p.globalEnabled) return
         clearThumbnailsInternal()
     }
 
+    /** Clear only cached database data. */
     override suspend fun clearDatabase() {
         val p = policy()
         if (!p.globalEnabled) return
         clearDatabaseInternal()
     }
 
+    /** Clear only cached Series Detail V2 payloads. */
     override suspend fun clearDetails() {
         val p = policy()
         if (!p.globalEnabled) return
@@ -507,6 +540,7 @@ class CacheManagerImpl(
         }
     }
 
+    /** Return total cache size in bytes (DB + thumbnails). */
     override suspend fun getCacheSizeBytes(): Long =
         withContext(Dispatchers.IO) {
             var total = 0L
@@ -515,6 +549,7 @@ class CacheManagerImpl(
             total
         }
 
+    /** Build a snapshot of cached counts and sizes for diagnostics. */
     override suspend fun getCacheStats(): CacheStats {
         val policy = policy()
         val dbSize = dbFile?.takeIf { it.exists() }?.length() ?: 0L
@@ -572,6 +607,7 @@ class CacheManagerImpl(
         return stats
     }
 
+    /** Compute the total byte size of a directory tree. */
     private fun dirSize(dir: File?): Long {
         if (dir == null || !dir.exists()) return 0L
         return dir
@@ -581,6 +617,7 @@ class CacheManagerImpl(
             .sum()
     }
 
+    /** Count the number of files inside a directory tree. */
     private fun dirFileCount(dir: File?): Int {
         if (dir == null || !dir.exists()) return 0
         return dir
@@ -588,6 +625,7 @@ class CacheManagerImpl(
             .count { it.isFile }
     }
 
+    /** Remove all cached thumbnails from disk. */
     private fun clearThumbnailsInternal() {
         thumbnailsDir?.listFiles()?.forEach { file ->
             runCatching { file.delete() }
@@ -595,6 +633,7 @@ class CacheManagerImpl(
         LoggingManager.d("CacheManager", "Cleared thumbnails")
     }
 
+    /** Remove all cached rows from V2 cache tables. */
     private suspend fun clearDatabaseInternal() {
         libraryV2Dao?.let { v2Dao ->
             v2Dao.clearAllSeriesRefs()
@@ -617,6 +656,7 @@ class CacheManagerImpl(
         LoggingManager.d("CacheManager", "Cleared database cache")
     }
 
+    /** Gate Library V2 cache reads/writes by policy and list type. */
     private fun isLibraryV2CacheAllowed(
         policy: CachePolicy,
         listType: String,
@@ -637,8 +677,10 @@ class CacheManagerImpl(
         }
     }
 
+    /** Serialize a list of strings for storage. */
     private fun toJsonList(value: List<String>): String = stringListAdapter.toJson(value)
 
+    /** Recreate minimal metadata when cached JSON payload is missing. */
     private fun buildFallbackMetadata(entity: net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity): SeriesMetadataDto? {
         if (
             entity.summary == null &&
@@ -681,16 +723,19 @@ class CacheManagerImpl(
         )
     }
 
+    /** Deserialize a JSON string into an object. */
     private fun <T> fromJson(
         adapter: com.squareup.moshi.JsonAdapter<T>,
         value: String,
     ): T? = runCatching { adapter.fromJson(value) }.getOrNull()
 
+    /** Deserialize a JSON string into a list. */
     private fun <T> fromJsonList(
         adapter: com.squareup.moshi.JsonAdapter<List<T>>,
         value: String,
     ): List<T>? = runCatching { adapter.fromJson(value) }.getOrNull()
 
+    /** Convert a domain series into a cached entity row. */
     private fun Series.toCachedSeriesV2(updatedAt: Long): CachedSeriesV2Entity =
         CachedSeriesV2Entity(
             id = id,
@@ -708,6 +753,7 @@ class CacheManagerImpl(
             updatedAt = updatedAt,
         )
 
+    /** Convert a cached entity row into a domain series. */
     private fun CachedSeriesV2Entity.toDomainSeries(): Series =
         Series(
             id = id,
@@ -724,6 +770,7 @@ class CacheManagerImpl(
             localThumbPath = localThumbPath,
         )
 
+    /** Download and store a local series thumbnail if missing. */
     private suspend fun downloadThumbnailIfNeeded(
         serverUrl: String,
         apiKey: String,

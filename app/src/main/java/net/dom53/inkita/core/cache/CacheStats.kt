@@ -1,5 +1,10 @@
 package net.dom53.inkita.core.cache
 
+/**
+ * Aggregated cache metrics for the stats/debug screen.
+ *
+ * Counts are stored per table or reference list, sizes are in bytes.
+ */
 data class CacheStats(
     val seriesCount: Int = 0,
     val seriesListRefsCount: Int = 0,
