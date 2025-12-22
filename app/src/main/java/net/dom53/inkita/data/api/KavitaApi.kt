@@ -343,6 +343,16 @@ interface KavitaApi {
         @Body body: net.dom53.inkita.data.api.dto.MarkSeriesDto,
     ): Response<Unit>
 
+    @POST("api/reader/mark-volume-read")
+    suspend fun markVolumeRead(
+        @Body body: net.dom53.inkita.data.api.dto.MarkVolumeReadDto,
+    ): Response<Unit>
+
+    @POST("api/reader/mark-volume-unread")
+    suspend fun markVolumeUnread(
+        @Body body: net.dom53.inkita.data.api.dto.MarkVolumeReadDto,
+    ): Response<Unit>
+
     @POST("api/reader/mark-multiple-read")
     suspend fun markMultipleRead(
         @Body body: net.dom53.inkita.data.api.dto.MarkMultipleDto,
