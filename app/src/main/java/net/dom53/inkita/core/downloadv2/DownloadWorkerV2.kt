@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
+import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
@@ -24,10 +25,24 @@ class DownloadWorkerV2(
         val maxConcurrent = appPreferences.downloadMaxConcurrentFlow.first().coerceAtLeast(1)
         val retryEnabled = appPreferences.downloadRetryEnabledFlow.first()
         val maxRetries = appPreferences.downloadRetryMaxAttemptsFlow.first().coerceAtLeast(1)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d(
+                "DownloadWorkerV2",
+                "Start (maxConcurrent=$maxConcurrent retry=$retryEnabled maxRetries=$maxRetries)",
+            )
+        }
         val semaphore = Semaphore(maxConcurrent)
         while (true) {
             val pending = dao.getJobsByStatus(DownloadJobV2Entity.STATUS_PENDING)
-            if (pending.isEmpty()) break
+            if (pending.isEmpty()) {
+                if (LoggingManager.isDebugEnabled()) {
+                    LoggingManager.d("DownloadWorkerV2", "No pending jobs")
+                }
+                break
+            }
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("DownloadWorkerV2", "Processing pending=${pending.size}")
+            }
             coroutineScope {
                 pending.forEach { job ->
                     launch {
@@ -66,7 +81,14 @@ class DownloadWorkerV2(
                     error = "No strategy: ${job.strategy}",
                 ),
             )
+            LoggingManager.w("DownloadWorkerV2", "No strategy for job=${job.id} strategy=${job.strategy}")
             return
+        }
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d(
+                "DownloadWorkerV2",
+                "Run job=${job.id} type=${job.type} series=${job.seriesId} volume=${job.volumeId} chapter=${job.chapterId}",
+            )
         }
         strategy.run(job.id)
         val updated = dao.getJob(job.id) ?: return
@@ -79,7 +101,15 @@ class DownloadWorkerV2(
                         updatedAt = System.currentTimeMillis(),
                     ),
                 )
+                if (LoggingManager.isDebugEnabled()) {
+                    LoggingManager.d(
+                        "DownloadWorkerV2",
+                        "Retrying job=${updated.id} attempt=${updated.retryCount + 1}/$maxRetries",
+                    )
+                }
             }
+        } else if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("DownloadWorkerV2", "Job done id=${updated.id} status=${updated.status}")
         }
     }
 }

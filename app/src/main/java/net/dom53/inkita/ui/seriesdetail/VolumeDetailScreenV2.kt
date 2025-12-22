@@ -56,6 +56,7 @@ import kotlinx.coroutines.launch
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
+import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppConfig
@@ -113,6 +114,9 @@ fun VolumeDetailScreenV2(
         }
 
     if (payload == null) {
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("VolumeDetailV2", "Missing payload for volume=$volumeId")
+        }
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
@@ -128,6 +132,9 @@ fun VolumeDetailScreenV2(
     var volumeState by remember(volumeId) { mutableStateOf(payload.volume) }
     LaunchedEffect(readerReturn) {
         if (readerReturn != null) {
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("VolumeDetailV2", "Reader return; refresh volume=$volumeId")
+            }
             applyLocalProgress(volumeState, readerRepository)?.let { updated ->
                 volumeState = updated
                 VolumeDetailCache.put(payload.copy(volume = updated))
@@ -149,6 +156,9 @@ fun VolumeDetailScreenV2(
                             )
                         volumeState = merged
                         VolumeDetailCache.put(payload.copy(volume = merged))
+                        if (LoggingManager.isDebugEnabled()) {
+                            LoggingManager.d("VolumeDetailV2", "Volume refreshed from API volume=$volumeId")
+                        }
                     }
                 }
             }
@@ -157,6 +167,9 @@ fun VolumeDetailScreenV2(
     }
     LaunchedEffect(volumeId, offlineMode) {
         if (offlineMode) {
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("VolumeDetailV2", "Offline mode; applying local progress volume=$volumeId")
+            }
             applyLocalProgress(volumeState, readerRepository)?.let { updated ->
                 volumeState = updated
                 VolumeDetailCache.put(payload.copy(volume = updated))

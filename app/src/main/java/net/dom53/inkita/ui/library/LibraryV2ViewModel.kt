@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import net.dom53.inkita.R
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.cache.LibraryV2CacheKeys
+import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.domain.model.Collection
@@ -262,6 +263,10 @@ class LibraryV2ViewModel(
             val isStale =
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+            logCacheDecision(
+                "home",
+                "online=$isOnline cache=${cachedHasData} stale=$isStale refresh=$alwaysRefresh onDeck=${cachedOnDeck.size} updated=${cachedUpdated.size} added=${cachedAdded.size}",
+            )
             val showDebugToast = appPreferences.debugToastsFlow.first()
             if (cachedHasData) {
                 _state.update {
@@ -274,6 +279,7 @@ class LibraryV2ViewModel(
                     )
                 }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    logCacheDecision("home", "using cached data only")
                     if (showDebugToast) {
                         android.widget.Toast
                             .makeText(
@@ -300,6 +306,7 @@ class LibraryV2ViewModel(
                         ).show()
                 }
             } else if (showDebugToast) {
+                logCacheDecision("home", if (isOnline) "cache miss; fetch fresh" else "cache miss; offline")
                 val message =
                     if (isOnline) {
                         R.string.debug_cache_use_fresh
@@ -316,6 +323,10 @@ class LibraryV2ViewModel(
             val onDeckResult = runCatching { seriesRepository.getOnDeckSeries(1, 20, 0) }
             val updatedResult = runCatching { seriesRepository.getRecentlyUpdatedSeries(1, 20) }
             val addedResult = runCatching { seriesRepository.getRecentlyAddedSeries(1, 20) }
+            logCacheDecision(
+                "home",
+                "fetched onDeck=${onDeckResult.getOrDefault(emptyList()).size} updated=${updatedResult.getOrDefault(emptyList()).size} added=${addedResult.getOrDefault(emptyList()).size}",
+            )
 
             val onDeck =
                 onDeckResult.getOrDefault(emptyList()).map { series ->
@@ -369,6 +380,7 @@ class LibraryV2ViewModel(
                 "",
                 updatedSeries,
             )
+            logCacheDecision("home", "cached lists stored")
 
             val error =
                 onDeckResult.exceptionOrNull()
@@ -409,11 +421,16 @@ class LibraryV2ViewModel(
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
             val hasAnyData = cached.isNotEmpty() || hasStateData
+            logCacheDecision(
+                "want",
+                "online=$isOnline cache=${cached.size} hasState=$hasStateData stale=$isStale refresh=$alwaysRefresh",
+            )
             if (hasAnyData) {
                 if (cached.isNotEmpty() && !hasStateData) {
                     _state.update { it.copy(wantToRead = cached, isWantToReadLoading = true, wantToReadError = null) }
                 }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    logCacheDecision("want", "using cached data only")
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isWantToReadLoading = false) }
                     return@launch
@@ -426,6 +443,7 @@ class LibraryV2ViewModel(
                     }
                 maybeShowDebugToast(message)
             } else {
+                logCacheDecision("want", if (isOnline) "cache miss; fetch fresh" else "cache miss; offline")
                 val message =
                     if (isOnline) {
                         R.string.debug_cache_use_fresh
@@ -447,6 +465,7 @@ class LibraryV2ViewModel(
                 "",
                 result.getOrDefault(emptyList()),
             )
+            logCacheDecision("want", "cached list stored size=${result.getOrDefault(emptyList()).size}")
         }
     }
 
@@ -468,11 +487,16 @@ class LibraryV2ViewModel(
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
             val hasAnyData = cached.isNotEmpty() || hasStateData
+            logCacheDecision(
+                "collections",
+                "online=$isOnline cache=${cached.size} hasState=$hasStateData stale=$isStale refresh=$alwaysRefresh",
+            )
             if (hasAnyData) {
                 if (cached.isNotEmpty() && !hasStateData) {
                     _state.update { it.copy(collections = cached, isCollectionsLoading = true, collectionsError = null) }
                 }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    logCacheDecision("collections", "using cached data only")
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isCollectionsLoading = false) }
                     return@launch
@@ -485,6 +509,7 @@ class LibraryV2ViewModel(
                     }
                 maybeShowDebugToast(message)
             } else {
+                logCacheDecision("collections", if (isOnline) "cache miss; fetch fresh" else "cache miss; offline")
                 val message =
                     if (isOnline) {
                         R.string.debug_cache_use_fresh
@@ -505,6 +530,7 @@ class LibraryV2ViewModel(
                 LibraryV2CacheKeys.COLLECTIONS,
                 result.getOrDefault(emptyList()),
             )
+            logCacheDecision("collections", "cached list stored size=${result.getOrDefault(emptyList()).size}")
         }
     }
 
@@ -526,11 +552,16 @@ class LibraryV2ViewModel(
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
             val hasAnyData = cached.isNotEmpty() || hasStateData
+            logCacheDecision(
+                "readingLists",
+                "online=$isOnline cache=${cached.size} hasState=$hasStateData stale=$isStale refresh=$alwaysRefresh",
+            )
             if (hasAnyData) {
                 if (cached.isNotEmpty() && !hasStateData) {
                     _state.update { it.copy(readingLists = cached, isReadingListsLoading = true, readingListsError = null) }
                 }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    logCacheDecision("readingLists", "using cached data only")
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isReadingListsLoading = false) }
                     return@launch
@@ -543,6 +574,7 @@ class LibraryV2ViewModel(
                     }
                 maybeShowDebugToast(message)
             } else {
+                logCacheDecision("readingLists", if (isOnline) "cache miss; fetch fresh" else "cache miss; offline")
                 val message =
                     if (isOnline) {
                         R.string.debug_cache_use_fresh
@@ -563,6 +595,7 @@ class LibraryV2ViewModel(
                 LibraryV2CacheKeys.READING_LISTS,
                 result.getOrDefault(emptyList()),
             )
+            logCacheDecision("readingLists", "cached list stored size=${result.getOrDefault(emptyList()).size}")
         }
     }
 
@@ -585,6 +618,10 @@ class LibraryV2ViewModel(
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
             val hasAnyData = cached.isNotEmpty() || hasStateData
+            logCacheDecision(
+                "people",
+                "online=$isOnline cache=${cached.size} hasState=$hasStateData stale=$isStale refresh=$alwaysRefresh",
+            )
             if (hasAnyData) {
                 if (cached.isNotEmpty() && !hasStateData) {
                     _state.update {
@@ -598,6 +635,7 @@ class LibraryV2ViewModel(
                     }
                 }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    logCacheDecision("people", "using cached data only")
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isPeopleLoading = false) }
                     return@launch
@@ -610,6 +648,7 @@ class LibraryV2ViewModel(
                     }
                 maybeShowDebugToast(message)
             } else {
+                logCacheDecision("people", if (isOnline) "cache miss; fetch fresh" else "cache miss; offline")
                 val message =
                     if (isOnline) {
                         R.string.debug_cache_use_fresh
@@ -634,6 +673,7 @@ class LibraryV2ViewModel(
                 1,
                 pageItems,
             )
+            logCacheDecision("people", "cached list stored size=${pageItems.size}")
         }
     }
 
@@ -740,6 +780,10 @@ class LibraryV2ViewModel(
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
             val hasAnyData = cached.isNotEmpty() || hasStateData
+            logCacheDecision(
+                "collection:$collectionId",
+                "online=$isOnline cache=${cached.size} hasState=$hasStateData stale=$isStale refresh=$alwaysRefresh",
+            )
             if (hasAnyData) {
                 if (cached.isNotEmpty() && !hasStateData) {
                     _state.update {
@@ -747,6 +791,7 @@ class LibraryV2ViewModel(
                     }
                 }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    logCacheDecision("collection:$collectionId", "using cached data only")
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isCollectionSeriesLoading = false) }
                     return@launch
@@ -759,6 +804,7 @@ class LibraryV2ViewModel(
                     }
                 maybeShowDebugToast(message)
             } else {
+                logCacheDecision("collection:$collectionId", if (isOnline) "cache miss; fetch fresh" else "cache miss; offline")
                 val message =
                     if (isOnline) {
                         R.string.debug_cache_use_fresh
@@ -780,6 +826,10 @@ class LibraryV2ViewModel(
                 cacheKey,
                 result.getOrDefault(emptyList()),
             )
+            logCacheDecision(
+                "collection:$collectionId",
+                "cached list stored size=${result.getOrDefault(emptyList()).size}",
+            )
         }
     }
 
@@ -793,6 +843,11 @@ class LibraryV2ViewModel(
                 appPreferences.appContext.getString(messageRes),
                 Toast.LENGTH_SHORT,
             ).show()
+    }
+
+    private fun logCacheDecision(section: String, message: String) {
+        if (!LoggingManager.isDebugEnabled()) return
+        LoggingManager.d("LibraryV2Cache", "[$section] $message")
     }
 
     private fun showCollectionSeriesDebugToast(collectionId: Int) {

@@ -65,7 +65,15 @@ class EpubDownloadStrategyV2(
                 val count = pageCount ?: return -1L
                 (0 until count).filter { page -> page !in completedPages }
             }
-        if (missingPages.isEmpty()) return -1L
+        if (missingPages.isEmpty()) {
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d(
+                    "EpubDownloadV2",
+                    "Skip enqueue chapter=$chapterId page=$pageIndex (already downloaded)",
+                )
+            }
+            return -1L
+        }
         val job =
             DownloadJobV2Entity(
                 type = request.type,
@@ -84,6 +92,12 @@ class EpubDownloadStrategyV2(
                 error = null,
             )
         val jobId = downloadDao.insertJob(job)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d(
+                "EpubDownloadV2",
+                "Enqueue job=$jobId chapter=$chapterId pages=${missingPages.size} volume=$volumeId",
+            )
+        }
         val items =
             missingPages.map { page ->
                 DownloadedItemV2Entity(
@@ -118,6 +132,7 @@ class EpubDownloadStrategyV2(
                 status = DownloadJobV2Entity.STATUS_FAILED,
                 error = "Offline mode",
             )
+            LoggingManager.w("EpubDownloadV2", "Offline; job=${job.id} failed")
             return
         }
         val config = appPreferences.configFlow.first()
@@ -127,6 +142,7 @@ class EpubDownloadStrategyV2(
                 status = DownloadJobV2Entity.STATUS_FAILED,
                 error = "Not configured",
             )
+            LoggingManager.w("EpubDownloadV2", "Not configured; job=${job.id} failed")
             return
         }
         val seriesId = job.seriesId ?: return
@@ -139,6 +155,12 @@ class EpubDownloadStrategyV2(
         val assetsDir = File(baseDir, "assets").apply { if (!exists()) mkdirs() }
 
         updateJob(job, DownloadJobV2Entity.STATUS_RUNNING, error = null)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d(
+                "EpubDownloadV2",
+                "Run job=${job.id} chapter=$chapterId pending=${job.totalItems ?: 0}",
+            )
+        }
 
         val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
         val items =
@@ -183,6 +205,9 @@ class EpubDownloadStrategyV2(
                 status = DownloadJobV2Entity.STATUS_COMPLETED,
                 error = null,
             )
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("EpubDownloadV2", "Completed job=${job.id} pages=$completed")
+            }
         } catch (e: Exception) {
             LoggingManager.e("EpubDownloadV2", "Download failed", e)
             val failedItem =

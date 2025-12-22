@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import net.dom53.inkita.core.cache.CacheManager
+import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppPreferences
@@ -263,6 +264,12 @@ class SeriesDetailViewModelV2(
             val staleHours = appPreferences.cacheStaleHoursFlow.first()
             val policy = cacheManager.policy()
             val canCache = policy.globalEnabled && policy.libraryEnabled && policy.libraryDetailsEnabled
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d(
+                    "SeriesDetailV2",
+                    "Load series=$seriesId online=$isOnline cache=$canCache refresh=$alwaysRefresh staleHours=$staleHours",
+                )
+            }
             val cachedDetail =
                 if (canCache) cacheManager.getCachedSeriesDetailV2(seriesId) else null
             val cachedUpdatedAt =
@@ -271,6 +278,12 @@ class SeriesDetailViewModelV2(
                 cachedUpdatedAt == null ||
                     (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
             if (cachedDetail != null) {
+                if (LoggingManager.isDebugEnabled()) {
+                    LoggingManager.d(
+                        "SeriesDetailV2",
+                        "Cache hit series=$seriesId stale=$isStale updatedAt=${cachedUpdatedAt ?: 0L}",
+                    )
+                }
                 val localMerged = applyLocalProgress(cachedDetail, isOnline)
                 val membership =
                     localMerged.collections
@@ -287,6 +300,9 @@ class SeriesDetailViewModelV2(
                 }
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
                     showDebugToast(net.dom53.inkita.R.string.debug_cache_use)
+                    if (LoggingManager.isDebugEnabled()) {
+                        LoggingManager.d("SeriesDetailV2", "Using cached detail only (series=$seriesId)")
+                    }
                     _state.update { it.copy(isLoading = false) }
                     return@launch
                 }
@@ -298,6 +314,9 @@ class SeriesDetailViewModelV2(
                     }
                 showDebugToast(message)
             } else {
+                if (LoggingManager.isDebugEnabled()) {
+                    LoggingManager.d("SeriesDetailV2", "Cache miss series=$seriesId online=$isOnline")
+                }
                 val message =
                     if (isOnline) {
                         net.dom53.inkita.R.string.debug_cache_use_fresh
@@ -404,6 +423,9 @@ class SeriesDetailViewModelV2(
             }
             if (canCache) {
                 cacheManager.cacheSeriesDetailV2(seriesId, mergedDetail)
+                if (LoggingManager.isDebugEnabled()) {
+                    LoggingManager.d("SeriesDetailV2", "Cached detail series=$seriesId")
+                }
             }
         }
     }
@@ -440,6 +462,12 @@ class SeriesDetailViewModelV2(
                 remoteProgress == null ||
                 localProgress.lastModifiedUtcMillis > remoteProgress.lastModifiedUtcMillis
         if (!shouldOverride) return detail
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d(
+                "SeriesDetailV2",
+                "Apply local progress series=$seriesId chapter=${localProgress.chapterId} page=${localProgress.page}",
+            )
+        }
         val chapter =
             ChapterDto(
                 id = localProgress.chapterId,

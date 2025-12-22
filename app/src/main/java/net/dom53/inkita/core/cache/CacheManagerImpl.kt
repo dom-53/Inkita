@@ -201,6 +201,9 @@ class CacheManagerImpl(
                 )
             }
         dao.upsertSeriesRefs(refs)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("CacheV2", "Store series list type=$listType key=$listKey count=${refs.size}")
+        }
     }
 
     override suspend fun getCachedLibraryV2SeriesList(
@@ -210,7 +213,11 @@ class CacheManagerImpl(
         val dao = libraryV2Dao ?: return emptyList()
         val p = policy()
         if (!isLibraryV2CacheAllowed(p, listType)) return emptyList()
-        return dao.getSeriesForList(listType, listKey).map { it.toDomainSeries() }
+        val result = dao.getSeriesForList(listType, listKey).map { it.toDomainSeries() }
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("CacheV2", "Read series list type=$listType key=$listKey count=${result.size}")
+        }
+        return result
     }
 
     override suspend fun getLibraryV2SeriesListUpdatedAt(
@@ -260,13 +267,20 @@ class CacheManagerImpl(
                 )
             }
         dao.upsertCollectionRefs(refs)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("CacheV2", "Store collections type=$listType count=${refs.size}")
+        }
     }
 
     override suspend fun getCachedLibraryV2Collections(listType: String): List<Collection> {
         val dao = libraryV2Dao ?: return emptyList()
         val p = policy()
         if (!isLibraryV2CacheAllowed(p, listType)) return emptyList()
-        return dao.getCollectionsForList(listType).map { Collection(it.id, it.name) }
+        val result = dao.getCollectionsForList(listType).map { Collection(it.id, it.name) }
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("CacheV2", "Read collections type=$listType count=${result.size}")
+        }
+        return result
     }
 
     override suspend fun cacheLibraryV2ReadingLists(
@@ -290,13 +304,20 @@ class CacheManagerImpl(
                 )
             }
         dao.upsertReadingListRefs(refs)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("CacheV2", "Store reading lists type=$listType count=${refs.size}")
+        }
     }
 
     override suspend fun getCachedLibraryV2ReadingLists(listType: String): List<ReadingList> {
         val dao = libraryV2Dao ?: return emptyList()
         val p = policy()
         if (!isLibraryV2CacheAllowed(p, listType)) return emptyList()
-        return dao.getReadingListsForList(listType).map { ReadingList(it.id, it.title, it.itemCount) }
+        val result = dao.getReadingListsForList(listType).map { ReadingList(it.id, it.title, it.itemCount) }
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("CacheV2", "Read reading lists type=$listType count=${result.size}")
+        }
+        return result
     }
 
     override suspend fun cacheLibraryV2People(
@@ -327,6 +348,9 @@ class CacheManagerImpl(
                 )
             }
         dao.upsertPersonRefs(refs)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("CacheV2", "Store people type=$listType page=$page count=${refs.size}")
+        }
     }
 
     override suspend fun getCachedLibraryV2People(
@@ -336,7 +360,11 @@ class CacheManagerImpl(
         val dao = libraryV2Dao ?: return emptyList()
         val p = policy()
         if (!isLibraryV2CacheAllowed(p, listType)) return emptyList()
-        return dao.getPeopleForList(listType, page).map { Person(it.id, it.name) }
+        val result = dao.getPeopleForList(listType, page).map { Person(it.id, it.name) }
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("CacheV2", "Read people type=$listType page=$page count=${result.size}")
+        }
+        return result
     }
 
     override suspend fun cacheSeriesDetailV2(
@@ -379,6 +407,9 @@ class CacheManagerImpl(
                 updatedAt = now,
             )
         dao.upsertSeriesDetail(entity)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("CacheV2", "Store series detail series=$seriesId")
+        }
     }
 
     override suspend fun getCachedSeriesDetailV2(seriesId: Int): InkitaDetailV2? {
@@ -386,6 +417,9 @@ class CacheManagerImpl(
         val p = policy()
         if (!p.globalEnabled || !p.libraryEnabled || !p.libraryDetailsEnabled) return null
         val entity = dao.getSeriesDetail(seriesId) ?: return null
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d("CacheV2", "Read series detail series=$seriesId")
+        }
         val series = entity.seriesJson?.let { fromJson(seriesAdapter, it) }
         val metadata = entity.metadataJson?.let { fromJson(metadataAdapter, it) }
         val detail = entity.detailJson?.let { fromJson(detailAdapter, it) }
