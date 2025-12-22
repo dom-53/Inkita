@@ -5,6 +5,7 @@ import net.dom53.inkita.core.logging.LoggingManager
 
 data class VolumeDetailPayload(
     val seriesId: Int,
+    val libraryId: Int? = null,
     val volume: VolumeDto,
     val formatId: Int? = null,
 )

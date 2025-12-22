@@ -616,6 +616,7 @@ fun SeriesDetailScreenV2(
                                     VolumeDetailCache.put(
                                         VolumeDetailPayload(
                                             seriesId = seriesId,
+                                            libraryId = detail?.series?.libraryId,
                                             volume = volume,
                                             formatId = detail?.series?.format,
                                         ),
