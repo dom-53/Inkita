@@ -237,6 +237,9 @@
     <!-- ibrary Screen-->
     <string name="library_empty_want_to_read">You have no titles marked as \'want to read\'.</string>
     <string name="library_empty_reading_list">No reading lists found.</string>
+    <string name="download_empty_queue">No downloads in queue.</string>
+    <string name="download_empty_completed">No completed downloads.</string>
+    <string name="download_empty_downloaded">No downloaded pages.</string>
     <string name="library_no_access">You do not have access to this library.</string>
     <!-- Reader screen-->
     <string name="reader_title">Reader</string>

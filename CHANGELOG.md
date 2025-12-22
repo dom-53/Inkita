@@ -12,6 +12,10 @@ All notable changes to this project will be documented here.
 - UI: Progress overlays on volume/chapters (triangle for unread, progress bar for in-progress).
 - Downloads V2: Per-volume and per-chapter download actions, download queue screen wiring, and download state icons for volumes/chapters/pages.
 - Downloads V2: Page list supports swipe-to-download/remove with haptic feedback and adjustable swipe distance.
+- Downloads V2: Download queue screen redesigned with cards, status chips, progress bars, and empty states.
+- Reader: Prefer offline pages now loads downloaded HTML when available and shows an “Offline data” overlay flag.
+- Series Detail V2: Specials now open into per-page lists (like Volume Detail) with download/reader actions and long-press download dialog.
+- Settings: Added Kavita Images API key field for collection/person cover endpoints.
 
 ### Changed
 - DTOs: Completed several Kavita DTOs (SeriesMetadataDto, PersonDto, GenreTagDto, VolumeDto, and related detail DTOs) for Detail V2 data aggregation.
@@ -19,6 +23,7 @@ All notable changes to this project will be documented here.
 - Reader: Remaining time in the overlay updates on page/chapter changes and is rounded to one decimal.
 - Downloads V2: Download worker now respects max concurrent downloads and automatic retries/max retry attempts from settings.
 - Downloads V2: Download-all now includes volumes, chapters, specials, and storyline chapters.
+- Settings: Prefetch switches in Advanced are temporarily disabled until the new prefetch pipeline is implemented.
 
 ### Fixed
 - Detail V2: Progress and continue point refresh after returning from the reader to avoid stale data.
@@ -26,6 +31,7 @@ All notable changes to this project will be documented here.
 - Reader: Remaining time refreshes on page changes.
 - Downloads V2: Deduplicate page downloads and avoid re-queuing already downloaded pages.
 - Downloads V2: Queue processing continues beyond the first batch of pending jobs.
+- Reader: Offline overlays now show page/title data derived from downloaded files when online data is unavailable.
 
 ## v0.2.0-beta.2
 

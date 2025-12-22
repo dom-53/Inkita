@@ -3,6 +3,7 @@ package net.dom53.inkita.ui.download
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,8 +12,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -67,6 +74,9 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
             DownloadJobV2Entity.STATUS_CANCELED,
         )
     val completedStates = listOf(DownloadJobV2Entity.STATUS_COMPLETED)
+    val queueCount = tasks.count { it.status in queueStates }
+    val completedCount = tasks.count { it.status in completedStates }
+    val downloadedCount = downloaded.size
     val visibleTasks =
         when (selectedTab) {
             0 -> tasks.filter { it.status in queueStates }
@@ -84,43 +94,56 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
         Text(stringResource(R.string.download_screen_title), style = MaterialTheme.typography.headlineSmall)
         TabRow(selectedTabIndex = selectedTab) {
             Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
-                Text(stringResource(R.string.general_queue), modifier = Modifier.padding(12.dp))
+                Text(
+                    "${stringResource(R.string.general_queue)} ($queueCount)",
+                    modifier = Modifier.padding(12.dp),
+                )
             }
             Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
-                Text(stringResource(R.string.general_completed), modifier = Modifier.padding(12.dp))
+                Text(
+                    "${stringResource(R.string.general_completed)} ($completedCount)",
+                    modifier = Modifier.padding(12.dp),
+                )
             }
             Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) {
-                Text(stringResource(R.string.general_downloaded), modifier = Modifier.padding(12.dp))
+                Text(
+                    "${stringResource(R.string.general_downloaded)} ($downloadedCount)",
+                    modifier = Modifier.padding(12.dp),
+                )
             }
         }
         when (selectedTab) {
             2 -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    itemsIndexed(
-                        downloaded,
-                        key = { _, item -> item.id },
-                    ) { _, page ->
-                        DownloadedRow(
-                            page = page,
-                            onOpen = {
-                                val path = page.localPath ?: return@DownloadedRow
-                                val uri =
-                                    if (path.startsWith("file://") || path.startsWith("content://")) {
-                                        Uri.parse(path)
-                                    } else {
-                                        Uri.fromFile(File(path))
-                                    }
-                                val intent =
-                                    Intent(Intent.ACTION_VIEW)
-                                        .setDataAndType(uri, "text/html")
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                runCatching { context.startActivity(intent) }
-                            },
-                            onDelete = { viewModel.deleteDownloaded(page.id) },
-                        )
+                if (downloaded.isEmpty()) {
+                    EmptyState(text = stringResource(R.string.download_empty_downloaded))
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        itemsIndexed(
+                            downloaded,
+                            key = { _, item -> item.id },
+                        ) { _, page ->
+                            DownloadedRow(
+                                page = page,
+                                onOpen = {
+                                    val path = page.localPath ?: return@DownloadedRow
+                                    val uri =
+                                        if (path.startsWith("file://") || path.startsWith("content://")) {
+                                            Uri.parse(path)
+                                        } else {
+                                            Uri.fromFile(File(path))
+                                        }
+                                    val intent =
+                                        Intent(Intent.ACTION_VIEW)
+                                            .setDataAndType(uri, "text/html")
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    runCatching { context.startActivity(intent) }
+                                },
+                                onDelete = { viewModel.deleteDownloaded(page.id) },
+                            )
+                        }
                     }
                 }
             }
@@ -135,19 +158,29 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
                         }
                     }
                 }
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(visibleTasks, key = { it.id }) { task ->
-                        TaskRow(
-                            task = task,
-                            onCancel = { viewModel.cancelTask(task.id) },
-                            onPause = { viewModel.pauseTask(task.id) },
-                            onResume = { viewModel.resumeTask(task.id) },
-                            onRetry = { viewModel.retryTask(task.id) },
-                            onClear = { viewModel.deleteTask(task.id) },
-                        )
+                if (visibleTasks.isEmpty()) {
+                    val label =
+                        if (selectedTab == 0) {
+                            stringResource(R.string.download_empty_queue)
+                        } else {
+                            stringResource(R.string.download_empty_completed)
+                        }
+                    EmptyState(text = label)
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(visibleTasks, key = { it.id }) { task ->
+                            TaskRow(
+                                task = task,
+                                onCancel = { viewModel.cancelTask(task.id) },
+                                onPause = { viewModel.pauseTask(task.id) },
+                                onResume = { viewModel.resumeTask(task.id) },
+                                onRetry = { viewModel.retryTask(task.id) },
+                                onClear = { viewModel.deleteTask(task.id) },
+                            )
+                        }
                     }
                 }
             }
@@ -171,31 +204,47 @@ private fun TaskRow(
             DownloadJobV2Entity.TYPE_SERIES -> stringResource(R.string.general_series)
             else -> task.type
         }
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
         val seriesLabel = task.seriesId?.toString() ?: "-"
-        Text(
-            stringResource(R.string.download_item_title, seriesLabel, labelType),
-            style = MaterialTheme.typography.bodyLarge,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.download_item_title, seriesLabel, labelType),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            DownloadStatusChip(status = task.status)
+        }
         val chapterLabel = task.chapterId?.toString() ?: "-"
         val total = task.totalItems ?: 0
         val pageEnd = if (total > 0) total - 1 else "-"
-        Text(stringResource(R.string.download_item_chapter_pages, chapterLabel, 0, pageEnd))
-        Text(stringResource(R.string.download_item_state, task.status))
+        Text(
+            stringResource(R.string.download_item_chapter_pages, chapterLabel, 0, pageEnd),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             if (task.createdAt > 0) {
                 Text(
                     stringResource(R.string.download_item_created, formatDate(task.createdAt)),
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (task.updatedAt > 0) {
                 Text(
                     stringResource(R.string.download_item_updated, formatDate(task.updatedAt)),
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -203,10 +252,17 @@ private fun TaskRow(
             val total = task.totalItems ?: 0
             val progress = task.completedItems ?: 0
             val pct = (progress * 100f / total).toInt().coerceIn(0, 100)
-            Text(
-                stringResource(R.string.download_item_progress, progress, total, pct),
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                LinearProgressIndicator(
+                    progress = { progress.toFloat() / total.toFloat() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    stringResource(R.string.download_item_progress, progress, total, pct),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         task.error?.takeIf { it.isNotBlank() }?.let { err ->
             Text(
@@ -224,34 +280,38 @@ private fun TaskRow(
                 DownloadJobV2Entity.STATUS_PENDING,
                 DownloadJobV2Entity.STATUS_RUNNING,
                 -> {
-                    Button(onClick = onPause) {
+                    FilledTonalButton(onClick = onPause) {
                         Text(stringResource(R.string.download_action_pause))
                     }
-                    Button(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
+                    OutlinedButton(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
                         Text(stringResource(R.string.general_cancel))
                     }
                 }
                 DownloadJobV2Entity.STATUS_PAUSED -> {
-                    Button(onClick = onResume) {
+                    FilledTonalButton(onClick = onResume) {
                         Text(stringResource(R.string.download_action_resume))
+                    }
+                    OutlinedButton(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
+                        Text(stringResource(R.string.general_cancel))
                     }
                 }
                 DownloadJobV2Entity.STATUS_FAILED -> {
-                    Button(onClick = onRetry) {
+                    FilledTonalButton(onClick = onRetry) {
                         Text(stringResource(R.string.download_action_retry))
                     }
-                    Button(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
+                    OutlinedButton(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
                         Text(stringResource(R.string.general_cancel))
                     }
                 }
                 DownloadJobV2Entity.STATUS_CANCELED -> {
-                    Button(onClick = onClear) {
+                    OutlinedButton(onClick = onClear) {
                         Text(stringResource(R.string.download_action_clear))
                     }
                 }
                 else -> Unit
             }
         }
+    }
     }
 }
 
@@ -261,10 +321,14 @@ private fun DownloadedRow(
     onOpen: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
         Text(
             stringResource(
                 R.string.download_item_v2_title,
@@ -272,25 +336,78 @@ private fun DownloadedRow(
                 page.chapterId ?: "-",
                 page.page ?: "-",
             ),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.titleMedium,
         )
-        Text(stringResource(R.string.download_completed_status, page.status))
+        DownloadStatusChip(status = page.status)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(R.string.download_completed_updated, formatDate(page.updatedAt)), style = MaterialTheme.typography.bodySmall)
-            Text(stringResource(R.string.download_completed_size, formatBytes(page.bytes ?: 0L)), style = MaterialTheme.typography.bodySmall)
+            Text(
+                stringResource(R.string.download_completed_updated, formatDate(page.updatedAt)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                stringResource(R.string.download_completed_size, formatBytes(page.bytes ?: 0L)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        Text(page.localPath ?: "-", style = MaterialTheme.typography.bodySmall)
+        Text(
+            page.localPath ?: "-",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Button(onClick = onOpen) {
+            FilledTonalButton(onClick = onOpen) {
                 Text(stringResource(R.string.download_completed_open))
             }
-            Button(onClick = onDelete, modifier = Modifier.padding(start = 8.dp)) {
+            OutlinedButton(onClick = onDelete, modifier = Modifier.padding(start = 8.dp)) {
                 Text(stringResource(R.string.download_completed_delete))
             }
         }
+    }
+    }
+}
+
+@Composable
+private fun DownloadStatusChip(status: String) {
+    val (bg, fg) =
+        when (status) {
+            DownloadJobV2Entity.STATUS_RUNNING -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
+            DownloadJobV2Entity.STATUS_PENDING -> MaterialTheme.colorScheme.secondary to MaterialTheme.colorScheme.onSecondary
+            DownloadJobV2Entity.STATUS_PAUSED -> MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.onTertiary
+            DownloadJobV2Entity.STATUS_FAILED -> MaterialTheme.colorScheme.error to MaterialTheme.colorScheme.onError
+            DownloadJobV2Entity.STATUS_CANCELED -> MaterialTheme.colorScheme.outline to MaterialTheme.colorScheme.onSurface
+            DownloadJobV2Entity.STATUS_COMPLETED -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
+            else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+        }
+    AssistChip(
+        onClick = {},
+        label = { Text(status) },
+        enabled = false,
+        colors =
+            androidx.compose.material3.AssistChipDefaults.assistChipColors(
+                containerColor = bg,
+                labelColor = fg,
+                disabledContainerColor = bg,
+                disabledLabelColor = fg,
+            ),
+    )
+}
+
+@Composable
+private fun EmptyState(text: String) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
