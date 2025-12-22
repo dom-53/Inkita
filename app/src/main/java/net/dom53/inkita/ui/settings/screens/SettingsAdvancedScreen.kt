@@ -309,7 +309,7 @@ fun SettingsAdvancedScreen(
                     cacheAlwaysRefresh = checked
                     scope.launch { appPreferences.setCacheAlwaysRefresh(checked) }
                 },
-                enabled = false,
+                enabled = globalCacheEnabled,
             )
         }
 
@@ -340,7 +340,7 @@ fun SettingsAdvancedScreen(
                 label = { Text(stringResource(R.string.settings_cache_stale_hours_label)) },
                 supportingText = { Text(stringResource(R.string.settings_cache_stale_hours_hint)) },
                 singleLine = true,
-                enabled = false,
+                enabled = globalCacheEnabled,
             )
             Text(
                 text = stringResource(R.string.settings_cache_units_hours),
@@ -423,7 +423,7 @@ fun SettingsAdvancedScreen(
                     cacheEnabled = checked
                     scope.launch { appPreferences.setLibraryCacheEnabled(checked) }
                 },
-                enabled = false,
+                enabled = globalCacheEnabled,
             )
         }
 
@@ -643,7 +643,7 @@ fun SettingsAdvancedScreen(
                     prefetchInProgress = checked
                     scope.launch { appPreferences.setPrefetchInProgress(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
 
@@ -668,7 +668,7 @@ fun SettingsAdvancedScreen(
                     prefetchWant = checked
                     scope.launch { appPreferences.setPrefetchWant(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
 
@@ -693,7 +693,7 @@ fun SettingsAdvancedScreen(
                     prefetchCollections = checked
                     scope.launch { appPreferences.setPrefetchCollections(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
         if (prefetchCollections) {
