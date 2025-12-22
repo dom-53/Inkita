@@ -13,8 +13,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +45,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.os.LocaleListCompat
 import androidx.core.view.WindowCompat
@@ -118,8 +128,54 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-private const val IMPORTANT_INFO_BODY =
-    "Image API key was added. Please fill it in Kavita Settings."
+private const val IMPORTANT_INFO_HEADER =
+    "✅ Image API key was added — please fill it in Kavita Settings."
+
+private val IMPORTANT_INFO_ADDED =
+    listOf(
+        "Library V2 navigation with Home/Want to Read/Collections/Reading Lists/Browse People + pagination",
+        "Series Detail V2 with richer metadata, actions, and tabs",
+        "Volume Detail V2 with chapters list and deep link from series",
+        "Continue reading now routes to the correct reader with accurate labels",
+        "Progress overlays on volumes/chapters (unread triangle + in-progress bar)",
+        "Downloads V2: per-volume/chapter actions, queue screen, and state icons",
+        "Downloads V2: swipe to download/remove with haptics",
+        "Downloads queue redesign (cards, chips, progress bars, empty states)",
+        "Offline reading improvements + “Offline data” indicator",
+        "Specials now open into per-page lists with download/reader actions",
+        "Kavita Images API key field in Settings",
+        "Mark series/volume/chapter read/unread actions",
+        "EPUB TOC page titles for Volume Detail and Specials",
+        "Important update modal shown once per version",
+    )
+
+private val IMPORTANT_INFO_CHANGED =
+    listOf(
+        "Completed Kavita DTOs needed for Detail V2 aggregation",
+        "Detail V2 now fetches full series payloads + related data",
+        "Reader remaining time updates on page/chapter changes (rounded to 1 decimal)",
+        "Downloads V2 respects max concurrent + retry limits",
+        "Download-all now includes volumes, chapters, specials, storyline chapters",
+        "Prefetch switches are disabled until the new pipeline lands",
+        "Verbose logging added for cache decisions, detail flows, and downloads",
+        "Download settings now use dedicated metered/low-battery preferences",
+        "Cache stale window supports minutes/hours (default 15 min)",
+        "Global HTTP timeouts increased to 30 seconds",
+    )
+
+private val IMPORTANT_INFO_FIXED =
+    listOf(
+        "Progress/continue point refresh after returning from reader",
+        "Volume name no longer overwritten by numeric-only API values",
+        "Remaining time refreshes on page changes",
+        "Downloads V2 deduplicates pages and keeps the queue moving",
+        "Offline overlays show page/title from downloaded files",
+        "Progress sync respects Kavita timestamps",
+        "Clearing downloads removes items from the Downloaded tab",
+        "Browse thumbnail shimmer stays active per-item until load completes",
+    )
+
+private const val FORCE_SHOW_IMPORTANT_INFO = false
 
 private fun applyLocale(languageTag: String) {
     val locales =
@@ -130,6 +186,32 @@ private fun applyLocale(languageTag: String) {
         }
     if (AppCompatDelegate.getApplicationLocales() != locales) {
         AppCompatDelegate.setApplicationLocales(locales)
+    }
+}
+
+@Composable
+private fun InfoSection(
+    title: String,
+    items: List<String>,
+) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+    )
+    Spacer(modifier = Modifier.size(6.dp))
+    items.forEach { item ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("•")
+            Text(
+                text = item,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(modifier = Modifier.size(4.dp))
     }
 }
 
@@ -171,6 +253,10 @@ fun InkitaApp(
     }
 
     LaunchedEffect(lastImportantInfoVersion) {
+        if (FORCE_SHOW_IMPORTANT_INFO) {
+            showImportantInfoDialog.value = true
+            return@LaunchedEffect
+        }
         if (lastImportantInfoVersion < 0) return@LaunchedEffect
         showImportantInfoDialog.value = BuildConfig.VERSION_CODE > lastImportantInfoVersion
     }
@@ -237,7 +323,44 @@ fun InkitaApp(
             AlertDialog(
                 onDismissRequest = {},
                 title = { Text(text = context.getString(R.string.update_info_title)) },
-                text = { Text(IMPORTANT_INFO_BODY) },
+                text = {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 420.dp)
+                                .verticalScroll(rememberScrollState()),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = IMPORTANT_INFO_HEADER,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                            )
+                            Spacer(modifier = Modifier.size(12.dp))
+                            Text(
+                                text = "📌 Unreleased",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            )
+                            Spacer(modifier = Modifier.size(8.dp))
+                            InfoSection(
+                                title = "✨ Added",
+                                items = IMPORTANT_INFO_ADDED,
+                            )
+                            Spacer(modifier = Modifier.size(10.dp))
+                            InfoSection(
+                                title = "🔁 Changed",
+                                items = IMPORTANT_INFO_CHANGED,
+                            )
+                            Spacer(modifier = Modifier.size(10.dp))
+                            InfoSection(
+                                title = "🛠️ Fixed",
+                                items = IMPORTANT_INFO_FIXED,
+                            )
+                        }
+                    }
+                },
                 confirmButton = {
                     TextButton(
                         onClick = {
