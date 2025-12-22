@@ -18,6 +18,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -65,6 +66,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -79,7 +81,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -107,26 +108,62 @@ fun ReaderScreen(
     onBack: (chapterId: Int, page: Int, seriesId: Int?, volumeId: Int?) -> Unit = { _, _, _, _ -> },
     onNavigateToChapter: (Int, Int?, Int?, Int?) -> Unit = { _, _, _, _ -> },
 ) {
-    val viewModel: ReaderViewModel =
-        viewModel(
-            factory =
-                ReaderViewModel.provideFactory(
-                    chapterId = chapterId,
-                    initialPage = initialPage ?: 0,
-                    readerRepository = readerRepository,
-                    seriesId = seriesId,
-                    volumeId = volumeId,
-                    format = Format.fromId(formatId),
-                ),
+    val format = Format.fromId(formatId)
+    if (format == Format.Pdf) {
+        PdfReaderScreen(
+            chapterId = chapterId,
+            initialPage = initialPage,
+            readerRepository = readerRepository,
+            appPreferences = appPreferences,
+            seriesId = seriesId,
+            volumeId = volumeId,
+            serverUrl = serverUrl,
+            apiKey = apiKey,
+            onBack = onBack,
+            onNavigateToChapter = onNavigateToChapter,
         )
-    val uiState by viewModel.state.collectAsState()
+    } else {
+        EpubReaderScreen(
+            chapterId = chapterId,
+            initialPage = initialPage,
+            readerRepository = readerRepository,
+            appPreferences = appPreferences,
+            seriesId = seriesId,
+            volumeId = volumeId,
+            serverUrl = serverUrl,
+            apiKey = apiKey,
+            onBack = onBack,
+            onNavigateToChapter = onNavigateToChapter,
+        )
+    }
+}
+
+@Composable
+internal fun BaseReaderScreen(
+    chapterId: Int,
+    initialPage: Int?,
+    readerViewModel: BaseReaderViewModel,
+    appPreferences: AppPreferences,
+    seriesId: Int?,
+    volumeId: Int?,
+    serverUrl: String?,
+    apiKey: String? = null,
+    renderer: BaseReader,
+    onBack: (chapterId: Int, page: Int, seriesId: Int?, volumeId: Int?) -> Unit = { _, _, _, _ -> },
+    onNavigateToChapter: (Int, Int?, Int?, Int?) -> Unit = { _, _, _, _ -> },
+    topBarContent: (@Composable (String, String, () -> Unit) -> Unit)? = null,
+    bottomBarContent: (@Composable (ReaderBottomBarState, ReaderBottomBarCallbacks) -> Unit)? = null,
+    settingsContent: (@Composable (ReaderSettingsState, ReaderSettingsCallbacks) -> Unit)? = null,
+    overlayExtras: @Composable BoxScope.() -> Unit = {},
+) {
+    val uiState by readerViewModel.state.collectAsState()
     val context = LocalContext.current
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-            viewModel.clearError()
+            readerViewModel.clearError()
         }
     }
 
@@ -152,18 +189,6 @@ fun ReaderScreen(
     var showSettingsPanel by remember { mutableStateOf(false) }
     var selectedSettingsTab by remember { mutableStateOf(ReaderSettingsTab.Font) }
     val selectedFont = fontOptions.firstOrNull { it.id == fontFamilyId } ?: readerFontOptions.first()
-
-    if (uiState.isPdf) {
-        PdfReaderScreen(
-            chapterId = chapterId,
-            seriesId = seriesId,
-            volumeId = volumeId,
-            uiState = uiState,
-            onBack = onBack,
-            onSetPage = { idx, count -> viewModel.setPdfPageIndex(idx, count) },
-        )
-        return
-    }
 
     LaunchedEffect(readerPrefs) {
         fontSize = readerPrefs.fontSize
@@ -194,29 +219,18 @@ fun ReaderScreen(
         }
     }
 
-    val html = uiState.content
-    if (html == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            if (uiState.isLoading) {
-                CircularProgressIndicator()
-            } else {
-                Text(
-                    uiState.error ?: stringResource(R.string.general_error),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-        return
-    }
-
     val goPrevPage: () -> Unit = {
         val prev = (uiState.pageIndex - 1).coerceAtLeast(0)
-        scope.launch {
-            if (!NetworkUtils.isOnline(context) && !viewModel.isPageDownloaded(prev)) {
-                Toast.makeText(context, context.getString(R.string.reader_page_not_downloaded), Toast.LENGTH_SHORT).show()
-                return@launch
+        if (uiState.isPdf) {
+            (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(prev, uiState.pageCount)
+        } else {
+            scope.launch {
+                if (!NetworkUtils.isOnline(context) && !readerViewModel.isPageDownloaded(prev)) {
+                    Toast.makeText(context, context.getString(R.string.reader_page_not_downloaded), Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                readerViewModel.loadPage(prev)
             }
-            viewModel.loadPage(prev)
         }
     }
     val goNextPage: () -> Unit = {
@@ -226,12 +240,16 @@ fun ReaderScreen(
             } else {
                 uiState.pageIndex + 1 // When page count is unknown (offline), allow attempting the next page.
             }
-        scope.launch {
-            if (!NetworkUtils.isOnline(context) && !viewModel.isPageDownloaded(next)) {
-                Toast.makeText(context, context.getString(R.string.reader_page_not_downloaded), Toast.LENGTH_SHORT).show()
-                return@launch
+        if (uiState.isPdf) {
+            (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(next, uiState.pageCount)
+        } else {
+            scope.launch {
+                if (!NetworkUtils.isOnline(context) && !readerViewModel.isPageDownloaded(next)) {
+                    Toast.makeText(context, context.getString(R.string.reader_page_not_downloaded), Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                readerViewModel.loadPage(next)
             }
-            viewModel.loadPage(next)
         }
     }
 
@@ -242,115 +260,160 @@ fun ReaderScreen(
                 // Keep container transparent; page colors come from reader theme CSS.
                 .background(Color.Transparent),
     ) {
-        ReaderWebView(
-            html = html,
-            fontSize = fontSize,
-            lineHeight = lineHeight,
-            paddingPx = with(LocalDensity.current) { padding.toPx() },
-            fontOption = selectedFont,
-            textAlignCss =
-                when (textAlign) {
-                    TextAlign.Center -> "center"
-                    TextAlign.End, TextAlign.Right -> "right"
-                    TextAlign.Justify -> "justify"
-                    else -> "left"
-                },
-            themeMode = themeMode,
-            serverUrl = serverUrl,
-            apiKey = apiKey,
-            onToggleOverlay = {
-                if (showSettingsPanel) {
-                    showSettingsPanel = false
-                } else {
-                    showOverlay = !showOverlay
-                }
-            },
-            pendingScrollY = pendingScrollY,
-            onConsumePendingScroll = { pendingScrollY = null },
-            onWebViewReady = { webViewRef.value = it },
-            onSwipeNext = { goNextPage() },
-            onSwipePrev = { goPrevPage() },
-            pendingScrollId = pendingScrollId,
-            onConsumeScrollId = { pendingScrollId = null },
-            onScrollIdle = { scrollId -> viewModel.markProgressAtCurrentPage(scrollId) },
+        renderer.Content(
+            params =
+                ReaderRenderParams(
+                    uiState = uiState,
+                    serverUrl = serverUrl,
+                    apiKey = apiKey,
+                    fontSize = fontSize,
+                    lineHeight = lineHeight,
+                    padding = padding,
+                    fontOption = selectedFont,
+                    textAlign = textAlign,
+                    themeMode = themeMode,
+                    pendingScrollY = pendingScrollY,
+                    pendingScrollId = pendingScrollId,
+                ),
+            callbacks =
+                ReaderRenderCallbacks(
+                    onToggleOverlay = {
+                        if (showSettingsPanel) {
+                            showSettingsPanel = false
+                        } else {
+                            showOverlay = !showOverlay
+                        }
+                    },
+                    onSwipeNext = { goNextPage() },
+                    onSwipePrev = { goPrevPage() },
+                    onConsumePendingScroll = { pendingScrollY = null },
+                    onConsumeScrollId = { pendingScrollId = null },
+                    onWebViewReady = { webViewRef.value = it },
+                    onScrollIdle = { scrollId -> readerViewModel.markProgressAtCurrentPage(scrollId) },
+                    onPdfPageChanged = { idx, count ->
+                        (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(idx, count)
+                    },
+                ),
         )
 
         if (showOverlay) {
-            ReaderTopBar(
-                title = uiState.bookInfo?.title ?: stringResource(R.string.reader_title),
-                pageText = pageText(uiState.pageIndex, uiState.pageCount, uiState.bookInfo?.pageTitle, context),
-                onBack = { onBack(chapterId, uiState.pageIndex, seriesId, volumeId) },
-                modifier =
-                    Modifier
-                        .align(Alignment.TopStart)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
-            )
+            val barTitle = uiState.bookInfo?.title ?: stringResource(R.string.reader_title)
+            val barPageText = pageText(uiState.pageIndex, uiState.pageCount, uiState.bookInfo?.pageTitle, context)
+            if (topBarContent != null) {
+                topBarContent(barTitle, barPageText) {
+                    onBack(chapterId, uiState.pageIndex, seriesId, volumeId)
+                }
+            } else {
+                ReaderTopBar(
+                    title = barTitle,
+                    pageText = barPageText,
+                    onBack = { onBack(chapterId, uiState.pageIndex, seriesId, volumeId) },
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
+                )
+            }
 
-            ReaderBottomBar(
-                isLoading = uiState.isLoading,
-                enableChapterNav = uiState.bookInfo != null && !uiState.isLoading,
-                pageIndex = uiState.pageIndex,
-                pageCount = uiState.pageCount,
-                timeLeft = uiState.timeLeftText(context),
-                onScrollTop = {
-                    val web = webViewRef.value ?: return@ReaderBottomBar
-                    web.post { web.scrollTo(0, 0) }
-                },
-                onScrollBottom = {
-                    val web = webViewRef.value ?: return@ReaderBottomBar
-                    web.post {
-                        val bottom = ((web.contentHeight * web.scale) - web.height).toInt().coerceAtLeast(0)
-                        web.scrollTo(0, bottom)
-                    }
-                },
-                onPrevPage = {
-                    goPrevPage()
-                },
-                onNextPage = {
-                    goNextPage()
-                },
-                onOpenSettings = { showSettingsPanel = !showSettingsPanel },
-                onPrevChapter = {
-                    scope.launch {
-                        val nav = viewModel.getPreviousChapter()
-                        val chId = nav?.chapterId
-                        if (chId != null && chId >= 0) {
-                            onNavigateToChapter(
-                                chId,
-                                nav.pagesRead ?: 0,
-                                nav.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
-                                nav.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
-                            )
+            val bottomBarState =
+                ReaderBottomBarState(
+                    isLoading = uiState.isLoading,
+                    enableChapterNav = uiState.bookInfo != null && !uiState.isLoading,
+                    pageIndex = uiState.pageIndex,
+                    pageCount = uiState.pageCount,
+                    timeLeft = uiState.timeLeftText(context),
+                    enableSettings = renderer.supportsTextSettings,
+                )
+            val bottomBarCallbacks =
+                ReaderBottomBarCallbacks(
+                    onScrollTop = {
+                        if (uiState.isPdf) {
+                            if (uiState.pageCount > 0) {
+                                (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(0, uiState.pageCount)
+                            }
                         } else {
-                            Toast
-                                .makeText(
-                                    context,
-                                    context.resources.getString(R.string.reader_no_previous_chapter),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
+                            webViewRef.value?.let { web ->
+                                web.post { web.scrollTo(0, 0) }
+                            }
                         }
-                    }
-                },
-                onNextChapter = {
-                    scope.launch {
-                        val nav = viewModel.getNextChapter()
-                        val chId = nav?.chapterId
-                        if (chId != null && chId >= 0) {
-                            onNavigateToChapter(
-                                chId,
-                                nav.pagesRead ?: 0,
-                                nav.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
-                                nav.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
-                            )
+                    },
+                    onScrollBottom = {
+                        if (uiState.isPdf) {
+                            if (uiState.pageCount > 0) {
+                                (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(uiState.pageCount - 1, uiState.pageCount)
+                            }
                         } else {
-                            Toast.makeText(context, context.resources.getString(R.string.reader_no_next_chapter), Toast.LENGTH_SHORT).show()
+                            webViewRef.value?.let { web ->
+                                web.post {
+                                    val bottom = ((web.contentHeight * web.scale) - web.height).toInt().coerceAtLeast(0)
+                                    web.scrollTo(0, bottom)
+                                }
+                            }
                         }
-                    }
-                },
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter),
-            )
+                    },
+                    onPrevPage = { goPrevPage() },
+                    onNextPage = { goNextPage() },
+                    onOpenSettings = { if (renderer.supportsTextSettings) showSettingsPanel = !showSettingsPanel },
+                    onPrevChapter = {
+                        scope.launch {
+                            val nav = readerViewModel.getPreviousChapter()
+                            val chId = nav?.chapterId
+                            if (chId != null && chId >= 0) {
+                                onNavigateToChapter(
+                                    chId,
+                                    nav.pagesRead ?: 0,
+                                    nav.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
+                                    nav.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
+                                )
+                            } else {
+                                Toast
+                                    .makeText(
+                                        context,
+                                        context.resources.getString(R.string.reader_no_previous_chapter),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                            }
+                        }
+                    },
+                    onNextChapter = {
+                        scope.launch {
+                            val nav = readerViewModel.getNextChapter()
+                            val chId = nav?.chapterId
+                            if (chId != null && chId >= 0) {
+                                onNavigateToChapter(
+                                    chId,
+                                    nav.pagesRead ?: 0,
+                                    nav.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
+                                    nav.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
+                                )
+                            } else {
+                                Toast.makeText(context, context.resources.getString(R.string.reader_no_next_chapter), Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                )
+            if (bottomBarContent != null) {
+                bottomBarContent(bottomBarState, bottomBarCallbacks)
+            } else {
+                ReaderBottomBar(
+                    isLoading = bottomBarState.isLoading,
+                    enableChapterNav = bottomBarState.enableChapterNav,
+                    pageIndex = bottomBarState.pageIndex,
+                    pageCount = bottomBarState.pageCount,
+                    timeLeft = bottomBarState.timeLeft,
+                    onScrollTop = bottomBarCallbacks.onScrollTop,
+                    onScrollBottom = bottomBarCallbacks.onScrollBottom,
+                    onPrevPage = bottomBarCallbacks.onPrevPage,
+                    onNextPage = bottomBarCallbacks.onNextPage,
+                    onOpenSettings = bottomBarCallbacks.onOpenSettings,
+                    onPrevChapter = bottomBarCallbacks.onPrevChapter,
+                    onNextChapter = bottomBarCallbacks.onNextChapter,
+                    enableSettings = bottomBarState.enableSettings,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter),
+                )
+            }
 
             AnimatedVisibility(
                 visible = uiState.fromOffline,
@@ -367,70 +430,98 @@ fun ReaderScreen(
             }
 
             AnimatedVisibility(
-                visible = showSettingsPanel,
+                visible = renderer.supportsTextSettings && showSettingsPanel,
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 72.dp), // raise above bottom bar
             ) {
-                SettingsPanel(
-                    selectedTab = selectedSettingsTab,
-                    onSelectTab = { selectedSettingsTab = it },
-                    fontSize = fontSize,
-                    onFontSizeChange = {
-                        pendingScrollY = webViewRef.value?.scrollY ?: 0
-                        val new = it.coerceIn(8f, 36f)
-                        fontSize = new
-                        scope.launch { appPreferences.updateReaderPrefs { copy(fontSize = new) } }
-                    },
-                    lineHeight = lineHeight,
-                    onLineHeightChange = {
-                        pendingScrollY = webViewRef.value?.scrollY ?: 0
-                        val new = it.coerceIn(0.8f, 2.5f)
-                        lineHeight = new
-                        scope.launch { appPreferences.updateReaderPrefs { copy(lineHeight = new) } }
-                    },
-                    padding = padding,
-                    onPaddingChange = {
-                        pendingScrollY = webViewRef.value?.scrollY ?: 0
-                        val new = it.coerceIn(0.dp, 32.dp)
-                        padding = new
-                        scope.launch { appPreferences.updateReaderPrefs { copy(paddingDp = new.value) } }
-                    },
-                    themeMode = themeMode,
-                    onThemeChange = { mode ->
-                        themeMode = mode
-                        scope.launch { appPreferences.updateReaderPrefs { copy(readerTheme = mode) } }
-                    },
-                    textAlign = textAlign,
-                    onTextAlignChange = {
-                        pendingScrollY = webViewRef.value?.scrollY ?: 0
-                        textAlign = it
-                        scope.launch { appPreferences.updateReaderPrefs { copy(textAlign = it) } }
-                    },
-                    fontOptions = fontOptions,
-                    fontFamilyId = selectedFont.id,
-                    onFontFamilyChange = { option ->
-                        pendingScrollY = webViewRef.value?.scrollY ?: 0
-                        fontFamilyId = option.id
-                        scope.launch {
-                            appPreferences.updateReaderPrefs {
-                                copy(
-                                    fontFamily = option.id,
-                                    useSerif = option.isSerif,
-                                )
+                val settingsState =
+                    ReaderSettingsState(
+                        selectedTab = selectedSettingsTab,
+                        fontSize = fontSize,
+                        lineHeight = lineHeight,
+                        padding = padding,
+                        themeMode = themeMode,
+                        textAlign = textAlign,
+                        fontOptions = fontOptions,
+                        fontFamilyId = selectedFont.id,
+                    )
+                val settingsCallbacks =
+                    ReaderSettingsCallbacks(
+                        onSelectTab = { selectedSettingsTab = it },
+                        onFontSizeChange = {
+                            pendingScrollY = webViewRef.value?.scrollY ?: 0
+                            val new = it.coerceIn(8f, 36f)
+                            fontSize = new
+                            scope.launch { appPreferences.updateReaderPrefs { copy(fontSize = new) } }
+                        },
+                        onLineHeightChange = {
+                            pendingScrollY = webViewRef.value?.scrollY ?: 0
+                            val new = it.coerceIn(0.8f, 2.5f)
+                            lineHeight = new
+                            scope.launch { appPreferences.updateReaderPrefs { copy(lineHeight = new) } }
+                        },
+                        onPaddingChange = {
+                            pendingScrollY = webViewRef.value?.scrollY ?: 0
+                            val new = it.coerceIn(0.dp, 32.dp)
+                            padding = new
+                            scope.launch { appPreferences.updateReaderPrefs { copy(paddingDp = new.value) } }
+                        },
+                        onThemeChange = { mode ->
+                            themeMode = mode
+                            scope.launch { appPreferences.updateReaderPrefs { copy(readerTheme = mode) } }
+                        },
+                        onTextAlignChange = {
+                            pendingScrollY = webViewRef.value?.scrollY ?: 0
+                            textAlign = it
+                            scope.launch { appPreferences.updateReaderPrefs { copy(textAlign = it) } }
+                        },
+                        onFontFamilyChange = { option ->
+                            pendingScrollY = webViewRef.value?.scrollY ?: 0
+                            fontFamilyId = option.id
+                            scope.launch {
+                                appPreferences.updateReaderPrefs {
+                                    copy(
+                                        fontFamily = option.id,
+                                        useSerif = option.isSerif,
+                                    )
+                                }
                             }
-                        }
-                    },
-                )
+                        },
+                    )
+                if (settingsContent != null) {
+                    settingsContent(settingsState, settingsCallbacks)
+                } else {
+                    SettingsPanel(
+                        selectedTab = settingsState.selectedTab,
+                        onSelectTab = settingsCallbacks.onSelectTab,
+                        fontSize = settingsState.fontSize,
+                        onFontSizeChange = settingsCallbacks.onFontSizeChange,
+                        lineHeight = settingsState.lineHeight,
+                        onLineHeightChange = settingsCallbacks.onLineHeightChange,
+                        padding = settingsState.padding,
+                        onPaddingChange = settingsCallbacks.onPaddingChange,
+                        themeMode = settingsState.themeMode,
+                        onThemeChange = settingsCallbacks.onThemeChange,
+                        textAlign = settingsState.textAlign,
+                        onTextAlignChange = settingsCallbacks.onTextAlignChange,
+                        fontOptions = settingsState.fontOptions,
+                        fontFamilyId = settingsState.fontFamilyId,
+                        onFontFamilyChange = settingsCallbacks.onFontFamilyChange,
+                    )
+                }
             }
+
+            overlayExtras()
         }
     }
 }
 
 private fun ReaderUiState.timeLeftText(context: Context): String? {
     val tl = timeLeft ?: return null
-    return "${context.resources.getString(R.string.reader_time_left)}: ${tl.avgHours} h"
+    val rounded = String.format(java.util.Locale.getDefault(), "%.1f", tl.avgHours)
+    return "${context.resources.getString(R.string.reader_time_left)}: $rounded h"
 }
 
 @Composable
@@ -467,6 +558,7 @@ private fun ReaderBottomBar(
     pageIndex: Int,
     pageCount: Int,
     timeLeft: String?,
+    enableSettings: Boolean,
     onScrollTop: () -> Unit,
     onScrollBottom: () -> Unit,
     onPrevPage: () -> Unit,
@@ -515,7 +607,7 @@ private fun ReaderBottomBar(
                 }
             }
             // Center: settings
-            IconButton(onClick = onOpenSettings, enabled = true) {
+            IconButton(onClick = onOpenSettings, enabled = enableSettings) {
                 Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.reader_reader_settings))
             }
             Row(
@@ -539,6 +631,46 @@ private fun ReaderBottomBar(
         }
     }
 }
+
+data class ReaderBottomBarState(
+    val isLoading: Boolean,
+    val enableChapterNav: Boolean,
+    val pageIndex: Int,
+    val pageCount: Int,
+    val timeLeft: String?,
+    val enableSettings: Boolean,
+)
+
+data class ReaderBottomBarCallbacks(
+    val onScrollTop: () -> Unit,
+    val onScrollBottom: () -> Unit,
+    val onPrevPage: () -> Unit,
+    val onNextPage: () -> Unit,
+    val onOpenSettings: () -> Unit,
+    val onPrevChapter: () -> Unit,
+    val onNextChapter: () -> Unit,
+)
+
+data class ReaderSettingsState(
+    val selectedTab: ReaderSettingsTab,
+    val fontSize: Float,
+    val lineHeight: Float,
+    val padding: Dp,
+    val themeMode: ReaderThemeMode,
+    val textAlign: TextAlign,
+    val fontOptions: List<ReaderFontOption>,
+    val fontFamilyId: String,
+)
+
+data class ReaderSettingsCallbacks(
+    val onSelectTab: (ReaderSettingsTab) -> Unit,
+    val onFontSizeChange: (Float) -> Unit,
+    val onLineHeightChange: (Float) -> Unit,
+    val onPaddingChange: (Dp) -> Unit,
+    val onThemeChange: (ReaderThemeMode) -> Unit,
+    val onTextAlignChange: (TextAlign) -> Unit,
+    val onFontFamilyChange: (ReaderFontOption) -> Unit,
+)
 
 @Composable
 private fun SettingsPanel(
@@ -641,7 +773,7 @@ private fun SettingsPanel(
     }
 }
 
-private enum class ReaderSettingsTab(
+public enum class ReaderSettingsTab(
     val label: String,
 ) {
     Font("Font"),
@@ -808,7 +940,7 @@ private fun pageText(
 }
 
 @Composable
-private fun ReaderWebView(
+internal fun ReaderWebView(
     html: String,
     fontSize: Float,
     lineHeight: Float,
@@ -1094,42 +1226,7 @@ private fun ReaderWebView(
 }
 
 @Composable
-private fun PdfReaderScreen(
-    chapterId: Int,
-    seriesId: Int?,
-    volumeId: Int?,
-    uiState: ReaderUiState,
-    onBack: (chapterId: Int, page: Int, seriesId: Int?, volumeId: Int?) -> Unit,
-    onSetPage: (Int, Int) -> Unit,
-) {
-    val sid = uiState.bookInfo?.seriesId ?: seriesId
-    val vid = uiState.bookInfo?.volumeId ?: volumeId
-    BackHandler {
-        onBack(chapterId, uiState.pageIndex, sid, vid)
-    }
-    when {
-        uiState.isLoading -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        }
-        uiState.pdfPath == null -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = stringResource(R.string.general_error))
-            }
-        }
-        else -> {
-            PdfPageViewer(
-                pdfPath = uiState.pdfPath,
-                currentPage = uiState.pageIndex,
-                onPageChanged = onSetPage,
-            )
-        }
-    }
-}
-
-@Composable
-private fun PdfPageViewer(
+internal fun PdfPageViewer(
     pdfPath: String,
     currentPage: Int,
     onPageChanged: (Int, Int) -> Unit,
@@ -1138,6 +1235,7 @@ private fun PdfPageViewer(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val targetWidthPx = remember(configuration.screenWidthDp) { with(density) { configuration.screenWidthDp.dp.roundToPx() } }
+    val swipeThresholdPx = with(density) { 64.dp.toPx() }
 
     var pageIndex by remember { mutableStateOf(currentPage.coerceAtLeast(0)) }
     var pageCount by remember { mutableStateOf(0) }
@@ -1157,6 +1255,9 @@ private fun PdfPageViewer(
             pageCount = renderer.pageCount
             pageIndex = pageIndex.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
         }
+    }
+    LaunchedEffect(currentPage) {
+        pageIndex = currentPage.coerceAtLeast(0).coerceIn(0, (pageCount - 1).coerceAtLeast(0))
     }
 
     DisposableEffect(rendererHolder.value) {
@@ -1201,7 +1302,25 @@ private fun PdfPageViewer(
             modifier =
                 Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .pointerInput(pageIndex, pageCount) {
+                        var totalDrag = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                            onDragEnd = {
+                                if (kotlin.math.abs(totalDrag) > swipeThresholdPx) {
+                                    if (totalDrag < 0 && pageIndex < pageCount - 1) {
+                                        pageIndex += 1
+                                    } else if (totalDrag > 0 && pageIndex > 0) {
+                                        pageIndex -= 1
+                                    }
+                                }
+                                totalDrag = 0f
+                            },
+                            onDragCancel = { totalDrag = 0f },
+                        )
+                    },
             contentAlignment = Alignment.Center,
         ) {
             when {

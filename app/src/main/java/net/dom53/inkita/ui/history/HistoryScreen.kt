@@ -51,7 +51,7 @@ import java.util.Locale
 @Composable
 fun HistoryScreen(appPreferences: AppPreferences) {
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
     val isLoading = remember { mutableStateOf(true) }
     val error = remember { mutableStateOf<String?>(null) }

@@ -2,7 +2,49 @@
 
 All notable changes to this project will be documented here.
 
-## Unreleased
+## v0.3.0-beta
+
+### Added
+- Library V2: Added a new navigation entry and sliding menu with sections (Home, Want To Read, Collections, Reading Lists, Browse People, libraries list) plus data loading from Kavita endpoints with pagination where applicable.
+- Series Detail V2: New screen with summary expand/collapse, chips, metadata layout, action row (collections/want-to-read/web/share), and tabs for Books/Chapters/Specials/Related/Recommendations/Reviews.
+- Volume Detail V2: Dedicated screen with volume metadata, summary expand/collapse, and chapters list; supports deep link from series detail volumes.
+- Reader: Continue reading button now routes into the correct reader using progress data; volume/series continue labels reflect progress and volume/chapter info.
+- UI: Progress overlays on volume/chapters (triangle for unread, progress bar for in-progress).
+- Downloads V2: Per-volume and per-chapter download actions, download queue screen wiring, and download state icons for volumes/chapters/pages.
+- Downloads V2: Page list supports swipe-to-download/remove with haptic feedback and adjustable swipe distance.
+- Downloads V2: Download queue screen redesigned with cards, status chips, progress bars, and empty states.
+- Reader: Prefer offline pages now loads downloaded HTML when available and shows an “Offline data” overlay flag.
+- Series Detail V2: Specials now open into per-page lists (like Volume Detail) with download/reader actions and long-press download dialog.
+- Settings: Added Kavita Images API key field for collection/person cover endpoints.
+- Series Detail V2: Added menu actions to mark series read/unread.
+- Series Detail V2: Volume long-press actions now include mark volume read/unread.
+- Volume Detail V2: Chapter long-press actions now include mark read/unread (progress update).
+- Volume Detail V2: Swipe right on a page updates progress (read/unread); swipe left still downloads/removes.
+- Volume Detail V2 / Specials: Page titles now pull from EPUB TOC (getBookChapters) instead of generic labels.
+- UI: Important update modal now shows once per versionCode.
+
+### Changed
+- DTOs: Completed several Kavita DTOs (SeriesMetadataDto, PersonDto, GenreTagDto, VolumeDto, and related detail DTOs) for Detail V2 data aggregation.
+- Detail data: Added InkitaDetailV2 aggregator and wiring to fetch full series detail payloads and related data.
+- Reader: Remaining time in the overlay updates on page/chapter changes and is rounded to one decimal.
+- Downloads V2: Download worker now respects max concurrent downloads and automatic retries/max retry attempts from settings.
+- Downloads V2: Download-all now includes volumes, chapters, specials, and storyline chapters.
+- Settings: Prefetch switches in Advanced are temporarily disabled until the new prefetch pipeline is implemented.
+- Logging: Added verbose logs for Library V2 cache decisions, Series/Volume Detail V2 flows, and Download V2 enqueue/worker events.
+- Downloads: Download settings now use dedicated metered/low-battery preferences; download workers respect those constraints.
+- Cache: “Cache stale after” now supports minutes or hours with a 15-minute default.
+- Network: Increased global HTTP timeouts to 30 seconds.
+
+### Fixed
+- Detail V2: Progress and continue point refresh after returning from the reader to avoid stale data.
+- Volume detail: Prevent volume name from being overwritten by API responses that return only the numeric label.
+- Reader: Remaining time refreshes on page changes.
+- Downloads V2: Deduplicate page downloads and avoid re-queuing already downloaded pages.
+- Downloads V2: Queue processing continues beyond the first batch of pending jobs.
+- Reader: Offline overlays now show page/title data derived from downloaded files when online data is unavailable.
+- Reader: Progress sync now respects Kavita timestamps without timezone and avoids overwriting newer server progress.
+- Downloads V2: Clearing downloaded pages now removes items from the Downloaded tab.
+- Browse: Thumbnail shimmer stays active per-item until the image finishes loading.
 
 ## v0.2.0-beta.2
 
@@ -22,6 +64,9 @@ All notable changes to this project will be documented here.
 - Browse: Guarded paging requests to avoid duplicate page loads during fast scrolling.
 - Browse: Search field now includes a clear (X) button that resets the query and reloads results.
 - Browse: Fresh cache no longer blocks loading additional pages; pagination continues beyond the first cached page.
+- Reader: Refactored to use a shared BaseReader interface with separate EPUB/PDF renderers.
+- Reader: Split into BaseReaderScreen with dedicated EPUB/PDF screens for easier per-format customization.
+- Reader: Added domain BaseReader + EPUB/PDF reader implementations and per-format ViewModels.
 
 ## v0.2.0-beta.1
 

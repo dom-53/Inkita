@@ -5,12 +5,14 @@ import android.net.Uri
 import android.os.Environment
 import kotlinx.coroutines.flow.first
 import net.dom53.inkita.core.network.KavitaApiFactory
-import net.dom53.inkita.core.network.NetworkUtils
+import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.sync.ProgressSyncWorker
 import net.dom53.inkita.data.local.db.dao.DownloadDao
+import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
 import net.dom53.inkita.data.local.db.entity.CachedPageEntity
+import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
 import net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity
 import net.dom53.inkita.data.mapper.toDomain
@@ -29,6 +31,7 @@ class ReaderRepositoryImpl(
     private val appPreferences: AppPreferences,
     private val readerDao: ReaderDao,
     private val downloadDao: DownloadDao? = null,
+    private val downloadV2Dao: DownloadV2Dao? = null,
 ) : ReaderRepository {
     class PageNotDownloadedException(
         message: String,
@@ -39,6 +42,15 @@ class ReaderRepositoryImpl(
         page: Int,
     ): ReaderPageResult {
         val preferOffline = appPreferences.preferOfflinePagesFlow.first()
+        val downloadedV2 = downloadV2Dao?.getDownloadedPageForChapter(chapterId, page)
+        val downloadedHtmlV2 =
+            downloadedV2?.localPath?.let { path ->
+                if (isPathPresent(path)) {
+                    readDownloadedHtml(path)
+                } else {
+                    null
+                }
+            }
         val downloaded = downloadDao?.getDownloadedPage(chapterId, page)
         val downloadedHtml =
             downloaded?.let { pageEntity ->
@@ -50,12 +62,13 @@ class ReaderRepositoryImpl(
                 }
             }
         val cached = readerDao.getPage(chapterId, page)?.html
+        val offlineHtml = downloadedHtmlV2 ?: downloadedHtml
 
-        if (!NetworkUtils.isOnline(context) && downloadedHtml == null) {
+        if (!isOnlineAllowed() && offlineHtml == null) {
             throw PageNotDownloadedException("Page not downloaded for offline reading")
         }
 
-        if (preferOffline && downloadedHtml != null) return ReaderPageResult(downloadedHtml, true)
+        if (preferOffline && offlineHtml != null) return ReaderPageResult(offlineHtml, true)
 
         val apiHtml =
             try {
@@ -75,18 +88,18 @@ class ReaderRepositoryImpl(
                 )
                 body
             } catch (io: IOException) {
-                if (downloadedHtml != null) return ReaderPageResult(downloadedHtml, true)
+                if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
                 if (cached != null) return ReaderPageResult(cached, false)
-                if (!NetworkUtils.isOnline(context)) throw PageNotDownloadedException("Page not downloaded for offline reading")
+                if (!isOnlineAllowed()) throw PageNotDownloadedException("Page not downloaded for offline reading")
                 throw io
             } catch (e: Exception) {
-                if (downloadedHtml != null) return ReaderPageResult(downloadedHtml, true)
+                if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
                 if (cached != null) return ReaderPageResult(cached, false)
                 throw e
             }
 
         if (apiHtml != null) return ReaderPageResult(apiHtml, false)
-        if (downloadedHtml != null) return ReaderPageResult(downloadedHtml, true)
+        if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
         if (cached != null) return ReaderPageResult(cached, false)
 
         throw PageNotDownloadedException("Page not downloaded for offline reading")
@@ -101,6 +114,15 @@ class ReaderRepositoryImpl(
         chapterId: Int,
         page: Int,
     ): Boolean {
+        val v2Item = downloadV2Dao?.getDownloadedPageForChapter(chapterId, page)
+        if (v2Item != null) {
+            val path = v2Item.localPath
+            if (!path.isNullOrBlank()) {
+                val present = isPathPresent(path)
+                if (!present) return false
+                return present
+            }
+        }
         val downloaded = downloadDao?.getDownloadedPage(chapterId, page) ?: return false
         val present = isPathPresent(downloaded.htmlPath)
         if (!present) {
@@ -111,7 +133,7 @@ class ReaderRepositoryImpl(
 
     override suspend fun getProgress(chapterId: Int): ReaderProgress? {
         val local = readerDao.getLocalProgress(chapterId)?.toDomain()
-        if (!NetworkUtils.isOnline(context)) return local
+        if (!isOnlineAllowed()) return local
 
         val api =
             try {
@@ -156,7 +178,7 @@ class ReaderRepositoryImpl(
                 progress
             }
 
-        if (!NetworkUtils.isOnline(context)) {
+        if (!isOnlineAllowed()) {
             readerDao.upsertLocalProgress(progressWithTs.toEntity())
             ProgressSyncWorker.enqueue(context)
             return
@@ -251,15 +273,23 @@ class ReaderRepositoryImpl(
         runCatching {
             val api = apiOrThrow()
             val resp = api.getContinuePoint(seriesId)
-            if (resp.isSuccessful) resp.body()?.toDomain() else null
+            if (!resp.isSuccessful) return@runCatching null
+            val chapter = resp.body() ?: return@runCatching null
+            ReaderChapterNav(
+                seriesId = seriesId,
+                volumeId = chapter.volumeId,
+                chapterId = chapter.id,
+                pagesRead = chapter.pagesRead,
+            )
         }.getOrNull()
 
     override suspend fun getBookInfo(chapterId: Int): ReaderBookInfo? =
         runCatching {
+            if (!isOnlineAllowed()) return@runCatching getOfflineBookInfo(chapterId)
             val api = apiOrThrow()
             val resp = api.getBookInfo(chapterId)
             if (resp.isSuccessful) resp.body()?.toDomain() else null
-        }.getOrNull()
+        }.getOrNull() ?: getOfflineBookInfo(chapterId)
 
     override suspend fun markSeriesRead(seriesId: Int) {
         runCatching {
@@ -312,7 +342,7 @@ class ReaderRepositoryImpl(
     }
 
     override suspend fun syncLocalProgress() {
-        if (!NetworkUtils.isOnline(context)) return
+        if (!isOnlineAllowed()) return
         val api = runCatching { apiOrThrow() }.getOrElse { return }
         val locals = runCatching { readerDao.getAllLocalProgress() }.getOrDefault(emptyList())
         if (locals.isEmpty()) return
@@ -329,15 +359,40 @@ class ReaderRepositoryImpl(
                     local.lastModifiedUtcMillis > remote.lastModifiedUtcMillis -> local
                     else -> remote
                 }
-            runCatching { api.setReaderProgress(latest.toDto()) }
-            readerDao.upsertLocalProgress(latest.toEntity())
+            val resp =
+                runCatching { api.setReaderProgress(latest.toDto()) }
+                    .getOrNull()
+            if (resp?.isSuccessful == true) {
+                readerDao.clearLocalProgress(local.chapterId)
+            } else {
+                readerDao.upsertLocalProgress(latest.toEntity())
+            }
         }
+    }
+
+    override suspend fun getLatestLocalProgress(seriesId: Int): ReaderProgress? {
+        val locals = runCatching { readerDao.getAllLocalProgress() }.getOrDefault(emptyList())
+        val latest =
+            locals
+                .filter { it.seriesId == seriesId }
+                .maxByOrNull { it.lastModifiedUtc }
+        return latest?.toDomain()
+    }
+
+    override suspend fun getLatestLocalProgressForChapters(chapterIds: Set<Int>): ReaderProgress? {
+        if (chapterIds.isEmpty()) return null
+        val locals = runCatching { readerDao.getAllLocalProgress() }.getOrDefault(emptyList())
+        val latest =
+            locals
+                .filter { it.chapterId in chapterIds }
+                .maxByOrNull { it.lastModifiedUtc }
+        return latest?.toDomain()
     }
 
     private suspend fun apiOrThrow(): net.dom53.inkita.data.api.KavitaApi {
         val config = appPreferences.configFlow.first()
         check(config.isConfigured) { "Not authenticated" }
-        if (!NetworkUtils.isOnline(context)) throw IOException("Offline")
+        if (!isOnlineAllowed()) throw IOException("Offline")
 
         return KavitaApiFactory.createAuthenticated(
             baseUrl = config.serverUrl,
@@ -360,6 +415,42 @@ class ReaderRepositoryImpl(
     private fun isPathPresent(path: String): Boolean {
         if (path.startsWith("content://")) return true
         return File(path).exists()
+    }
+
+    private fun isOnlineAllowed(): Boolean =
+        NetworkMonitor
+            .getInstance(context, appPreferences)
+            .status.value.isOnlineAllowed
+
+    private suspend fun getOfflineBookInfo(chapterId: Int): ReaderBookInfo? {
+        val items = downloadV2Dao?.getItemsForChapter(chapterId).orEmpty()
+        if (items.isEmpty()) return null
+        val completed =
+            items
+                .filter { it.status == DownloadedItemV2Entity.STATUS_COMPLETED }
+                .filter { it.page != null }
+                .filter { isPathPresent(it.localPath ?: return@filter false) }
+        if (completed.isEmpty()) return null
+        val maxPage = completed.maxOf { it.page ?: 0 }
+        val progress = readerDao.getLocalProgress(chapterId)
+        val seriesId = progress?.seriesId ?: completed.firstOrNull()?.seriesId
+        val volumeId = progress?.volumeId ?: completed.firstOrNull()?.volumeId
+        val libraryId = progress?.libraryId
+        val title =
+            runCatching {
+                context.getString(
+                    net.dom53.inkita.R.string.series_detail_chapter_fallback,
+                    chapterId,
+                )
+            }.getOrNull()
+        return ReaderBookInfo(
+            pages = maxPage + 1,
+            seriesId = seriesId,
+            volumeId = volumeId,
+            libraryId = libraryId,
+            title = null,
+            pageTitle = title,
+        )
     }
 
     private fun LocalReaderProgressEntity.toDomain(): ReaderProgress =

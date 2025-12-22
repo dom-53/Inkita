@@ -176,7 +176,7 @@ fun SeriesDetailScreen(
     }
     val scope = rememberCoroutineScope()
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
     var summaryExpanded by remember { mutableStateOf(false) }
     var showCollectionDialog by remember { mutableStateOf(false) }
@@ -424,7 +424,7 @@ fun SeriesDetailScreen(
                                     showResetProgressDialog = true
                                     return@Button
                                 }
-                                val volumesList = currentDetail?.volumes.orEmpty()
+                                val volumesList = currentDetail?.volumes.orEmpty() + currentDetail?.specials.orEmpty()
                                 val targetVolume =
                                     volumesList
                                         .firstOrNull { volumeProgress[it.id]?.page != null }
@@ -447,7 +447,7 @@ fun SeriesDetailScreen(
                                     else -> {
                                         val volId = uiState.continueVolumeId
                                         val page = uiState.continuePage?.plus(1)
-                                        val volumesList = currentDetail?.volumes.orEmpty()
+                                        val volumesList = currentDetail?.volumes.orEmpty() + currentDetail?.specials.orEmpty()
                                         val targetVolume = volId?.let { id -> volumesList.firstOrNull { it.id == id } }
                                         val volumeIndex = targetVolume?.let { volumesList.indexOf(it) } ?: -1
                                         val volText =

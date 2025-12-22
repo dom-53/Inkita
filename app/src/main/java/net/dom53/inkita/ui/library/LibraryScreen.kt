@@ -65,7 +65,7 @@ fun LibraryScreen(
     val uiState by viewModel.state.collectAsState()
 
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
     val context = LocalContext.current
     val permissionLauncher =

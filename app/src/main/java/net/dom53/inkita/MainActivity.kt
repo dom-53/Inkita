@@ -13,8 +13,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +45,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.os.LocaleListCompat
 import androidx.core.view.WindowCompat
@@ -64,10 +74,10 @@ import net.dom53.inkita.ui.browse.BrowseScreen
 import net.dom53.inkita.ui.download.DownloadQueueScreen
 import net.dom53.inkita.ui.download.DownloadQueueViewModelFactory
 import net.dom53.inkita.ui.history.HistoryScreen
-import net.dom53.inkita.ui.library.LibraryScreen
+import net.dom53.inkita.ui.library.LibraryV2Screen
 import net.dom53.inkita.ui.navigation.MainScreen
 import net.dom53.inkita.ui.reader.ReaderScreen
-import net.dom53.inkita.ui.seriesdetail.SeriesDetailScreen
+import net.dom53.inkita.ui.seriesdetail.SeriesDetailScreenV2
 import net.dom53.inkita.ui.settings.SettingsScreen
 import net.dom53.inkita.ui.theme.InkitaTheme
 import net.dom53.inkita.ui.updates.UpdatesScreen
@@ -103,6 +113,8 @@ class MainActivity : AppCompatActivity() {
                 authRepository = components.authRepository,
                 seriesRepository = components.seriesRepository,
                 collectionsRepository = components.collectionsRepository,
+                readingListRepository = components.readingListRepository,
+                personRepository = components.personRepository,
                 readerRepository = components.readerRepository,
                 cacheManager = components.cacheManager,
             )
@@ -115,6 +127,55 @@ class MainActivity : AppCompatActivity() {
         StartupManager.onResume(applicationContext)
     }
 }
+
+private const val IMPORTANT_INFO_HEADER =
+    "✅ Image API key was added — please fill it in Kavita Settings."
+
+private val IMPORTANT_INFO_ADDED =
+    listOf(
+        "Library V2 navigation with Home/Want to Read/Collections/Reading Lists/Browse People + pagination",
+        "Series Detail V2 with richer metadata, actions, and tabs",
+        "Volume Detail V2 with chapters list and deep link from series",
+        "Continue reading now routes to the correct reader with accurate labels",
+        "Progress overlays on volumes/chapters (unread triangle + in-progress bar)",
+        "Downloads V2: per-volume/chapter actions, queue screen, and state icons",
+        "Downloads V2: swipe to download/remove with haptics",
+        "Downloads queue redesign (cards, chips, progress bars, empty states)",
+        "Offline reading improvements + “Offline data” indicator",
+        "Specials now open into per-page lists with download/reader actions",
+        "Kavita Images API key field in Settings",
+        "Mark series/volume/chapter read/unread actions",
+        "EPUB TOC page titles for Volume Detail and Specials",
+        "Important update modal shown once per version",
+    )
+
+private val IMPORTANT_INFO_CHANGED =
+    listOf(
+        "Completed Kavita DTOs needed for Detail V2 aggregation",
+        "Detail V2 now fetches full series payloads + related data",
+        "Reader remaining time updates on page/chapter changes (rounded to 1 decimal)",
+        "Downloads V2 respects max concurrent + retry limits",
+        "Download-all now includes volumes, chapters, specials, storyline chapters",
+        "Prefetch switches are disabled until the new pipeline lands",
+        "Verbose logging added for cache decisions, detail flows, and downloads",
+        "Download settings now use dedicated metered/low-battery preferences",
+        "Cache stale window supports minutes/hours (default 15 min)",
+        "Global HTTP timeouts increased to 30 seconds",
+    )
+
+private val IMPORTANT_INFO_FIXED =
+    listOf(
+        "Progress/continue point refresh after returning from reader",
+        "Volume name no longer overwritten by numeric-only API values",
+        "Remaining time refreshes on page changes",
+        "Downloads V2 deduplicates pages and keeps the queue moving",
+        "Offline overlays show page/title from downloaded files",
+        "Progress sync respects Kavita timestamps",
+        "Clearing downloads removes items from the Downloaded tab",
+        "Browse thumbnail shimmer stays active per-item until load completes",
+    )
+
+private const val FORCE_SHOW_IMPORTANT_INFO = false
 
 private fun applyLocale(languageTag: String) {
     val locales =
@@ -129,6 +190,32 @@ private fun applyLocale(languageTag: String) {
 }
 
 @Composable
+private fun InfoSection(
+    title: String,
+    items: List<String>,
+) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+    )
+    Spacer(modifier = Modifier.size(6.dp))
+    items.forEach { item ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("•")
+            Text(
+                text = item,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(modifier = Modifier.size(4.dp))
+    }
+}
+
+@Composable
 fun InkitaApp(
     initialLanguage: String,
     appPreferences: AppPreferences,
@@ -136,6 +223,8 @@ fun InkitaApp(
     authRepository: AuthRepository,
     seriesRepository: SeriesRepository,
     collectionsRepository: CollectionsRepository,
+    readingListRepository: net.dom53.inkita.domain.repository.ReadingListRepository,
+    personRepository: net.dom53.inkita.domain.repository.PersonRepository,
     readerRepository: net.dom53.inkita.domain.repository.ReaderRepository,
     cacheManager: CacheManager,
 ) {
@@ -145,6 +234,8 @@ fun InkitaApp(
     val notificationsEnabled =
         NotificationManagerCompat.from(context).areNotificationsEnabled()
     val showNotifDialog = remember { mutableStateOf(false) }
+    val lastImportantInfoVersion by appPreferences.importantInfoVersionFlow.collectAsState(initial = -1)
+    val showImportantInfoDialog = remember { mutableStateOf(false) }
     val appLanguage by appPreferences.appLanguageFlow.collectAsState(initial = initialLanguage)
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
@@ -159,6 +250,15 @@ fun InkitaApp(
         } else if (!notifPromptShown && notificationsEnabled) {
             appPreferences.setNotificationsPromptShown(true)
         }
+    }
+
+    LaunchedEffect(lastImportantInfoVersion) {
+        if (FORCE_SHOW_IMPORTANT_INFO) {
+            showImportantInfoDialog.value = true
+            return@LaunchedEffect
+        }
+        if (lastImportantInfoVersion < 0) return@LaunchedEffect
+        showImportantInfoDialog.value = BuildConfig.VERSION_CODE > lastImportantInfoVersion
     }
 
     LaunchedEffect(appLanguage) {
@@ -180,7 +280,7 @@ fun InkitaApp(
     val currentRoute = backStackEntry?.destination?.route
     val mainRoutes = MainScreen.items.map { it.route }
     val config by appPreferences.configFlow.collectAsState(
-        initial = AppConfig(serverUrl = "", apiKey = "", userId = 0),
+        initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
 
     InkitaTheme(darkTheme = darkTheme, dynamicColor = false) {
@@ -216,6 +316,58 @@ fun InkitaApp(
                             scope.launch { appPreferences.setNotificationsPromptShown(true) }
                         },
                     ) { Text(context.getString(R.string.notifications_prompt_dismiss)) }
+                },
+            )
+        }
+        if (showImportantInfoDialog.value) {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text(text = context.getString(R.string.update_info_title)) },
+                text = {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 420.dp)
+                                .verticalScroll(rememberScrollState()),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = IMPORTANT_INFO_HEADER,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                            )
+                            Spacer(modifier = Modifier.size(12.dp))
+                            Text(
+                                text = "📌 Unreleased",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            )
+                            Spacer(modifier = Modifier.size(8.dp))
+                            InfoSection(
+                                title = "✨ Added",
+                                items = IMPORTANT_INFO_ADDED,
+                            )
+                            Spacer(modifier = Modifier.size(10.dp))
+                            InfoSection(
+                                title = "🔁 Changed",
+                                items = IMPORTANT_INFO_CHANGED,
+                            )
+                            Spacer(modifier = Modifier.size(10.dp))
+                            InfoSection(
+                                title = "🛠️ Fixed",
+                                items = IMPORTANT_INFO_FIXED,
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showImportantInfoDialog.value = false
+                            scope.launch { appPreferences.setImportantInfoVersion(BuildConfig.VERSION_CODE) }
+                        },
+                    ) { Text(context.getString(R.string.general_close)) }
                 },
             )
         }
@@ -283,15 +435,18 @@ fun InkitaApp(
             ) { innerPadding ->
                 NavHost(
                     navController = navController,
-                    startDestination = MainScreen.Library.route,
+                    startDestination = MainScreen.LibraryV2.route,
                     modifier = Modifier.padding(innerPadding),
                 ) {
-                    composable(MainScreen.Library.route) {
-                        LibraryScreen(
+                    composable(MainScreen.LibraryV2.route) {
+                        LibraryV2Screen(
+                            libraryRepository = libraryRepository,
                             seriesRepository = seriesRepository,
                             collectionsRepository = collectionsRepository,
-                            appPreferences = appPreferences,
+                            readingListRepository = readingListRepository,
+                            personRepository = personRepository,
                             cacheManager = cacheManager,
+                            appPreferences = appPreferences,
                             onOpenSeries = { seriesId ->
                                 navController.navigate("series/$seriesId")
                             },
@@ -337,23 +492,60 @@ fun InkitaApp(
                                     "reader_return",
                                     null,
                                 ).collectAsState(initial = null)
-                        SeriesDetailScreen(
+                        val refreshSignal =
+                            entry.savedStateHandle
+                                .getStateFlow<Boolean>(
+                                    "series_refresh",
+                                    false,
+                                ).collectAsState(initial = false)
+                        SeriesDetailScreenV2(
                             seriesId = seriesId,
-                            seriesRepository = seriesRepository,
                             appPreferences = appPreferences,
                             collectionsRepository = collectionsRepository,
                             readerRepository = readerRepository,
+                            cacheManager = cacheManager,
+                            onOpenReader = { chapterId, page, sid, vid, fmt ->
+                                navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: 0}")
+                            },
+                            onOpenVolume = { volumeId ->
+                                navController.navigate("volume/$volumeId")
+                            },
+                            onOpenSeries = { id ->
+                                navController.navigate("series/$id")
+                            },
                             readerReturn = readerReturn.value,
                             onConsumeReaderReturn = { entry.savedStateHandle["reader_return"] = null },
+                            refreshSignal = refreshSignal.value,
+                            onConsumeRefreshSignal = { entry.savedStateHandle["series_refresh"] = false },
                             onBack = { navController.popBackStack() },
-                            onOpenSeries = { targetId ->
-                                navController.navigate("series/$targetId")
+                        )
+                    }
+                    composable(
+                        route = "volume/{volumeId}",
+                        arguments = listOf(navArgument("volumeId") { type = NavType.IntType }),
+                    ) { entry ->
+                        val volumeId = entry.arguments?.getInt("volumeId") ?: return@composable
+                        val readerReturn =
+                            entry.savedStateHandle
+                                .getStateFlow<net.dom53.inkita.ui.reader.ReaderReturn?>(
+                                    "reader_return",
+                                    null,
+                                ).collectAsState(initial = null)
+                        net.dom53.inkita.ui.seriesdetail.VolumeDetailScreenV2(
+                            volumeId = volumeId,
+                            appPreferences = appPreferences,
+                            readerRepository = readerRepository,
+                            readerReturn = readerReturn.value,
+                            onConsumeReaderReturn = {
+                                entry.savedStateHandle["reader_return"] = null
+                                navController.previousBackStackEntry?.savedStateHandle?.set("series_refresh", true)
                             },
-                            onOpenDownloads = {
-                                navController.navigate(MainScreen.Downloads.route)
+                            onOpenReader = { chapterId, page, sid, vid, fmt ->
+                                navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: 0}")
                             },
-                            onOpenReader = { chapterId, page, sId, vId, fmt ->
-                                navController.navigate("reader/$chapterId?page=${page ?: 0}&sid=$sId&vid=$vId&fmt=${fmt ?: 0}")
+                            onBack = {
+                                navController.previousBackStackEntry?.savedStateHandle?.set("series_refresh", true)
+                                navController.popBackStack()
                             },
                         )
                     }

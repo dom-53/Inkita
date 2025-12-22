@@ -9,8 +9,24 @@ import net.dom53.inkita.domain.model.ReaderChapterNav
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.ReaderTimeLeft
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
-private fun String?.toEpochMillis(): Long = runCatching { this?.let { Instant.parse(it).toEpochMilli() } ?: 0L }.getOrDefault(0L)
+private fun String?.toEpochMillis(): Long {
+    val raw = this?.trim().orEmpty()
+    if (raw.isBlank()) return 0L
+    runCatching { return Instant.parse(raw).toEpochMilli() }
+    runCatching { return OffsetDateTime.parse(raw).toInstant().toEpochMilli() }
+    runCatching {
+        return LocalDateTime
+            .parse(raw)
+            .atZone(ZoneOffset.UTC)
+            .toInstant()
+            .toEpochMilli()
+    }
+    return 0L
+}
 
 fun ReaderProgressDto.toDomain(): ReaderProgress =
     ReaderProgress(

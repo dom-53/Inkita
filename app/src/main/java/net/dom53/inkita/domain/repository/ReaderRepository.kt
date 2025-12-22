@@ -67,4 +67,8 @@ interface ReaderRepository {
     )
 
     suspend fun syncLocalProgress()
+
+    suspend fun getLatestLocalProgress(seriesId: Int): ReaderProgress?
+
+    suspend fun getLatestLocalProgressForChapters(chapterIds: Set<Int>): ReaderProgress?
 }

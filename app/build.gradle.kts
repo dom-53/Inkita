@@ -25,7 +25,7 @@ android {
         // Allow CI to override version/channel (falls back to local defaults).
         val versionNameOverride = project.findProperty("versionNameOverride") as? String
         val releaseChannel = project.findProperty("releaseChannel") as? String ?: "preview"
-        versionName = versionNameOverride ?: "0.2.0-beta.3"
+        versionName = versionNameOverride ?: "0.3.0-beta"
         buildConfigField("String", "RELEASE_CHANNEL", "\"$releaseChannel\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -142,6 +142,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation("androidx.compose.material:material")
     implementation(libs.androidx.navigation.compose)
     implementation("androidx.datastore:datastore-preferences:1.2.0")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")

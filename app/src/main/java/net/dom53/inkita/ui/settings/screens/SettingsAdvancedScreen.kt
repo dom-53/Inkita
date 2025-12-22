@@ -66,6 +66,18 @@ fun SettingsAdvancedScreen(
     var globalCacheEnabled by remember { mutableStateOf(true) }
     var cacheEnabled by remember { mutableStateOf(false) }
     var browseCacheEnabled by remember { mutableStateOf(false) }
+    var libraryCacheHomeEnabled by remember { mutableStateOf(false) }
+    var libraryCacheWantEnabled by remember { mutableStateOf(false) }
+    var libraryCacheCollectionsEnabled by remember { mutableStateOf(false) }
+    var libraryCacheReadingListsEnabled by remember { mutableStateOf(false) }
+    var libraryCacheBrowsePeopleEnabled by remember { mutableStateOf(false) }
+    var libraryCacheDetailsEnabled by remember { mutableStateOf(false) }
+    var cacheAlwaysRefresh by remember { mutableStateOf(false) }
+    var cacheStaleMinutes by remember { mutableStateOf(15) }
+    var cacheStaleInput by remember { mutableStateOf("15") }
+    var cacheStaleFocused by remember { mutableStateOf(false) }
+    var useStaleHours by remember { mutableStateOf(false) }
+    var debugToasts by remember { mutableStateOf(false) }
     var cacheTtlMinutes by remember { mutableStateOf(0) }
     var ttlInput by remember { mutableStateOf("0") }
     var useHours by remember { mutableStateOf(false) }
@@ -110,6 +122,38 @@ fun SettingsAdvancedScreen(
     }
     LaunchedEffect(Unit) {
         appPreferences.browseCacheEnabledFlow.collectLatest { browseCacheEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.cacheAlwaysRefreshFlow.collectLatest { cacheAlwaysRefresh = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.debugToastsFlow.collectLatest { debugToasts = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.cacheStaleMinutesFlow.collectLatest {
+            cacheStaleMinutes = it
+            if (!cacheStaleFocused) {
+                cacheStaleInput = minutesToDisplay(it, useStaleHours)
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.libraryCacheHomeFlow.collectLatest { libraryCacheHomeEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.libraryCacheWantToReadFlow.collectLatest { libraryCacheWantEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.libraryCacheCollectionsFlow.collectLatest { libraryCacheCollectionsEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.libraryCacheReadingListsFlow.collectLatest { libraryCacheReadingListsEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.libraryCacheBrowsePeopleFlow.collectLatest { libraryCacheBrowsePeopleEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.libraryCacheDetailsFlow.collectLatest { libraryCacheDetailsEnabled = it }
     }
     LaunchedEffect(Unit) {
         appPreferences.cacheRefreshTtlMinutesFlow.collectLatest {
@@ -191,6 +235,34 @@ fun SettingsAdvancedScreen(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
+                    text = stringResource(R.string.settings_debug_toasts_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_debug_toasts_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = debugToasts,
+                onCheckedChange = { checked ->
+                    debugToasts = checked
+                    scope.launch { appPreferences.setDebugToasts(checked) }
+                },
+            )
+        }
+
+        Text(
+            text = stringResource(R.string.settings_advanced_section_global_cache),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
                     text = stringResource(R.string.settings_cache_global_title),
                     style = MaterialTheme.typography.bodyLarge,
                 )
@@ -215,6 +287,80 @@ fun SettingsAdvancedScreen(
                     }
                 },
             )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_cache_always_refresh_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_cache_always_refresh_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = cacheAlwaysRefresh,
+                onCheckedChange = { checked ->
+                    cacheAlwaysRefresh = checked
+                    scope.launch { appPreferences.setCacheAlwaysRefresh(checked) }
+                },
+                enabled = globalCacheEnabled,
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = cacheStaleInput,
+                onValueChange = { value ->
+                    cacheStaleInput = value
+                    val normalized = value.replace(',', '.')
+                    val parsed = normalized.toFloatOrNull()
+                    if (parsed != null) {
+                        val minutes = if (useStaleHours) (parsed * 60f).toInt() else parsed.toInt()
+                        cacheStaleMinutes = minutes.coerceIn(1, 10080)
+                        scope.launch { appPreferences.setCacheStaleMinutes(cacheStaleMinutes) }
+                    }
+                },
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .onFocusChanged { state ->
+                            cacheStaleFocused = state.isFocused
+                            if (!state.isFocused) {
+                                cacheStaleInput = minutesToDisplay(cacheStaleMinutes, useStaleHours)
+                            }
+                        },
+                label = {
+                    Text(
+                        text =
+                            stringResource(
+                                R.string.settings_cache_stale_label,
+                                if (useStaleHours) stringResource(R.string.settings_units_hours) else stringResource(R.string.settings_units_minutes),
+                            ),
+                    )
+                },
+                supportingText = { Text(stringResource(R.string.settings_cache_stale_hours_hint)) },
+                singleLine = true,
+                enabled = globalCacheEnabled,
+            )
+            OutlinedButton(
+                onClick = {
+                    useStaleHours = !useStaleHours
+                    cacheStaleInput = minutesToDisplay(cacheStaleMinutes, useStaleHours)
+                },
+            ) {
+                Text(if (useStaleHours) stringResource(R.string.settings_units_hours) else stringResource(R.string.settings_units_minutes))
+            }
         }
 
         Row(
@@ -267,6 +413,10 @@ fun SettingsAdvancedScreen(
 
         Divider()
 
+        Text(
+            text = stringResource(R.string.settings_advanced_section_library_cache),
+            style = MaterialTheme.typography.titleMedium,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -292,6 +442,79 @@ fun SettingsAdvancedScreen(
             )
         }
 
+        if (cacheEnabled) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_cache_library_sections_title),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                CacheToggleRow(
+                    title = stringResource(R.string.settings_cache_library_home_title),
+                    subtitle = stringResource(R.string.settings_cache_library_home_subtitle),
+                    checked = libraryCacheHomeEnabled,
+                    enabled = globalCacheEnabled,
+                ) { checked ->
+                    libraryCacheHomeEnabled = checked
+                    scope.launch { appPreferences.setLibraryCacheHomeEnabled(checked) }
+                }
+                CacheToggleRow(
+                    title = stringResource(R.string.settings_cache_library_want_title),
+                    subtitle = stringResource(R.string.settings_cache_library_want_subtitle),
+                    checked = libraryCacheWantEnabled,
+                    enabled = globalCacheEnabled,
+                ) { checked ->
+                    libraryCacheWantEnabled = checked
+                    scope.launch { appPreferences.setLibraryCacheWantToReadEnabled(checked) }
+                }
+                CacheToggleRow(
+                    title = stringResource(R.string.settings_cache_library_collections_title),
+                    subtitle = stringResource(R.string.settings_cache_library_collections_subtitle),
+                    checked = libraryCacheCollectionsEnabled,
+                    enabled = globalCacheEnabled,
+                ) { checked ->
+                    libraryCacheCollectionsEnabled = checked
+                    scope.launch { appPreferences.setLibraryCacheCollectionsEnabled(checked) }
+                }
+                CacheToggleRow(
+                    title = stringResource(R.string.settings_cache_library_reading_lists_title),
+                    subtitle = stringResource(R.string.settings_cache_library_reading_lists_subtitle),
+                    checked = libraryCacheReadingListsEnabled,
+                    enabled = globalCacheEnabled,
+                ) { checked ->
+                    libraryCacheReadingListsEnabled = checked
+                    scope.launch { appPreferences.setLibraryCacheReadingListsEnabled(checked) }
+                }
+                CacheToggleRow(
+                    title = stringResource(R.string.settings_cache_library_browse_people_title),
+                    subtitle = stringResource(R.string.settings_cache_library_browse_people_subtitle),
+                    checked = libraryCacheBrowsePeopleEnabled,
+                    enabled = globalCacheEnabled,
+                ) { checked ->
+                    libraryCacheBrowsePeopleEnabled = checked
+                    scope.launch { appPreferences.setLibraryCacheBrowsePeopleEnabled(checked) }
+                }
+                CacheToggleRow(
+                    title = stringResource(R.string.settings_cache_library_details_title),
+                    subtitle = stringResource(R.string.settings_cache_library_details_subtitle),
+                    checked = libraryCacheDetailsEnabled,
+                    enabled = globalCacheEnabled,
+                ) { checked ->
+                    libraryCacheDetailsEnabled = checked
+                    scope.launch { appPreferences.setLibraryCacheDetailsEnabled(checked) }
+                }
+            }
+        }
+
+        Divider()
+
+        Text(
+            text = stringResource(R.string.settings_advanced_section_browse_cache),
+            style = MaterialTheme.typography.titleMedium,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -410,6 +633,10 @@ fun SettingsAdvancedScreen(
 
         Divider()
 
+        Text(
+            text = stringResource(R.string.settings_advanced_section_prefetch),
+            style = MaterialTheme.typography.titleMedium,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -431,7 +658,7 @@ fun SettingsAdvancedScreen(
                     prefetchInProgress = checked
                     scope.launch { appPreferences.setPrefetchInProgress(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
 
@@ -456,7 +683,7 @@ fun SettingsAdvancedScreen(
                     prefetchWant = checked
                     scope.launch { appPreferences.setPrefetchWant(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
 
@@ -481,7 +708,7 @@ fun SettingsAdvancedScreen(
                     prefetchCollections = checked
                     scope.launch { appPreferences.setPrefetchCollections(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
         if (prefetchCollections) {
@@ -502,7 +729,7 @@ fun SettingsAdvancedScreen(
                             prefetchCollectionsAll = true
                             scope.launch { appPreferences.setPrefetchCollectionsAll(true) }
                         },
-                        enabled = globalCacheEnabled,
+                        enabled = false,
                         colors =
                             ButtonDefaults.outlinedButtonColors(
                                 containerColor =
@@ -518,7 +745,7 @@ fun SettingsAdvancedScreen(
                             prefetchCollectionsAll = false
                             scope.launch { appPreferences.setPrefetchCollectionsAll(false) }
                         },
-                        enabled = globalCacheEnabled,
+                        enabled = false,
                         colors =
                             ButtonDefaults.outlinedButtonColors(
                                 containerColor =
@@ -558,7 +785,7 @@ fun SettingsAdvancedScreen(
                                             selectedCollectionIds = next
                                             scope.launch { appPreferences.setPrefetchCollectionIds(next.toList()) }
                                         },
-                                        enabled = globalCacheEnabled,
+                                        enabled = false,
                                     )
                                     Text(collection.name, style = MaterialTheme.typography.bodyMedium)
                                 }
@@ -595,7 +822,7 @@ fun SettingsAdvancedScreen(
                     prefetchDetails = checked
                     scope.launch { appPreferences.setPrefetchDetails(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
 
@@ -620,7 +847,7 @@ fun SettingsAdvancedScreen(
                     prefetchAllowMetered = checked
                     scope.launch { appPreferences.setPrefetchAllowMetered(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
 
@@ -645,12 +872,16 @@ fun SettingsAdvancedScreen(
                     prefetchAllowLowBattery = checked
                     scope.launch { appPreferences.setPrefetchAllowLowBattery(checked) }
                 },
-                enabled = globalCacheEnabled,
+                enabled = false,
             )
         }
 
         Divider()
 
+        Text(
+            text = stringResource(R.string.settings_advanced_section_cache_maintenance),
+            style = MaterialTheme.typography.titleMedium,
+        )
         Text(
             text =
                 stringResource(
@@ -741,12 +972,21 @@ fun SettingsAdvancedScreen(
                     val body =
                         buildString {
                             appendLine(context.getString(R.string.advanced_cache_stats_series, stats.seriesCount))
-                            appendLine(context.getString(R.string.advanced_cache_stats_tabs, stats.tabRefs))
-                            appendLine(context.getString(R.string.advanced_cache_stats_browse, stats.browseRefs))
+                            appendLine(context.getString(R.string.advanced_cache_stats_series_refs, stats.seriesListRefsCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_collections, stats.collectionsCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_collection_refs, stats.collectionRefsCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_reading_lists, stats.readingListsCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_reading_list_refs, stats.readingListRefsCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_people, stats.peopleCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_person_refs, stats.personRefsCount))
                             appendLine(context.getString(R.string.advanced_cache_stats_details, stats.detailsCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_related_refs, stats.relatedRefsCount))
                             appendLine(context.getString(R.string.advanced_cache_stats_volumes, stats.volumesCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_series_volume_refs, stats.seriesVolumeRefsCount))
                             appendLine(context.getString(R.string.advanced_cache_stats_chapters, stats.chaptersCount))
+                            appendLine(context.getString(R.string.advanced_cache_stats_volume_chapter_refs, stats.volumeChapterRefsCount))
                             appendLine(context.getString(R.string.advanced_cache_stats_db_size, bytesToMb(stats.dbBytes)))
+                            appendLine(context.getString(R.string.advanced_cache_stats_thumbnails_count, stats.thumbnailsCount))
                             appendLine(context.getString(R.string.advanced_cache_stats_thumbnails, bytesToMb(stats.thumbnailsBytes)))
                             appendLine(context.getString(R.string.advanced_cache_stats_last_library, formatTs(stats.lastLibraryRefresh)))
                             appendLine(context.getString(R.string.advanced_cache_stats_last_browse, formatTs(stats.lastBrowseRefresh)))
@@ -909,6 +1149,37 @@ fun SettingsAdvancedScreen(
     }
 }
 
+@Composable
+private fun CacheToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+        )
+    }
+}
+
 private fun bytesToMb(bytes: Long): String {
     val mb = max(bytes, 0L) / 1_000_000.0
     return String.format("%.1f MB", mb)
@@ -986,14 +1257,7 @@ private suspend fun buildConfigSnapshot(
     val cacheLib = prefs.libraryCacheEnabledFlow.first()
     val cacheBrowse = prefs.browseCacheEnabledFlow.first()
     val cacheTtl = prefs.cacheRefreshTtlMinutesFlow.first()
-    val prefetchInProgress = prefs.prefetchInProgressFlow.first()
-    val prefetchWant = prefs.prefetchWantFlow.first()
-    val prefetchColl = prefs.prefetchCollectionsFlow.first()
-    val prefetchDetails = prefs.prefetchDetailsFlow.first()
-    val prefetchMetered = prefs.prefetchAllowMeteredFlow.first()
-    val prefetchLowBatt = prefs.prefetchAllowLowBatteryFlow.first()
-    val prefetchAll = prefs.prefetchCollectionsAllFlow.first()
-    val prefetchIds = prefs.prefetchCollectionIdsFlow.first()
+    val prefetchPolicy = prefs.prefetchPolicy()
     val downloadConcurrent = prefs.downloadMaxConcurrentFlow.first()
     val downloadRetry = prefs.downloadRetryEnabledFlow.first()
     val downloadRetryMax = prefs.downloadRetryMaxAttemptsFlow.first()
@@ -1011,7 +1275,10 @@ private suspend fun buildConfigSnapshot(
         appendLine("OfflineMode: $offline")
         appendLine("CacheEnabled: $cacheGlobal lib=$cacheLib browse=$cacheBrowse ttlMin=$cacheTtl")
         appendLine(
-            "Prefetch: inProgress=$prefetchInProgress want=$prefetchWant collections=$prefetchColl details=$prefetchDetails meter=$prefetchMetered lowBatt=$prefetchLowBatt all=$prefetchAll ids=$prefetchIds",
+            "Prefetch: inProgress=${prefetchPolicy.inProgressEnabled} want=${prefetchPolicy.wantEnabled} " +
+                "collections=${prefetchPolicy.collectionsEnabled} details=${prefetchPolicy.detailsEnabled} " +
+                "meter=${prefetchPolicy.allowMetered} lowBatt=${prefetchPolicy.allowLowBattery} " +
+                "all=${prefetchPolicy.collectionsAll} ids=${prefetchPolicy.collectionIds}",
         )
         appendLine(
             "Downloads: concurrent=$downloadConcurrent autoRetry=$downloadRetry maxRetry=$downloadRetryMax preferOffline=$preferOfflinePages deleteAfter=$deleteAfter depth=$deleteDepth",

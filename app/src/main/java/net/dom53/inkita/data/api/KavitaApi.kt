@@ -1,13 +1,22 @@
 package net.dom53.inkita.data.api
 
+import net.dom53.inkita.data.api.dto.AnnotationDto
 import net.dom53.inkita.data.api.dto.AppUserCollectionDto
+import net.dom53.inkita.data.api.dto.BookmarkDto
+import net.dom53.inkita.data.api.dto.BrowsePersonDto
+import net.dom53.inkita.data.api.dto.BrowsePersonFilterDto
 import net.dom53.inkita.data.api.dto.CollectionDto
 import net.dom53.inkita.data.api.dto.DecodeFilterRequest
 import net.dom53.inkita.data.api.dto.FilterDefinitionDto
 import net.dom53.inkita.data.api.dto.FilterV2Dto
+import net.dom53.inkita.data.api.dto.HourEstimateRangeDto
 import net.dom53.inkita.data.api.dto.LanguageDto
 import net.dom53.inkita.data.api.dto.LibraryDto
 import net.dom53.inkita.data.api.dto.NamedDto
+import net.dom53.inkita.data.api.dto.RatingDto
+import net.dom53.inkita.data.api.dto.ReadingListDto
+import net.dom53.inkita.data.api.dto.RecentlyAddedItemDto
+import net.dom53.inkita.data.api.dto.SeriesDetailPlusDto
 import net.dom53.inkita.data.api.dto.SeriesDto
 import okhttp3.ResponseBody
 import retrofit2.Response
@@ -17,12 +26,33 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 import retrofit2.http.Streaming
 
+@Suppress("TooManyFunctions")
 interface KavitaApi {
     @GET("api/Library")
     suspend fun getLibraries(): retrofit2.Response<List<LibraryDto>>
 
     @GET("api/Collection")
     suspend fun getCollections(): Response<List<CollectionDto>>
+
+    @GET("api/Collection")
+    suspend fun getCollectionsAll(
+        @Query("ownedOnly") ownedOnly: Boolean = false,
+    ): Response<List<AppUserCollectionDto>>
+
+    @POST("api/ReadingList/lists")
+    suspend fun getReadingLists(
+        @Query("includePromoted") includePromoted: Boolean = true,
+        @Query("sortByLastModified") sortByLastModified: Boolean = false,
+        @Query("PageNumber") pageNumber: Int = 1,
+        @Query("PageSize") pageSize: Int = 50,
+    ): Response<List<ReadingListDto>>
+
+    @POST("api/Person/all")
+    suspend fun getBrowsePeople(
+        @Body filter: BrowsePersonFilterDto,
+        @Query("PageNumber") pageNumber: Int,
+        @Query("PageSize") pageSize: Int,
+    ): Response<List<BrowsePersonDto>>
 
     @GET("api/Collection")
     suspend fun getOwnedCollections(
@@ -35,11 +65,25 @@ interface KavitaApi {
         @Query("includePromoted") includePromoted: Boolean = true,
     ): Response<List<AppUserCollectionDto>>
 
+    @GET("api/Collection/all-series")
+    suspend fun getCollectionsForSeriesOwned(
+        @Query("seriesId") seriesId: Int,
+        @Query("ownedOnly") ownedOnly: Boolean = false,
+    ): Response<List<AppUserCollectionDto>>
+
     @POST("api/Series/v2")
     suspend fun getSeriesV2(
         @Body filter: FilterV2Dto,
         @Query("PageNumber") pageNumber: Int,
         @Query("PageSize") pageSize: Int,
+    ): Response<List<SeriesDto>>
+
+    @POST("api/Series/all-v2")
+    suspend fun getAllSeriesV2(
+        @Body filter: FilterV2Dto,
+        @Query("PageNumber") pageNumber: Int,
+        @Query("PageSize") pageSize: Int,
+        @Query("context") context: Int,
     ): Response<List<SeriesDto>>
 
     @GET("api/Series/series-by-collection")
@@ -63,6 +107,42 @@ interface KavitaApi {
     suspend fun getTimeLeft(
         @Query("seriesId") seriesId: Int,
     ): Response<net.dom53.inkita.data.api.dto.TimeLeftDto>
+
+    @GET("api/reader/time-left")
+    suspend fun getSeriesTimeLeft(
+        @Query("seriesId") seriesId: Int,
+    ): Response<HourEstimateRangeDto>
+
+    @GET("api/reader/has-progress")
+    suspend fun getHasProgress(
+        @Query("seriesId") seriesId: Int,
+    ): Response<Boolean>
+
+    @GET("api/reader/continue-point")
+    suspend fun getContinuePoint(
+        @Query("seriesId") seriesId: Int,
+    ): Response<net.dom53.inkita.data.api.dto.ChapterDto>
+
+    @GET("api/reader/series-bookmarks")
+    suspend fun getSeriesBookmarks(
+        @Query("seriesId") seriesId: Int,
+    ): Response<List<BookmarkDto>>
+
+    @GET("api/Annotation/all-for-series")
+    suspend fun getAnnotationsForSeries(
+        @Query("seriesId") seriesId: Int,
+    ): Response<List<AnnotationDto>>
+
+    @GET("api/Rating/overall-series")
+    suspend fun getOverallSeriesRating(
+        @Query("seriesId") seriesId: Int,
+    ): Response<RatingDto>
+
+    @GET("api/Metadata/series-detail-plus")
+    suspend fun getSeriesDetailPlus(
+        @Query("seriesId") seriesId: Int,
+        @Query("libraryType") libraryType: Int,
+    ): Response<SeriesDetailPlusDto>
 
     @GET("api/Series/metadata")
     suspend fun getSeriesMetadata(
@@ -116,6 +196,31 @@ interface KavitaApi {
     @GET("api/library/libraries")
     suspend fun getLibrariesFilter(): Response<List<LibraryDto>>
 
+    @GET("api/users/has-library-access")
+    suspend fun hasLibraryAccess(
+        @Query("libraryId") libraryId: Int,
+    ): Response<Boolean>
+
+    @POST("api/Series/on-deck")
+    suspend fun getOnDeckSeries(
+        @Query("libraryId") libraryId: Int = 0,
+        @Query("PageNumber") pageNumber: Int,
+        @Query("PageSize") pageSize: Int,
+    ): Response<List<SeriesDto>>
+
+    @POST("api/Series/recently-updated-series")
+    suspend fun getRecentlyUpdatedSeries(
+        @Query("PageNumber") pageNumber: Int,
+        @Query("PageSize") pageSize: Int,
+    ): Response<List<RecentlyAddedItemDto>>
+
+    @POST("api/Series/recently-added-v2")
+    suspend fun getRecentlyAddedSeries(
+        @Body filter: FilterV2Dto,
+        @Query("PageNumber") pageNumber: Int,
+        @Query("PageSize") pageSize: Int,
+    ): Response<List<SeriesDto>>
+
     @GET("api/Filter")
     suspend fun getFilters(): Response<List<FilterDefinitionDto>>
 
@@ -130,6 +235,16 @@ interface KavitaApi {
         @Query("PageNumber") pageNumber: Int,
         @Query("PageSize") pageSize: Int,
     ): Response<List<SeriesDto>>
+
+    @GET("api/want-to-read")
+    suspend fun hasWantToRead(
+        @Query("seriesId") seriesId: Int,
+    ): Response<Boolean>
+
+    @GET("api/ReadingList/lists-for-series")
+    suspend fun getReadingListsForSeries(
+        @Query("seriesId") seriesId: Int,
+    ): Response<List<ReadingListDto>>
 
     @GET("api/Metadata/tags")
     suspend fun getTagsForLibraries(
@@ -212,11 +327,6 @@ interface KavitaApi {
         @Query("currentChapterId") currentChapterId: Int,
     ): Response<Int>
 
-    @GET("api/reader/continue-point")
-    suspend fun getContinuePoint(
-        @Query("seriesId") seriesId: Int,
-    ): Response<net.dom53.inkita.data.api.dto.ReaderChapterNavDto>
-
     @GET("api/reader/time-left-for-chapter")
     suspend fun getTimeLeftForChapter(
         @Query("seriesId") seriesId: Int,
@@ -231,6 +341,16 @@ interface KavitaApi {
     @POST("api/reader/mark-unread")
     suspend fun markSeriesUnread(
         @Body body: net.dom53.inkita.data.api.dto.MarkSeriesDto,
+    ): Response<Unit>
+
+    @POST("api/reader/mark-volume-read")
+    suspend fun markVolumeRead(
+        @Body body: net.dom53.inkita.data.api.dto.MarkVolumeReadDto,
+    ): Response<Unit>
+
+    @POST("api/reader/mark-volume-unread")
+    suspend fun markVolumeUnread(
+        @Body body: net.dom53.inkita.data.api.dto.MarkVolumeReadDto,
     ): Response<Unit>
 
     @POST("api/reader/mark-multiple-read")

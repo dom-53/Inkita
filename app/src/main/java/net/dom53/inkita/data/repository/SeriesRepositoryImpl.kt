@@ -7,6 +7,8 @@ import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.data.api.dto.FilterV2Dto
+import net.dom53.inkita.data.api.dto.SortOptionDto
 import net.dom53.inkita.data.mapper.buildChaptersFromPages
 import net.dom53.inkita.data.mapper.computeSeriesReadState
 import net.dom53.inkita.data.mapper.flattenToc
@@ -14,9 +16,11 @@ import net.dom53.inkita.data.mapper.mergeWith
 import net.dom53.inkita.data.mapper.toDomain
 import net.dom53.inkita.data.mapper.toFilterV2Dto
 import net.dom53.inkita.domain.model.ReadState
+import net.dom53.inkita.domain.model.RecentlyUpdatedSeriesItem
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.domain.model.SeriesDetail
 import net.dom53.inkita.domain.model.Volume
+import net.dom53.inkita.domain.model.filter.KavitaSortField
 import net.dom53.inkita.domain.model.filter.SeriesQuery
 import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
 import net.dom53.inkita.domain.repository.SeriesRepository
@@ -73,20 +77,27 @@ class SeriesRepositoryImpl(
         }
     }
 
-    override suspend fun getSeriesDetail(seriesId: Int): SeriesDetail {
+    override suspend fun getSeriesDetail(
+        seriesId: Int,
+        useCache: Boolean,
+    ): SeriesDetail {
         val config = appPreferences.configFlow.first()
 
         if (!config.isConfigured) {
-            val cached = cacheManager.getCachedSeriesDetail(seriesId)
-            LoggingManager.d("SeriesRepo", "Detail offline-only (not configured), cached=${cached != null}")
-            if (cached != null) return cached
+            if (useCache) {
+                val cached = cacheManager.getCachedSeriesDetail(seriesId)
+                LoggingManager.d("SeriesRepo", "Detail offline-only (not configured), cached=${cached != null}")
+                if (cached != null) return cached
+            }
             throw Exception("The app is not configured, API key is missing.")
         }
 
         if (!NetworkUtils.isOnline(context)) {
-            val cached = cacheManager.getCachedSeriesDetail(seriesId)
-            LoggingManager.w("SeriesRepo", "Offline; using cached detail for $seriesId: ${cached != null}")
-            if (cached != null) return cached
+            if (useCache) {
+                val cached = cacheManager.getCachedSeriesDetail(seriesId)
+                LoggingManager.w("SeriesRepo", "Offline; using cached detail for $seriesId: ${cached != null}")
+                if (cached != null) return cached
+            }
             throw IOException("Offline")
         }
 
@@ -96,7 +107,14 @@ class SeriesRepositoryImpl(
                 apiKey = config.apiKey,
             )
 
-        val cachedFallback = cacheManager.getCachedSeriesDetail(seriesId).also { LoggingManager.d("SeriesRepo", "Cached detail fallback present=${it != null}") }
+        val cachedFallback =
+            if (useCache) {
+                cacheManager.getCachedSeriesDetail(seriesId).also {
+                    LoggingManager.d("SeriesRepo", "Cached detail fallback present=${it != null}")
+                }
+            } else {
+                null
+            }
 
         return try {
             val seriesResponse = api.getSeriesById(seriesId)
@@ -233,13 +251,302 @@ class SeriesRepositoryImpl(
                     timeLeftMax = timeLeft?.maxHours,
                     timeLeftAvg = timeLeft?.avgHours,
                 )
-            cacheSeriesDetail(detail)
-            LoggingManager.d("SeriesRepo", "Cached detail stored for series $seriesId (volumes=${volumes.size})")
+            if (useCache) {
+                cacheSeriesDetail(detail)
+                LoggingManager.d("SeriesRepo", "Cached detail stored for series $seriesId (volumes=${volumes.size})")
+            }
             detail
         } catch (e: Exception) {
             LoggingManager.e("SeriesRepo", "Detail fetch failed: ${e.message}")
             cachedFallback ?: throw e
         }
+    }
+
+    override suspend fun getOnDeckSeries(
+        pageNumber: Int,
+        pageSize: Int,
+        libraryId: Int,
+    ): List<Series> {
+        val config = appPreferences.configFlow.first()
+
+        if (!config.isConfigured) {
+            return emptyList()
+        }
+
+        if (!NetworkUtils.isOnline(context)) {
+            throw IOException("Offline")
+        }
+
+        val api =
+            KavitaApiFactory.createAuthenticated(
+                baseUrl = config.serverUrl,
+                apiKey = config.apiKey,
+            )
+
+        val response =
+            api.getOnDeckSeries(
+                libraryId = libraryId,
+                pageNumber = pageNumber,
+                pageSize = pageSize,
+            )
+
+        if (!response.isSuccessful) {
+            throw Exception("Error loading on-deck series: HTTP ${response.code()} ${response.message()}")
+        }
+
+        val body = response.body().orEmpty()
+        val domain = body.map { it.toDomain() }
+        return cacheManager.enrichThumbnails(domain)
+    }
+
+    override suspend fun getRecentlyUpdatedSeries(
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<RecentlyUpdatedSeriesItem> {
+        val config = appPreferences.configFlow.first()
+
+        if (!config.isConfigured) {
+            return emptyList()
+        }
+
+        if (!NetworkUtils.isOnline(context)) {
+            throw IOException("Offline")
+        }
+
+        val api =
+            KavitaApiFactory.createAuthenticated(
+                baseUrl = config.serverUrl,
+                apiKey = config.apiKey,
+            )
+
+        val response =
+            api.getRecentlyUpdatedSeries(
+                pageNumber = pageNumber,
+                pageSize = pageSize,
+            )
+
+        if (!response.isSuccessful) {
+            throw Exception("Error loading recently updated series: HTTP ${response.code()} ${response.message()}")
+        }
+
+        return response.body().orEmpty().map { it.toDomain() }
+    }
+
+    override suspend fun getRecentlyAddedSeries(
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<Series> {
+        val config = appPreferences.configFlow.first()
+
+        if (!config.isConfigured) {
+            return emptyList()
+        }
+
+        if (!NetworkUtils.isOnline(context)) {
+            throw IOException("Offline")
+        }
+
+        val api =
+            KavitaApiFactory.createAuthenticated(
+                baseUrl = config.serverUrl,
+                apiKey = config.apiKey,
+            )
+
+        val filter =
+            FilterV2Dto(
+                id = null,
+                name = null,
+                statements = null,
+                combination = 0,
+                sortOptions =
+                    SortOptionDto(
+                        sortField = KavitaSortField.ItemAdded.id,
+                        isAscending = false,
+                    ),
+                limitTo = 0,
+            )
+
+        val response =
+            api.getRecentlyAddedSeries(
+                filter = filter,
+                pageNumber = pageNumber,
+                pageSize = pageSize,
+            )
+
+        if (!response.isSuccessful) {
+            throw Exception("Error loading recently added series: HTTP ${response.code()} ${response.message()}")
+        }
+
+        val body = response.body().orEmpty()
+        val domain = body.map { it.toDomain() }
+        return cacheManager.enrichThumbnails(domain)
+    }
+
+    override suspend fun getWantToReadSeries(
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<Series> {
+        val config = appPreferences.configFlow.first()
+
+        if (!config.isConfigured) {
+            return emptyList()
+        }
+
+        if (!NetworkUtils.isOnline(context)) {
+            throw IOException("Offline")
+        }
+
+        val api =
+            KavitaApiFactory.createAuthenticated(
+                baseUrl = config.serverUrl,
+                apiKey = config.apiKey,
+            )
+
+        val filter =
+            FilterV2Dto(
+                id = null,
+                name = null,
+                statements = null,
+                combination = 1,
+                sortOptions =
+                    SortOptionDto(
+                        sortField = KavitaSortField.SortName.id,
+                        isAscending = true,
+                    ),
+                limitTo = 0,
+            )
+
+        val response =
+            api.getWantToRead(
+                filter = filter,
+                pageNumber = pageNumber,
+                pageSize = pageSize,
+            )
+
+        if (!response.isSuccessful) {
+            throw Exception("Error loading want-to-read: HTTP ${response.code()} ${response.message()}")
+        }
+
+        val body = response.body().orEmpty()
+        val domain = body.map { it.toDomain() }
+        return cacheManager.enrichThumbnails(domain)
+    }
+
+    override suspend fun getSeriesForCollection(
+        collectionId: Int,
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<Series> {
+        val config = appPreferences.configFlow.first()
+
+        if (!config.isConfigured) {
+            return emptyList()
+        }
+
+        if (!NetworkUtils.isOnline(context)) {
+            throw IOException("Offline")
+        }
+
+        val api =
+            KavitaApiFactory.createAuthenticated(
+                baseUrl = config.serverUrl,
+                apiKey = config.apiKey,
+            )
+
+        val filter =
+            FilterV2Dto(
+                id = null,
+                name = null,
+                statements =
+                    listOf(
+                        net.dom53.inkita.data.api.dto.FilterStatementDto(
+                            field = 7,
+                            value = collectionId.toString(),
+                            comparison = 0,
+                        ),
+                    ),
+                combination = 1,
+                sortOptions =
+                    SortOptionDto(
+                        sortField = KavitaSortField.SortName.id,
+                        isAscending = true,
+                    ),
+                limitTo = 0,
+            )
+
+        val response =
+            api.getAllSeriesV2(
+                filter = filter,
+                pageNumber = pageNumber,
+                pageSize = pageSize,
+                context = 1,
+            )
+
+        if (!response.isSuccessful) {
+            throw Exception("Error loading collection series: HTTP ${response.code()} ${response.message()}")
+        }
+
+        val body = response.body().orEmpty()
+        val domain = body.map { it.toDomain() }
+        return cacheManager.enrichThumbnails(domain)
+    }
+
+    override suspend fun getSeriesForLibrary(
+        libraryId: Int,
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<Series> {
+        val config = appPreferences.configFlow.first()
+
+        if (!config.isConfigured) {
+            return emptyList()
+        }
+
+        if (!NetworkUtils.isOnline(context)) {
+            throw IOException("Offline")
+        }
+
+        val api =
+            KavitaApiFactory.createAuthenticated(
+                baseUrl = config.serverUrl,
+                apiKey = config.apiKey,
+            )
+
+        val filter =
+            FilterV2Dto(
+                id = null,
+                name = null,
+                statements =
+                    listOf(
+                        net.dom53.inkita.data.api.dto.FilterStatementDto(
+                            field = 19,
+                            value = libraryId.toString(),
+                            comparison = 0,
+                        ),
+                    ),
+                combination = 1,
+                sortOptions =
+                    SortOptionDto(
+                        sortField = KavitaSortField.SortName.id,
+                        isAscending = true,
+                    ),
+                limitTo = 0,
+            )
+
+        val response =
+            api.getSeriesV2(
+                filter = filter,
+                pageNumber = pageNumber,
+                pageSize = pageSize,
+            )
+
+        if (!response.isSuccessful) {
+            throw Exception("Error loading library series: HTTP ${response.code()} ${response.message()}")
+        }
+
+        val body = response.body().orEmpty()
+        val domain = body.map { it.toDomain() }
+        return cacheManager.enrichThumbnails(domain)
     }
 
     override suspend fun getCachedSeries(query: SeriesQuery): List<Series> = cacheManager.getCachedSeries(query)

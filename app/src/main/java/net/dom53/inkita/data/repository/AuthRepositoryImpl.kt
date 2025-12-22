@@ -9,11 +9,13 @@ class AuthRepositoryImpl(
     override suspend fun configure(
         serverUrl: String,
         apiKey: String,
+        imageApiKey: String,
         userId: Int,
     ) {
         appPreferences.updateKavitaConfig(
             serverUrl = serverUrl,
             apiKey = apiKey,
+            imageApiKey = imageApiKey,
             userId = userId,
         )
     }

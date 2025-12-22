@@ -34,6 +34,24 @@ class CollectionsRepositoryImpl(
         return dtos.map { it.toDomain() }
     }
 
+    override suspend fun getCollectionsAll(ownedOnly: Boolean): List<Collection> {
+        val config = appPreferences.configFlow.first()
+        if (!config.isConfigured) return emptyList()
+
+        if (!NetworkUtils.isOnline(context)) throw IOException("Offline")
+
+        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val response = api.getCollectionsAll(ownedOnly = ownedOnly)
+
+        if (!response.isSuccessful) {
+            val body = response.errorBody()?.string()
+            throw Exception("Error loading collections: HTTP ${response.code()} ${response.message()} body=$body")
+        }
+
+        val dtos = response.body() ?: emptyList()
+        return dtos.map { it.toDomain() }
+    }
+
     override suspend fun getSeriesForCollection(
         collectionId: Int,
         page: Int,

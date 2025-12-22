@@ -1,5 +1,6 @@
 package net.dom53.inkita.domain.repository
 
+import net.dom53.inkita.domain.model.RecentlyUpdatedSeriesItem
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.domain.model.SeriesDetail
 import net.dom53.inkita.domain.model.filter.SeriesQuery
@@ -11,7 +12,43 @@ interface SeriesRepository {
         prefetchThumbnails: Boolean = true,
     ): List<Series>
 
-    suspend fun getSeriesDetail(seriesId: Int): SeriesDetail
+    suspend fun getSeriesDetail(
+        seriesId: Int,
+        useCache: Boolean = true,
+    ): SeriesDetail
+
+    suspend fun getOnDeckSeries(
+        pageNumber: Int,
+        pageSize: Int,
+        libraryId: Int = 0,
+    ): List<Series>
+
+    suspend fun getRecentlyUpdatedSeries(
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<RecentlyUpdatedSeriesItem>
+
+    suspend fun getRecentlyAddedSeries(
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<Series>
+
+    suspend fun getWantToReadSeries(
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<Series>
+
+    suspend fun getSeriesForCollection(
+        collectionId: Int,
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<Series>
+
+    suspend fun getSeriesForLibrary(
+        libraryId: Int,
+        pageNumber: Int,
+        pageSize: Int,
+    ): List<Series>
 
     /**
      Cached series stored locally (best-effort).

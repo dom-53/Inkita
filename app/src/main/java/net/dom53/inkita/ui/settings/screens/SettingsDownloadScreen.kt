@@ -44,7 +44,9 @@ import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.download.DownloadManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
+import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.repository.DownloadRepositoryImpl
+import java.io.File
 
 @Composable
 fun SettingsDownloadScreen(
@@ -69,12 +71,16 @@ fun SettingsDownloadScreen(
             val manager = DownloadManager(context)
             DownloadRepositoryImpl(db.downloadDao(), manager, context.applicationContext)
         }
+    val downloadV2Dao =
+        remember {
+            InkitaDatabase.getInstance(context).downloadV2Dao()
+        }
 
     LaunchedEffect(Unit) {
-        appPreferences.prefetchAllowMeteredFlow.collectLatest { allowMetered = it }
+        appPreferences.downloadAllowMeteredFlow.collectLatest { allowMetered = it }
     }
     LaunchedEffect(Unit) {
-        appPreferences.prefetchAllowLowBatteryFlow.collectLatest { allowLowBattery = it }
+        appPreferences.downloadAllowLowBatteryFlow.collectLatest { allowLowBattery = it }
     }
     LaunchedEffect(Unit) {
         appPreferences.downloadMaxConcurrentFlow.collectLatest { maxConcurrent = it }
@@ -115,7 +121,7 @@ fun SettingsDownloadScreen(
             checked = allowMetered,
             onCheckedChange = {
                 allowMetered = it
-                scope.launch { appPreferences.setPrefetchAllowMetered(it) }
+                scope.launch { appPreferences.setDownloadAllowMetered(it) }
             },
         )
 
@@ -125,7 +131,7 @@ fun SettingsDownloadScreen(
             checked = allowLowBattery,
             onCheckedChange = {
                 allowLowBattery = it
-                scope.launch { appPreferences.setPrefetchAllowLowBattery(it) }
+                scope.launch { appPreferences.setDownloadAllowLowBattery(it) }
             },
         )
 
@@ -223,6 +229,7 @@ fun SettingsDownloadScreen(
                         scope.launch {
                             withContext(Dispatchers.IO) {
                                 downloadRepo.clearAllDownloads()
+                                clearDownloadV2(context, downloadV2Dao)
                             }
                             Toast.makeText(context, context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast), Toast.LENGTH_SHORT).show()
                         }
@@ -238,6 +245,21 @@ fun SettingsDownloadScreen(
             },
         )
     }
+}
+
+private suspend fun clearDownloadV2(
+    context: android.content.Context,
+    downloadV2Dao: DownloadV2Dao,
+) {
+    val externalRoot = context.getExternalFilesDir("Inkita/downloads")
+    val internalRoot = File(context.filesDir, "Inkita/downloads")
+    listOf(externalRoot, internalRoot).forEach { dir ->
+        if (dir != null && dir.exists()) {
+            runCatching { dir.deleteRecursively() }
+        }
+    }
+    downloadV2Dao.clearAllItems()
+    downloadV2Dao.clearAllJobs()
 }
 
 @Composable

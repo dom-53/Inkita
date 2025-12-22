@@ -1,0 +1,375 @@
+package net.dom53.inkita.core.downloadv2.strategies
+
+import android.content.Context
+import android.net.Uri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import net.dom53.inkita.core.downloadv2.DownloadRequestV2
+import net.dom53.inkita.core.downloadv2.DownloadStrategyV2
+import net.dom53.inkita.core.logging.LoggingManager
+import net.dom53.inkita.core.network.KavitaApiFactory
+import net.dom53.inkita.core.network.NetworkLoggingInterceptor
+import net.dom53.inkita.core.network.NetworkMonitor
+import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
+import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
+import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okio.buffer
+import okio.sink
+import retrofit2.HttpException
+import java.io.File
+import java.io.IOException
+import java.security.MessageDigest
+import java.util.regex.Pattern
+
+/**
+ * EPUB download strategy that fetches HTML pages and rewrites assets to local storage.
+ *
+ * Pages are stored as HTML files and referenced assets are downloaded into a shared assets folder.
+ */
+class EpubDownloadStrategyV2(
+    private val appContext: Context,
+    private val downloadDao: DownloadV2Dao,
+    private val appPreferences: AppPreferences,
+) : DownloadStrategyV2 {
+    override val key: String = FORMAT_EPUB
+
+    private val httpClient =
+        OkHttpClient
+            .Builder()
+            .addInterceptor(NetworkLoggingInterceptor)
+            .build()
+
+    /**
+     * Create a job with missing pages only and return its id, or -1 if nothing to download.
+     */
+    override suspend fun enqueue(request: DownloadRequestV2): Long {
+        val seriesId = request.seriesId ?: return -1L
+        val volumeId = request.volumeId
+        val chapterId = request.chapterId ?: return -1L
+        val pageCount = request.pageCount
+        val pageIndex = request.pageIndex
+        val now = System.currentTimeMillis()
+        val existing = downloadDao.getItemsForChapter(chapterId)
+        val completedPages =
+            existing
+                .filter { it.status == DownloadedItemV2Entity.STATUS_COMPLETED && it.page != null }
+                .filter { item -> isPathPresent(item.localPath) }
+                .mapNotNull { it.page }
+                .toSet()
+        if (pageIndex == null && pageCount == null) return -1L
+        if (pageIndex != null) {
+            downloadDao.deleteItemsForChapterPageNotStatus(chapterId, pageIndex)
+        } else {
+            downloadDao.deleteItemsForChapterNotStatus(chapterId)
+        }
+        val missingPages =
+            if (pageIndex != null) {
+                listOf(pageIndex).filter { page -> page !in completedPages }
+            } else {
+                val count = pageCount ?: return -1L
+                (0 until count).filter { page -> page !in completedPages }
+            }
+        if (missingPages.isEmpty()) {
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d(
+                    "EpubDownloadV2",
+                    "Skip enqueue chapter=$chapterId page=$pageIndex (already downloaded)",
+                )
+            }
+            return -1L
+        }
+        val job =
+            DownloadJobV2Entity(
+                type = request.type,
+                format = request.format,
+                strategy = key,
+                seriesId = seriesId,
+                volumeId = volumeId,
+                chapterId = chapterId,
+                status = DownloadJobV2Entity.STATUS_PENDING,
+                totalItems = missingPages.size,
+                completedItems = 0,
+                retryCount = 0,
+                priority = request.priority,
+                createdAt = now,
+                updatedAt = now,
+                error = null,
+            )
+        val jobId = downloadDao.insertJob(job)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d(
+                "EpubDownloadV2",
+                "Enqueue job=$jobId chapter=$chapterId pages=${missingPages.size} volume=$volumeId",
+            )
+        }
+        val items =
+            missingPages.map { page ->
+                DownloadedItemV2Entity(
+                    jobId = jobId,
+                    type = DownloadedItemV2Entity.TYPE_PAGE,
+                    seriesId = seriesId,
+                    volumeId = volumeId,
+                    chapterId = chapterId,
+                    page = page,
+                    url = null,
+                    localPath = null,
+                    bytes = null,
+                    checksum = null,
+                    status = DownloadedItemV2Entity.STATUS_PENDING,
+                    createdAt = now,
+                    updatedAt = now,
+                    error = null,
+                )
+            }
+        downloadDao.upsertItems(items)
+        return jobId
+    }
+
+    /**
+     * Execute the job: fetch HTML pages, rewrite assets, and update progress.
+     */
+    override suspend fun run(jobId: Long) {
+        val job = downloadDao.getJob(jobId) ?: return
+        if (job.status == DownloadJobV2Entity.STATUS_COMPLETED) return
+        val offlineMode = appPreferences.offlineModeFlow.first()
+        val networkStatus = NetworkMonitor.getInstance(appContext, appPreferences).status.value
+        if (offlineMode || !networkStatus.isOnlineAllowed) {
+            updateJob(
+                job,
+                status = DownloadJobV2Entity.STATUS_FAILED,
+                error = "Offline mode",
+            )
+            LoggingManager.w("EpubDownloadV2", "Offline; job=${job.id} failed")
+            return
+        }
+        val config = appPreferences.configFlow.first()
+        if (!config.isConfigured) {
+            updateJob(
+                job,
+                status = DownloadJobV2Entity.STATUS_FAILED,
+                error = "Not configured",
+            )
+            LoggingManager.w("EpubDownloadV2", "Not configured; job=${job.id} failed")
+            return
+        }
+        val seriesId = job.seriesId ?: return
+        val chapterId = job.chapterId ?: return
+        val volumeId = job.volumeId
+        val baseDir =
+            appContext.getExternalFilesDir("Inkita/downloads/series_$seriesId")
+                ?: File(appContext.filesDir, "Inkita/downloads/series_$seriesId").apply { mkdirs() }
+        if (!baseDir.exists()) baseDir.mkdirs()
+        val assetsDir = File(baseDir, "assets").apply { if (!exists()) mkdirs() }
+
+        updateJob(job, DownloadJobV2Entity.STATUS_RUNNING, error = null)
+        if (LoggingManager.isDebugEnabled()) {
+            LoggingManager.d(
+                "EpubDownloadV2",
+                "Run job=${job.id} chapter=$chapterId pending=${job.totalItems ?: 0}",
+            )
+        }
+
+        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val items =
+            downloadDao
+                .getItemsForJob(jobId)
+                .filter { it.status != DownloadedItemV2Entity.STATUS_COMPLETED }
+        var completed = job.completedItems ?: 0
+        try {
+            for (item in items) {
+                val page = item.page ?: continue
+                val htmlResp = api.getBookPage(chapterId, page)
+                if (!htmlResp.isSuccessful) throw HttpException(htmlResp)
+                val htmlRaw = htmlResp.body() ?: ""
+                val (rewrittenHtml, assetsBytes) = rewriteAndDownloadImages(htmlRaw, assetsDir, config.serverUrl, config.apiKey)
+                val htmlName = "page_${chapterId}_$page.html"
+                val htmlFile = File(baseDir, htmlName)
+                withContext(Dispatchers.IO) {
+                    htmlFile.sink().buffer().use { sink -> sink.writeString(rewrittenHtml, Charsets.UTF_8) }
+                }
+                val htmlSize = htmlFile.length()
+                val size = htmlSize + assetsBytes
+                downloadDao.upsertItems(
+                    listOf(
+                        item.copy(
+                            status = DownloadedItemV2Entity.STATUS_COMPLETED,
+                            localPath = htmlFile.absolutePath,
+                            bytes = size,
+                            updatedAt = System.currentTimeMillis(),
+                            error = null,
+                        ),
+                    ),
+                )
+                completed++
+                updateJob(
+                    job.copy(completedItems = completed),
+                    status = DownloadJobV2Entity.STATUS_RUNNING,
+                    error = null,
+                )
+            }
+            updateJob(
+                job.copy(completedItems = completed),
+                status = DownloadJobV2Entity.STATUS_COMPLETED,
+                error = null,
+            )
+            if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("EpubDownloadV2", "Completed job=${job.id} pages=$completed")
+            }
+        } catch (e: Exception) {
+            LoggingManager.e("EpubDownloadV2", "Download failed", e)
+            val failedItem =
+                items.firstOrNull { it.status != DownloadedItemV2Entity.STATUS_COMPLETED }
+            if (failedItem != null) {
+                downloadDao.upsertItems(
+                    listOf(
+                        failedItem.copy(
+                            status = DownloadedItemV2Entity.STATUS_FAILED,
+                            updatedAt = System.currentTimeMillis(),
+                            error = e.message,
+                        ),
+                    ),
+                )
+            }
+            updateJob(
+                job.copy(completedItems = completed),
+                status = DownloadJobV2Entity.STATUS_FAILED,
+                error = e.message,
+            )
+        }
+    }
+
+    /**
+     * Persist job status changes.
+     */
+    private suspend fun updateJob(
+        job: DownloadJobV2Entity,
+        status: String,
+        error: String?,
+    ) {
+        val updated =
+            job.copy(
+                status = status,
+                updatedAt = System.currentTimeMillis(),
+                error = error,
+            )
+        downloadDao.updateJob(updated)
+    }
+
+    @Suppress("LoopWithTooManyJumpStatements", "MagicNumber")
+    /**
+     * Rewrite image URLs in HTML and download referenced assets locally.
+     */
+    private suspend fun rewriteAndDownloadImages(
+        html: String,
+        assetsDir: File,
+        baseUrl: String,
+        apiKey: String,
+    ): Pair<String, Long> =
+        withContext(Dispatchers.IO) {
+            var result = html
+            val matcher = SRC_PATTERN.matcher(html)
+            val replacements = mutableMapOf<String, String>()
+            var totalBytes = 0L
+
+            while (matcher.find()) {
+                val src = matcher.group(1) ?: continue
+                if (replacements.containsKey(src)) continue
+
+                val absoluteUrl =
+                    when {
+                        src.startsWith("//") -> "https:$src"
+                        src.startsWith("http://") || src.startsWith("https://") -> src
+                        src.startsWith("/") -> baseUrl.trimEnd('/') + src
+                        else -> null
+                    } ?: continue
+
+                val ext =
+                    absoluteUrl
+                        .substringAfterLast('.', missingDelimiterValue = "")
+                        .takeIf { it.length in 2..5 }
+                        ?.let { ".$it" }
+                        .orEmpty()
+                val fileName = hashName(absoluteUrl) + ext
+                try {
+                    val (uri, bytes, legacyFile) = downloadBinary(absoluteUrl, fileName, assetsDir, apiKey)
+                    totalBytes += bytes
+                    val replacement =
+                        when {
+                            uri != null -> uri.toString()
+                            legacyFile != null -> Uri.fromFile(legacyFile).toString()
+                            else -> null
+                        }
+                    if (replacement != null) replacements[src] = replacement
+                } catch (_: IOException) {
+                    // ignore failed image
+                }
+            }
+
+            for ((old, new) in replacements) {
+                result = result.replace(old, new)
+            }
+            Pair(result, totalBytes)
+        }
+
+    /**
+     * Download a binary asset and return the local URI + byte size.
+     */
+    private suspend fun downloadBinary(
+        url: String,
+        fileName: String,
+        targetDir: File,
+        apiKey: String,
+    ): Triple<Uri?, Long, File?> =
+        withContext(Dispatchers.IO) {
+            val existing = File(targetDir, fileName)
+            if (existing.exists()) {
+                return@withContext Triple(null, existing.length(), existing)
+            }
+
+            val request =
+                Request
+                    .Builder()
+                    .url(url)
+                    .addHeader("x-api-key", apiKey)
+                    .build()
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
+                val body = response.body ?: throw IOException("Empty body")
+
+                val target = File(targetDir, fileName)
+                val bytes =
+                    target.sink().buffer().use { sink ->
+                        body.source().use { source ->
+                            sink.writeAll(source)
+                            target.length()
+                        }
+                    }
+                Triple(null, bytes, target)
+            }
+        }
+
+    private fun hashName(input: String): String {
+        val md = MessageDigest.getInstance("MD5")
+        val bytes = md.digest(input.toByteArray())
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun isPathPresent(path: String?): Boolean {
+        if (path.isNullOrBlank()) return false
+        return if (path.startsWith("content://")) {
+            true
+        } else {
+            val normalized = path.removePrefix("file://")
+            File(normalized).exists()
+        }
+    }
+
+    companion object {
+        const val FORMAT_EPUB = "epub"
+        private val SRC_PATTERN = Pattern.compile("src=[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE)
+    }
+}

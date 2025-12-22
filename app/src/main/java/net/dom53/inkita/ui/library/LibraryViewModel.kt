@@ -55,14 +55,6 @@ class LibraryViewModel(
     private var prefetchStarted = false
     private val freshCacheNotificationId = 2002
 
-    private data class PrefetchSettings(
-        val cacheAllowed: Boolean,
-        val prefetchInProgress: Boolean,
-        val prefetchWant: Boolean,
-        val prefetchCollections: Boolean,
-        val prefetchDetails: Boolean,
-    )
-
     init {
         refreshCollectionsAndFirstPage()
     }
@@ -410,12 +402,13 @@ class LibraryViewModel(
     private fun launchPrefetchIfNeeded() {
         if (prefetchStarted) return
         viewModelScope.launch {
-            val settings = loadPrefetchSettings()
-            if (!settings.cacheAllowed) {
+            val cacheAllowed = libraryCacheAllowed()
+            if (!cacheAllowed) {
                 LoggingManager.d("PrefetchWorker", "Prefetch skipped: cache disabled")
                 return@launch
             }
-            if (!settings.prefetchInProgress && !settings.prefetchWant && !settings.prefetchCollections) {
+            val policy = appPreferences.prefetchPolicy()
+            if (!policy.hasTargetsEnabled) {
                 LoggingManager.d("PrefetchWorker", "Prefetch skipped: no targets enabled")
                 return@launch
             }
@@ -427,21 +420,6 @@ class LibraryViewModel(
     }
 
     private suspend fun libraryCacheAllowed(): Boolean = cacheManager.policy().libraryEnabled
-
-    private suspend fun loadPrefetchSettings(): PrefetchSettings {
-        val cacheAllowed = libraryCacheAllowed()
-        val prefetchInProgress = appPreferences.prefetchInProgressFlow.first()
-        val prefetchWant = appPreferences.prefetchWantFlow.first()
-        val prefetchCollections = appPreferences.prefetchCollectionsFlow.first()
-        val prefetchDetails = appPreferences.prefetchDetailsFlow.first()
-        return PrefetchSettings(
-            cacheAllowed = cacheAllowed,
-            prefetchInProgress = prefetchInProgress,
-            prefetchWant = prefetchWant,
-            prefetchCollections = prefetchCollections,
-            prefetchDetails = prefetchDetails,
-        )
-    }
 
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     private fun showFreshCacheNotification(minutesRemaining: Int) {

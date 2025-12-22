@@ -13,6 +13,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import net.dom53.inkita.core.prefetch.PrefetchPolicy
 import net.dom53.inkita.domain.model.Collection
 
 private val Context.dataStore by preferencesDataStore(name = "inkita_prefs")
@@ -24,6 +25,7 @@ enum class ReaderThemeMode { Light, Dark, DarkHighContrast, Sepia, SepiaHighCont
 data class AppConfig(
     val serverUrl: String,
     val apiKey: String,
+    val imageApiKey: String,
     val userId: Int,
 ) {
     val isConfigured: Boolean
@@ -72,6 +74,16 @@ class AppPreferences(
         private val KEY_CACHE_ENABLED = booleanPreferencesKey("cache_enabled")
         private val KEY_LIBRARY_CACHE_ENABLED = booleanPreferencesKey("library_cache_enabled")
         private val KEY_BROWSE_CACHE_ENABLED = booleanPreferencesKey("browse_cache_enabled")
+        private val KEY_CACHE_ALWAYS_REFRESH = booleanPreferencesKey("cache_always_refresh")
+        private val KEY_CACHE_STALE_HOURS = intPreferencesKey("cache_stale_hours")
+        private val KEY_CACHE_STALE_MINUTES = intPreferencesKey("cache_stale_minutes")
+        private val KEY_DEBUG_TOASTS = booleanPreferencesKey("debug_toasts")
+        private val KEY_LIBRARY_CACHE_HOME = booleanPreferencesKey("library_cache_home")
+        private val KEY_LIBRARY_CACHE_WANT = booleanPreferencesKey("library_cache_want")
+        private val KEY_LIBRARY_CACHE_COLLECTIONS = booleanPreferencesKey("library_cache_collections")
+        private val KEY_LIBRARY_CACHE_READING_LISTS = booleanPreferencesKey("library_cache_reading_lists")
+        private val KEY_LIBRARY_CACHE_BROWSE_PEOPLE = booleanPreferencesKey("library_cache_browse_people")
+        private val KEY_LIBRARY_CACHE_DETAILS = booleanPreferencesKey("library_cache_details")
         private val KEY_NOTIF_PROMPT_SHOWN = booleanPreferencesKey("notifications_prompt_shown")
         private val KEY_CACHE_REFRESH_TTL_MIN = intPreferencesKey("cache_refresh_ttl_min")
         private val KEY_LAST_LIBRARY_REFRESH = longPreferencesKey("last_library_refresh")
@@ -85,10 +97,13 @@ class AppPreferences(
         private val KEY_PREFETCH_ALLOW_LOW_BATTERY = booleanPreferencesKey("prefetch_allow_low_battery")
         private val KEY_PREFETCH_COLLECTIONS_ALL = booleanPreferencesKey("prefetch_collections_all")
         private val KEY_PREFETCH_COLLECTION_IDS = stringPreferencesKey("prefetch_collection_ids")
+        private val KEY_DOWNLOAD_ALLOW_METERED = booleanPreferencesKey("download_allow_metered")
+        private val KEY_DOWNLOAD_ALLOW_LOW_BATTERY = booleanPreferencesKey("download_allow_low_battery")
         private val KEY_DOWNLOAD_MAX_CONCURRENT = intPreferencesKey("download_max_concurrent")
         private val KEY_PREFER_OFFLINE_PAGES = booleanPreferencesKey("prefer_offline_pages")
         private val KEY_DOWNLOAD_RETRY_ENABLED = booleanPreferencesKey("download_retry_enabled")
         private val KEY_DOWNLOAD_RETRY_MAX = intPreferencesKey("download_retry_max")
+        private val KEY_IMPORTANT_INFO_VERSION = intPreferencesKey("important_info_version")
         private val KEY_OFFLINE_MODE = booleanPreferencesKey("offline_mode")
         private val KEY_DELETE_AFTER_MARK_READ = booleanPreferencesKey("delete_after_mark_read")
         private val KEY_DELETE_AFTER_READ_DEPTH = intPreferencesKey("delete_after_read_depth")
@@ -98,6 +113,7 @@ class AppPreferences(
         private val KEY_DISABLE_BROWSE_THUMBNAILS = booleanPreferencesKey("disable_browse_thumbnails")
 
         private const val REFRESH_CACHE_DEFAULT = 720
+        private const val STALE_CACHE_DEFAULT_MIN = 15
 
         private const val DEFAULT_MAX_RETRY_ATTEMPT = 3
     }
@@ -109,6 +125,12 @@ class AppPreferences(
                 apiKey =
                     secureStorage.getApiKey().ifBlank {
                         prefs[KEY_API_KEY] ?: ""
+                    },
+                imageApiKey =
+                    secureStorage.getImageApiKey().ifBlank {
+                        secureStorage.getApiKey().ifBlank {
+                            prefs[KEY_API_KEY] ?: ""
+                        }
                     },
                 userId = prefs[KEY_USER_ID]?.toIntOrNull() ?: 0,
             )
@@ -147,9 +169,36 @@ class AppPreferences(
     val cacheEnabledFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_CACHE_ENABLED] ?: true }
     val libraryCacheEnabledFlow: Flow<Boolean> =
-        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_ENABLED] ?: false }
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_ENABLED] ?: true }
     val browseCacheEnabledFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_BROWSE_CACHE_ENABLED] ?: false }
+    val cacheAlwaysRefreshFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_CACHE_ALWAYS_REFRESH] ?: true }
+    val cacheStaleMinutesFlow: Flow<Int> =
+        context.dataStore.data.map { prefs ->
+            val minutes =
+                prefs[KEY_CACHE_STALE_MINUTES]
+                    ?: if (prefs.contains(KEY_CACHE_STALE_HOURS)) {
+                        (prefs[KEY_CACHE_STALE_HOURS] ?: 1) * 60
+                    } else {
+                        STALE_CACHE_DEFAULT_MIN
+                    }
+            minutes.coerceIn(1, 10080)
+        }
+    val debugToastsFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_DEBUG_TOASTS] ?: false }
+    val libraryCacheHomeFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_HOME] ?: true }
+    val libraryCacheWantToReadFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_WANT] ?: true }
+    val libraryCacheCollectionsFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_COLLECTIONS] ?: true }
+    val libraryCacheReadingListsFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_READING_LISTS] ?: false }
+    val libraryCacheBrowsePeopleFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_BROWSE_PEOPLE] ?: false }
+    val libraryCacheDetailsFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_DETAILS] ?: false }
     val offlineModeFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_OFFLINE_MODE] ?: false }
     val cacheRefreshTtlMinutesFlow: Flow<Int> =
@@ -170,10 +219,16 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_ALLOW_METERED] ?: false }
     val prefetchAllowLowBatteryFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_ALLOW_LOW_BATTERY] ?: false }
+    val downloadAllowMeteredFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_ALLOW_METERED] ?: false }
+    val downloadAllowLowBatteryFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_ALLOW_LOW_BATTERY] ?: false }
     val downloadMaxConcurrentFlow: Flow<Int> =
         context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_MAX_CONCURRENT] ?: 2 }
     val preferOfflinePagesFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFER_OFFLINE_PAGES] ?: true }
+    val importantInfoVersionFlow: Flow<Int> =
+        context.dataStore.data.map { prefs -> prefs[KEY_IMPORTANT_INFO_VERSION] ?: 0 }
     val downloadRetryEnabledFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_RETRY_ENABLED] ?: true }
     val downloadRetryMaxAttemptsFlow: Flow<Int> =
@@ -203,9 +258,22 @@ class AppPreferences(
                 ?: emptyList()
         }
 
+    suspend fun prefetchPolicy(): PrefetchPolicy =
+        PrefetchPolicy(
+            inProgressEnabled = prefetchInProgressFlow.first(),
+            wantEnabled = prefetchWantFlow.first(),
+            collectionsEnabled = prefetchCollectionsFlow.first(),
+            detailsEnabled = prefetchDetailsFlow.first(),
+            allowMetered = prefetchAllowMeteredFlow.first(),
+            allowLowBattery = prefetchAllowLowBatteryFlow.first(),
+            collectionsAll = prefetchCollectionsAllFlow.first(),
+            collectionIds = prefetchCollectionIdsFlow.first(),
+        )
+
     suspend fun updateKavitaConfig(
         serverUrl: String,
         apiKey: String,
+        imageApiKey: String,
         userId: Int = 0,
     ) {
         context.dataStore.edit { prefs ->
@@ -214,6 +282,7 @@ class AppPreferences(
             prefs[KEY_USER_ID] = userId.toString()
         }
         secureStorage.setApiKey(apiKey)
+        secureStorage.setImageApiKey(imageApiKey)
     }
 
     suspend fun clearAuth(clearServer: Boolean = false) {
@@ -324,6 +393,60 @@ class AppPreferences(
         }
     }
 
+    suspend fun setCacheAlwaysRefresh(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_CACHE_ALWAYS_REFRESH] = enabled
+        }
+    }
+
+    suspend fun setCacheStaleMinutes(minutes: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_CACHE_STALE_MINUTES] = minutes.coerceIn(1, 10080)
+        }
+    }
+
+    suspend fun setDebugToasts(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_DEBUG_TOASTS] = enabled
+        }
+    }
+
+    suspend fun setLibraryCacheHomeEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LIBRARY_CACHE_HOME] = enabled
+        }
+    }
+
+    suspend fun setLibraryCacheWantToReadEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LIBRARY_CACHE_WANT] = enabled
+        }
+    }
+
+    suspend fun setLibraryCacheCollectionsEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LIBRARY_CACHE_COLLECTIONS] = enabled
+        }
+    }
+
+    suspend fun setLibraryCacheReadingListsEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LIBRARY_CACHE_READING_LISTS] = enabled
+        }
+    }
+
+    suspend fun setLibraryCacheBrowsePeopleEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LIBRARY_CACHE_BROWSE_PEOPLE] = enabled
+        }
+    }
+
+    suspend fun setLibraryCacheDetailsEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LIBRARY_CACHE_DETAILS] = enabled
+        }
+    }
+
     suspend fun setCacheRefreshTtlMinutes(minutes: Int) {
         context.dataStore.edit { prefs ->
             prefs[KEY_CACHE_REFRESH_TTL_MIN] = minutes
@@ -398,6 +521,18 @@ class AppPreferences(
         }
     }
 
+    suspend fun setDownloadAllowMetered(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_DOWNLOAD_ALLOW_METERED] = enabled
+        }
+    }
+
+    suspend fun setDownloadAllowLowBattery(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_DOWNLOAD_ALLOW_LOW_BATTERY] = enabled
+        }
+    }
+
     suspend fun setDownloadMaxConcurrent(value: Int) {
         context.dataStore.edit { prefs ->
             prefs[KEY_DOWNLOAD_MAX_CONCURRENT] = value
@@ -443,6 +578,12 @@ class AppPreferences(
     suspend fun setPreferOfflinePages(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[KEY_PREFER_OFFLINE_PAGES] = enabled
+        }
+    }
+
+    suspend fun setImportantInfoVersion(versionCode: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_IMPORTANT_INFO_VERSION] = versionCode
         }
     }
 
