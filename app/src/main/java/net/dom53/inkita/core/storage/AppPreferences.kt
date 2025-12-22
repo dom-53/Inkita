@@ -76,6 +76,7 @@ class AppPreferences(
         private val KEY_BROWSE_CACHE_ENABLED = booleanPreferencesKey("browse_cache_enabled")
         private val KEY_CACHE_ALWAYS_REFRESH = booleanPreferencesKey("cache_always_refresh")
         private val KEY_CACHE_STALE_HOURS = intPreferencesKey("cache_stale_hours")
+        private val KEY_CACHE_STALE_MINUTES = intPreferencesKey("cache_stale_minutes")
         private val KEY_DEBUG_TOASTS = booleanPreferencesKey("debug_toasts")
         private val KEY_LIBRARY_CACHE_HOME = booleanPreferencesKey("library_cache_home")
         private val KEY_LIBRARY_CACHE_WANT = booleanPreferencesKey("library_cache_want")
@@ -112,6 +113,7 @@ class AppPreferences(
         private val KEY_DISABLE_BROWSE_THUMBNAILS = booleanPreferencesKey("disable_browse_thumbnails")
 
         private const val REFRESH_CACHE_DEFAULT = 720
+        private const val STALE_CACHE_DEFAULT_MIN = 15
 
         private const val DEFAULT_MAX_RETRY_ATTEMPT = 3
     }
@@ -172,8 +174,17 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_BROWSE_CACHE_ENABLED] ?: false }
     val cacheAlwaysRefreshFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_CACHE_ALWAYS_REFRESH] ?: true }
-    val cacheStaleHoursFlow: Flow<Int> =
-        context.dataStore.data.map { prefs -> (prefs[KEY_CACHE_STALE_HOURS] ?: 24).coerceIn(1, 168) }
+    val cacheStaleMinutesFlow: Flow<Int> =
+        context.dataStore.data.map { prefs ->
+            val minutes =
+                prefs[KEY_CACHE_STALE_MINUTES]
+                    ?: if (prefs.contains(KEY_CACHE_STALE_HOURS)) {
+                        (prefs[KEY_CACHE_STALE_HOURS] ?: 1) * 60
+                    } else {
+                        STALE_CACHE_DEFAULT_MIN
+                    }
+            minutes.coerceIn(1, 10080)
+        }
     val debugToastsFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_DEBUG_TOASTS] ?: false }
     val libraryCacheHomeFlow: Flow<Boolean> =
@@ -388,9 +399,9 @@ class AppPreferences(
         }
     }
 
-    suspend fun setCacheStaleHours(hours: Int) {
+    suspend fun setCacheStaleMinutes(minutes: Int) {
         context.dataStore.edit { prefs ->
-            prefs[KEY_CACHE_STALE_HOURS] = hours.coerceIn(1, 168)
+            prefs[KEY_CACHE_STALE_MINUTES] = minutes.coerceIn(1, 10080)
         }
     }
 

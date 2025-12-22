@@ -73,9 +73,10 @@ fun SettingsAdvancedScreen(
     var libraryCacheBrowsePeopleEnabled by remember { mutableStateOf(false) }
     var libraryCacheDetailsEnabled by remember { mutableStateOf(false) }
     var cacheAlwaysRefresh by remember { mutableStateOf(false) }
-    var cacheStaleHours by remember { mutableStateOf(24) }
-    var cacheStaleInput by remember { mutableStateOf("24") }
+    var cacheStaleMinutes by remember { mutableStateOf(15) }
+    var cacheStaleInput by remember { mutableStateOf("15") }
     var cacheStaleFocused by remember { mutableStateOf(false) }
+    var useStaleHours by remember { mutableStateOf(false) }
     var debugToasts by remember { mutableStateOf(false) }
     var cacheTtlMinutes by remember { mutableStateOf(0) }
     var ttlInput by remember { mutableStateOf("0") }
@@ -129,10 +130,10 @@ fun SettingsAdvancedScreen(
         appPreferences.debugToastsFlow.collectLatest { debugToasts = it }
     }
     LaunchedEffect(Unit) {
-        appPreferences.cacheStaleHoursFlow.collectLatest {
-            cacheStaleHours = it
+        appPreferences.cacheStaleMinutesFlow.collectLatest {
+            cacheStaleMinutes = it
             if (!cacheStaleFocused) {
-                cacheStaleInput = it.toString()
+                cacheStaleInput = minutesToDisplay(it, useStaleHours)
             }
         }
     }
@@ -322,10 +323,12 @@ fun SettingsAdvancedScreen(
                 value = cacheStaleInput,
                 onValueChange = { value ->
                     cacheStaleInput = value
-                    val parsed = value.toIntOrNull()
+                    val normalized = value.replace(',', '.')
+                    val parsed = normalized.toFloatOrNull()
                     if (parsed != null) {
-                        cacheStaleHours = parsed.coerceIn(1, 168)
-                        scope.launch { appPreferences.setCacheStaleHours(cacheStaleHours) }
+                        val minutes = if (useStaleHours) (parsed * 60f).toInt() else parsed.toInt()
+                        cacheStaleMinutes = minutes.coerceIn(1, 10080)
+                        scope.launch { appPreferences.setCacheStaleMinutes(cacheStaleMinutes) }
                     }
                 },
                 modifier =
@@ -334,18 +337,30 @@ fun SettingsAdvancedScreen(
                         .onFocusChanged { state ->
                             cacheStaleFocused = state.isFocused
                             if (!state.isFocused) {
-                                cacheStaleInput = cacheStaleHours.toString()
+                                cacheStaleInput = minutesToDisplay(cacheStaleMinutes, useStaleHours)
                             }
                         },
-                label = { Text(stringResource(R.string.settings_cache_stale_hours_label)) },
+                label = {
+                    Text(
+                        text =
+                            stringResource(
+                                R.string.settings_cache_stale_label,
+                                if (useStaleHours) stringResource(R.string.settings_units_hours) else stringResource(R.string.settings_units_minutes),
+                            ),
+                    )
+                },
                 supportingText = { Text(stringResource(R.string.settings_cache_stale_hours_hint)) },
                 singleLine = true,
                 enabled = globalCacheEnabled,
             )
-            Text(
-                text = stringResource(R.string.settings_cache_units_hours),
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            OutlinedButton(
+                onClick = {
+                    useStaleHours = !useStaleHours
+                    cacheStaleInput = minutesToDisplay(cacheStaleMinutes, useStaleHours)
+                },
+            ) {
+                Text(if (useStaleHours) stringResource(R.string.settings_units_hours) else stringResource(R.string.settings_units_minutes))
+            }
         }
 
         Row(

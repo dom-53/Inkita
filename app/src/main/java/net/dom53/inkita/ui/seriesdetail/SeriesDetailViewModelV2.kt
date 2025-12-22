@@ -307,13 +307,13 @@ class SeriesDetailViewModelV2(
             val offlineMode = appPreferences.offlineModeFlow.first()
             val isOnline = !offlineMode && NetworkUtils.isOnline(appPreferences.appContext)
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
-            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val staleMinutes = appPreferences.cacheStaleMinutesFlow.first()
             val policy = cacheManager.policy()
             val canCache = policy.globalEnabled && policy.libraryEnabled && policy.libraryDetailsEnabled
             if (LoggingManager.isDebugEnabled()) {
                 LoggingManager.d(
                     "SeriesDetailV2",
-                    "Load series=$seriesId online=$isOnline cache=$canCache refresh=$alwaysRefresh staleHours=$staleHours",
+                    "Load series=$seriesId online=$isOnline cache=$canCache refresh=$alwaysRefresh staleMinutes=$staleMinutes",
                 )
             }
             val cachedDetail =
@@ -322,7 +322,7 @@ class SeriesDetailViewModelV2(
                 if (canCache) cacheManager.getSeriesDetailV2UpdatedAt(seriesId) else null
             val isStale =
                 cachedUpdatedAt == null ||
-                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleMinutes * 60L * 1000L
             if (cachedDetail != null) {
                 if (LoggingManager.isDebugEnabled()) {
                     LoggingManager.d(

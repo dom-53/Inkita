@@ -236,7 +236,7 @@ class LibraryV2ViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isHomeLoading = true, homeError = null) }
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
-            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val staleMinutes = appPreferences.cacheStaleMinutesFlow.first()
             val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
             val cachedOnDeck =
                 cacheManager.getCachedLibraryV2SeriesList(
@@ -262,7 +262,7 @@ class LibraryV2ViewModel(
                 cachedOnDeck.isNotEmpty() || cachedUpdated.isNotEmpty() || cachedAdded.isNotEmpty()
             val isStale =
                 cachedUpdatedAt == null ||
-                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleMinutes * 60L * 1000L
             logCacheDecision(
                 "home",
                 "online=$isOnline cache=${cachedHasData} stale=$isStale refresh=$alwaysRefresh onDeck=${cachedOnDeck.size} updated=${cachedUpdated.size} added=${cachedAdded.size}",
@@ -404,7 +404,7 @@ class LibraryV2ViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isWantToReadLoading = true, wantToReadError = null) }
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
-            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val staleMinutes = appPreferences.cacheStaleMinutesFlow.first()
             val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
             val cached =
                 cacheManager.getCachedLibraryV2SeriesList(
@@ -419,7 +419,7 @@ class LibraryV2ViewModel(
             val hasStateData = current.wantToRead.isNotEmpty()
             val isStale =
                 cachedUpdatedAt == null ||
-                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleMinutes * 60L * 1000L
             val hasAnyData = cached.isNotEmpty() || hasStateData
             logCacheDecision(
                 "want",
@@ -475,7 +475,7 @@ class LibraryV2ViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isCollectionsLoading = true, collectionsError = null) }
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
-            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val staleMinutes = appPreferences.cacheStaleMinutesFlow.first()
             val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
             val cached = cacheManager.getCachedLibraryV2Collections(LibraryV2CacheKeys.COLLECTIONS)
             val cachedUpdatedAt =
@@ -485,7 +485,7 @@ class LibraryV2ViewModel(
             val hasStateData = current.collections.isNotEmpty()
             val isStale =
                 cachedUpdatedAt == null ||
-                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleMinutes * 60L * 1000L
             val hasAnyData = cached.isNotEmpty() || hasStateData
             logCacheDecision(
                 "collections",
@@ -540,7 +540,7 @@ class LibraryV2ViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isReadingListsLoading = true, readingListsError = null) }
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
-            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val staleMinutes = appPreferences.cacheStaleMinutesFlow.first()
             val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
             val cached = cacheManager.getCachedLibraryV2ReadingLists(LibraryV2CacheKeys.READING_LISTS)
             val cachedUpdatedAt =
@@ -550,7 +550,7 @@ class LibraryV2ViewModel(
             val hasStateData = current.readingLists.isNotEmpty()
             val isStale =
                 cachedUpdatedAt == null ||
-                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleMinutes * 60L * 1000L
             val hasAnyData = cached.isNotEmpty() || hasStateData
             logCacheDecision(
                 "readingLists",
@@ -605,7 +605,7 @@ class LibraryV2ViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isPeopleLoading = true, peopleError = null) }
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
-            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val staleMinutes = appPreferences.cacheStaleMinutesFlow.first()
             val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
             val cached = cacheManager.getCachedLibraryV2People(LibraryV2CacheKeys.BROWSE_PEOPLE, 1)
             val cachedUpdatedAt =
@@ -616,7 +616,7 @@ class LibraryV2ViewModel(
             val hasStateData = current.people.isNotEmpty()
             val isStale =
                 cachedUpdatedAt == null ||
-                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleMinutes * 60L * 1000L
             val hasAnyData = cached.isNotEmpty() || hasStateData
             logCacheDecision(
                 "people",
@@ -762,7 +762,7 @@ class LibraryV2ViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isCollectionSeriesLoading = true, collectionSeriesError = null) }
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
-            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val staleMinutes = appPreferences.cacheStaleMinutesFlow.first()
             val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
             val cacheKey = collectionId.toString()
             val cached =
@@ -778,7 +778,7 @@ class LibraryV2ViewModel(
             val hasStateData = _state.value.collectionSeries.isNotEmpty()
             val isStale =
                 cachedUpdatedAt == null ||
-                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleMinutes * 60L * 1000L
             val hasAnyData = cached.isNotEmpty() || hasStateData
             logCacheDecision(
                 "collection:$collectionId",
@@ -853,7 +853,7 @@ class LibraryV2ViewModel(
     private fun showCollectionSeriesDebugToast(collectionId: Int) {
         viewModelScope.launch {
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
-            val staleHours = appPreferences.cacheStaleHoursFlow.first()
+            val staleMinutes = appPreferences.cacheStaleMinutesFlow.first()
             val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
             val cacheKey = collectionId.toString()
             val cachedUpdatedAt =
@@ -863,7 +863,7 @@ class LibraryV2ViewModel(
                 )
             val isStale =
                 cachedUpdatedAt == null ||
-                    (System.currentTimeMillis() - cachedUpdatedAt) > staleHours * 60L * 60L * 1000L
+                    (System.currentTimeMillis() - cachedUpdatedAt) > staleMinutes * 60L * 1000L
             val message =
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
                     R.string.debug_cache_use

@@ -328,6 +328,7 @@
     <string name="settings_cache_always_refresh_subtitle">When online, prefer new data over cached data.</string>
     <string name="settings_cache_stale_hours_label">Cache stale after (hours)</string>
     <string name="settings_cache_stale_hours_hint">If older than this, cache refreshes automatically.</string>
+    <string name="settings_cache_stale_label">Cache stale after (%s)</string>
     <string name="settings_cache_units_hours">hours</string>
     <string name="settings_debug_toasts_title">Debug toasts</string>
     <string name="settings_debug_toasts_subtitle">Show debug cache decisions as toasts.</string>
