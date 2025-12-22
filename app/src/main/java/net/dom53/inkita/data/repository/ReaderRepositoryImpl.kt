@@ -12,6 +12,7 @@ import net.dom53.inkita.data.local.db.dao.DownloadDao
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
 import net.dom53.inkita.data.local.db.entity.CachedPageEntity
+import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
 import net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity
 import net.dom53.inkita.data.mapper.toDomain
@@ -284,10 +285,11 @@ class ReaderRepositoryImpl(
 
     override suspend fun getBookInfo(chapterId: Int): ReaderBookInfo? =
         runCatching {
+            if (!isOnlineAllowed()) return@runCatching getOfflineBookInfo(chapterId)
             val api = apiOrThrow()
             val resp = api.getBookInfo(chapterId)
             if (resp.isSuccessful) resp.body()?.toDomain() else null
-        }.getOrNull()
+        }.getOrNull() ?: getOfflineBookInfo(chapterId)
 
     override suspend fun markSeriesRead(seriesId: Int) {
         runCatching {
@@ -411,6 +413,37 @@ class ReaderRepositoryImpl(
 
     private fun isOnlineAllowed(): Boolean =
         NetworkMonitor.getInstance(context, appPreferences).status.value.isOnlineAllowed
+
+    private suspend fun getOfflineBookInfo(chapterId: Int): ReaderBookInfo? {
+        val items = downloadV2Dao?.getItemsForChapter(chapterId).orEmpty()
+        if (items.isEmpty()) return null
+        val completed =
+            items
+                .filter { it.status == DownloadedItemV2Entity.STATUS_COMPLETED }
+                .filter { it.page != null }
+                .filter { isPathPresent(it.localPath ?: return@filter false) }
+        if (completed.isEmpty()) return null
+        val maxPage = completed.maxOf { it.page ?: 0 }
+        val progress = readerDao.getLocalProgress(chapterId)
+        val seriesId = progress?.seriesId ?: completed.firstOrNull()?.seriesId
+        val volumeId = progress?.volumeId ?: completed.firstOrNull()?.volumeId
+        val libraryId = progress?.libraryId
+        val title =
+            runCatching {
+                context.getString(
+                    net.dom53.inkita.R.string.series_detail_chapter_fallback,
+                    chapterId,
+                )
+            }.getOrNull()
+        return ReaderBookInfo(
+            pages = maxPage + 1,
+            seriesId = seriesId,
+            volumeId = volumeId,
+            libraryId = libraryId,
+            title = null,
+            pageTitle = title,
+        )
+    }
 
     private fun LocalReaderProgressEntity.toDomain(): ReaderProgress =
         ReaderProgress(
