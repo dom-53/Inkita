@@ -76,6 +76,7 @@ import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.ui.browse.utils.PublicationState
+import net.dom53.inkita.ui.common.chapterCoverUrl
 import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
@@ -587,6 +588,46 @@ fun SeriesDetailScreenV2(
                                         selectedVolume = volume
                                         showDownloadVolumeDialog = true
                                     }
+                                },
+                            )
+                        }
+                        if (selectedTab == SeriesDetailTab.Specials) {
+                            val specials = detail?.detail?.specials.orEmpty()
+                            val specialDownloadStates = remember { mutableStateMapOf<Int, ChapterDownloadState>() }
+                            LaunchedEffect(specials, downloadedItemsBySeries.value) {
+                                val items = downloadedItemsBySeries.value
+                                val grouped = items.groupBy { it.chapterId }
+                                specials.forEach { chapter ->
+                                    val list = grouped[chapter.id].orEmpty()
+                                    val completed =
+                                        list.count { item ->
+                                            item.status ==
+                                                net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                isItemPathPresent(item.localPath)
+                                        }
+                                    val expected = chapter.pages?.takeIf { it > 0 } ?: 0
+                                    val state =
+                                        when {
+                                            expected > 0 && completed >= expected -> ChapterDownloadState.Complete
+                                            completed > 0 -> ChapterDownloadState.Partial
+                                            else -> ChapterDownloadState.None
+                                        }
+                                    specialDownloadStates[chapter.id] = state
+                                }
+                            }
+                            SpecialsGridRow(
+                                specials = specials,
+                                config = config,
+                                seriesCoverUrl = series?.id?.let { seriesCoverUrl(config, it) },
+                                downloadStates = specialDownloadStates,
+                                onOpenSpecial = { chapter ->
+                                    onOpenReader(
+                                        chapter.id,
+                                        0,
+                                        seriesId,
+                                        chapter.volumeId ?: 0,
+                                        detail?.series?.format,
+                                    )
                                 },
                             )
                         }
@@ -1124,6 +1165,134 @@ private fun VolumeGridRow(
                         stringResource(
                             id = net.dom53.inkita.R.string.series_detail_vol_short,
                             (index + 1).toString(),
+                        ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpecialsGridRow(
+    specials: List<net.dom53.inkita.data.api.dto.ChapterDto>,
+    config: AppConfig,
+    seriesCoverUrl: String?,
+    downloadStates: Map<Int, ChapterDownloadState>,
+    onOpenSpecial: (net.dom53.inkita.data.api.dto.ChapterDto) -> Unit,
+) {
+    if (specials.isEmpty()) return
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        specials.forEachIndexed { index, chapter ->
+            val coverUrl = chapterCoverUrl(config, chapter.id) ?: seriesCoverUrl
+            val title =
+                chapter.titleName?.takeIf { it.isNotBlank() }
+                    ?: chapter.title?.takeIf { it.isNotBlank() }
+                    ?: chapter.range?.takeIf { it.isNotBlank() }
+                    ?: stringResource(id = net.dom53.inkita.R.string.series_detail_chapter_fallback, index + 1)
+            Column(
+                modifier =
+                    Modifier
+                        .width(140.dp)
+                        .clickable { onOpenSpecial(chapter) },
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Box {
+                    CoverImage(
+                        coverUrl = coverUrl,
+                        context = LocalContext.current,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f),
+                    )
+                    val downloadState = downloadStates[chapter.id]
+                    if (downloadState == ChapterDownloadState.Complete || downloadState == ChapterDownloadState.Partial) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(end = 6.dp, bottom = 10.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                                        shape = MaterialTheme.shapes.small,
+                                    ).padding(4.dp),
+                        ) {
+                            Icon(
+                                imageVector =
+                                    if (downloadState == ChapterDownloadState.Complete) {
+                                        Icons.Filled.DownloadDone
+                                    } else {
+                                        Icons.Filled.Downloading
+                                    },
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                    val pagesRead = chapter.pagesRead ?: 0
+                    if (pagesRead == 0) {
+                        Canvas(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(2f / 3f),
+                        ) {
+                            val sizePx = 26.dp.toPx()
+                            val path =
+                                Path().apply {
+                                    moveTo(size.width - sizePx, 0f)
+                                    lineTo(size.width, 0f)
+                                    lineTo(size.width, sizePx)
+                                    close()
+                                }
+                            drawPath(
+                                path = path,
+                                color = Color(0xFFE91E63),
+                            )
+                        }
+                    }
+                    val pagesTotal = chapter.pages ?: 0
+                    if (pagesTotal > 0 && pagesRead in 1 until pagesTotal) {
+                        val progress =
+                            (pagesRead.toFloat() / pagesTotal.toFloat()).coerceIn(0f, 1f)
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .align(Alignment.BottomStart)
+                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+                        )
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth(progress)
+                                    .height(6.dp)
+                                    .align(Alignment.BottomStart)
+                                    .background(MaterialTheme.colorScheme.primary),
+                        )
+                    }
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text =
+                        stringResource(
+                            id = net.dom53.inkita.R.string.series_detail_chapter_fallback,
+                            index + 1,
                         ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
