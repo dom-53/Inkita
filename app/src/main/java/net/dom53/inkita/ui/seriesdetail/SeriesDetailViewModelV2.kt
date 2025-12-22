@@ -382,95 +382,107 @@ class SeriesDetailViewModelV2(
                 return@launch
             }
 
-            val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
-            val errors = mutableListOf<String>()
+            try {
+                val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+                val errors = mutableListOf<String>()
 
-            val seriesDeferred = async { api.getSeriesById(seriesId) }
-            val metadataDeferred = async { api.getSeriesMetadata(seriesId) }
-            val wantDeferred = async { api.hasWantToRead(seriesId) }
-            val readingListsDeferred = async { api.getReadingListsForSeries(seriesId) }
-            val collectionsDeferred = async { api.getCollectionsForSeriesOwned(seriesId, ownedOnly = false) }
-            val bookmarksDeferred = async { api.getSeriesBookmarks(seriesId) }
-            val annotationsDeferred = async { api.getAnnotationsForSeries(seriesId) }
-            val timeLeftDeferred = async { api.getSeriesTimeLeft(seriesId) }
-            val hasProgressDeferred = async { api.getHasProgress(seriesId) }
-            val continuePointDeferred = async { api.getContinuePoint(seriesId) }
-            val seriesDetailDeferred = async { api.getSeriesDetail(seriesId) }
-            val relatedDeferred = async { api.getAllRelated(seriesId) }
-            val ratingDeferred = async { api.getOverallSeriesRating(seriesId) }
-            val librariesDeferred = async { api.getLibrariesFilter() }
+                val seriesDeferred = async { api.getSeriesById(seriesId) }
+                val metadataDeferred = async { api.getSeriesMetadata(seriesId) }
+                val wantDeferred = async { api.hasWantToRead(seriesId) }
+                val readingListsDeferred = async { api.getReadingListsForSeries(seriesId) }
+                val collectionsDeferred = async { api.getCollectionsForSeriesOwned(seriesId, ownedOnly = false) }
+                val bookmarksDeferred = async { api.getSeriesBookmarks(seriesId) }
+                val annotationsDeferred = async { api.getAnnotationsForSeries(seriesId) }
+                val timeLeftDeferred = async { api.getSeriesTimeLeft(seriesId) }
+                val hasProgressDeferred = async { api.getHasProgress(seriesId) }
+                val continuePointDeferred = async { api.getContinuePoint(seriesId) }
+                val seriesDetailDeferred = async { api.getSeriesDetail(seriesId) }
+                val relatedDeferred = async { api.getAllRelated(seriesId) }
+                val ratingDeferred = async { api.getOverallSeriesRating(seriesId) }
+                val librariesDeferred = async { api.getLibrariesFilter() }
 
-            val seriesResponse = seriesDeferred.await()
-            val series = seriesResponse.extract("series", errors)
-            val metadata = metadataDeferred.await().extract("metadata", errors)
-            val wantToRead = wantDeferred.await().extract("wantToRead", errors)
-            val readingLists = readingListsDeferred.await().extractList("readingLists", errors)
-            val collections = collectionsDeferred.await().extractList("collections", errors)
-            val bookmarks = bookmarksDeferred.await().extractList("bookmarks", errors)
-            val annotations = annotationsDeferred.await().extractList("annotations", errors)
-            val timeLeft = timeLeftDeferred.await().extract("timeLeft", errors)
-            val hasProgress = hasProgressDeferred.await().extract("hasProgress", errors)
-            val continuePoint = continuePointDeferred.await().extract("continuePoint", errors)
-            val readerProgress =
-                if (continuePoint != null) {
-                    api.getReaderProgress(continuePoint.id).extract("readerProgress", errors)
-                } else {
-                    null
+                val seriesResponse = seriesDeferred.await()
+                val series = seriesResponse.extract("series", errors)
+                val metadata = metadataDeferred.await().extract("metadata", errors)
+                val wantToRead = wantDeferred.await().extract("wantToRead", errors)
+                val readingLists = readingListsDeferred.await().extractList("readingLists", errors)
+                val collections = collectionsDeferred.await().extractList("collections", errors)
+                val bookmarks = bookmarksDeferred.await().extractList("bookmarks", errors)
+                val annotations = annotationsDeferred.await().extractList("annotations", errors)
+                val timeLeft = timeLeftDeferred.await().extract("timeLeft", errors)
+                val hasProgress = hasProgressDeferred.await().extract("hasProgress", errors)
+                val continuePoint = continuePointDeferred.await().extract("continuePoint", errors)
+                val readerProgress =
+                    if (continuePoint != null) {
+                        api.getReaderProgress(continuePoint.id).extract("readerProgress", errors)
+                    } else {
+                        null
+                    }
+                val seriesDetail = seriesDetailDeferred.await().extract("seriesDetail", errors)
+                val related = relatedDeferred.await().extract("related", errors)
+                val rating = ratingDeferred.await().extract("rating", errors)
+
+                val libraries = librariesDeferred.await().extractList("libraries", errors)
+                val libraryType =
+                    series?.libraryId?.let { id ->
+                        libraries?.firstOrNull { it.id == id }?.type
+                    }
+                val seriesDetailPlus =
+                    if (libraryType != null) {
+                        api.getSeriesDetailPlus(seriesId, libraryType).extract("seriesDetailPlus", errors)
+                    } else {
+                        null
+                    }
+
+                val detail =
+                    InkitaDetailV2(
+                        series = series,
+                        metadata = metadata,
+                        wantToRead = wantToRead,
+                        readingLists = readingLists,
+                        collections = collections,
+                        bookmarks = bookmarks,
+                        annotations = annotations,
+                        timeLeft = timeLeft,
+                        hasProgress = hasProgress,
+                        continuePoint = continuePoint,
+                        seriesDetailPlus = seriesDetailPlus,
+                        related = related,
+                        detail = seriesDetail,
+                        rating = rating,
+                        readerProgress = readerProgress,
+                    )
+                val mergedDetail = applyLocalProgress(detail, isOnline)
+                val membership =
+                    mergedDetail.collections
+                        ?.map { it.id }
+                        ?.toSet()
+                        .orEmpty()
+
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        error = errors.firstOrNull(),
+                        detail = mergedDetail,
+                        showLoadedToast = true,
+                        collectionsWithSeries = membership,
+                    )
                 }
-            val seriesDetail = seriesDetailDeferred.await().extract("seriesDetail", errors)
-            val related = relatedDeferred.await().extract("related", errors)
-            val rating = ratingDeferred.await().extract("rating", errors)
-
-            val libraries = librariesDeferred.await().extractList("libraries", errors)
-            val libraryType =
-                series?.libraryId?.let { id ->
-                    libraries?.firstOrNull { it.id == id }?.type
+                if (canCache) {
+                    cacheManager.cacheSeriesDetailV2(seriesId, mergedDetail)
+                    if (LoggingManager.isDebugEnabled()) {
+                        LoggingManager.d("SeriesDetailV2", "Cached detail series=$seriesId")
+                    }
                 }
-            val seriesDetailPlus =
-                if (libraryType != null) {
-                    api.getSeriesDetailPlus(seriesId, libraryType).extract("seriesDetailPlus", errors)
-                } else {
-                    null
-                }
-
-            val detail =
-                InkitaDetailV2(
-                    series = series,
-                    metadata = metadata,
-                    wantToRead = wantToRead,
-                    readingLists = readingLists,
-                    collections = collections,
-                    bookmarks = bookmarks,
-                    annotations = annotations,
-                    timeLeft = timeLeft,
-                    hasProgress = hasProgress,
-                    continuePoint = continuePoint,
-                    seriesDetailPlus = seriesDetailPlus,
-                    related = related,
-                    detail = seriesDetail,
-                    rating = rating,
-                    readerProgress = readerProgress,
-                )
-            val mergedDetail = applyLocalProgress(detail, isOnline)
-            val membership =
-                mergedDetail.collections
-                    ?.map { it.id }
-                    ?.toSet()
-                    .orEmpty()
-
-            _state.update {
-                it.copy(
-                    isLoading = false,
-                    error = errors.firstOrNull(),
-                    detail = mergedDetail,
-                    showLoadedToast = true,
-                    collectionsWithSeries = membership,
-                )
-            }
-            if (canCache) {
-                cacheManager.cacheSeriesDetailV2(seriesId, mergedDetail)
+            } catch (e: Exception) {
                 if (LoggingManager.isDebugEnabled()) {
-                    LoggingManager.d("SeriesDetailV2", "Cached detail series=$seriesId")
+                    LoggingManager.e("SeriesDetailV2", "Load failed series=$seriesId", e)
+                }
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Failed to load series detail",
+                    )
                 }
             }
         }
