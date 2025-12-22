@@ -359,8 +359,14 @@ class ReaderRepositoryImpl(
                     local.lastModifiedUtcMillis > remote.lastModifiedUtcMillis -> local
                     else -> remote
                 }
-            runCatching { api.setReaderProgress(latest.toDto()) }
-            readerDao.upsertLocalProgress(latest.toEntity())
+            val resp =
+                runCatching { api.setReaderProgress(latest.toDto()) }
+                    .getOrNull()
+            if (resp?.isSuccessful == true) {
+                readerDao.clearLocalProgress(local.chapterId)
+            } else {
+                readerDao.upsertLocalProgress(latest.toEntity())
+            }
         }
     }
 
