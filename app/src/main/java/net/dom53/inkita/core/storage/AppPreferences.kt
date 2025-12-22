@@ -100,6 +100,7 @@ class AppPreferences(
         private val KEY_PREFER_OFFLINE_PAGES = booleanPreferencesKey("prefer_offline_pages")
         private val KEY_DOWNLOAD_RETRY_ENABLED = booleanPreferencesKey("download_retry_enabled")
         private val KEY_DOWNLOAD_RETRY_MAX = intPreferencesKey("download_retry_max")
+        private val KEY_IMPORTANT_INFO_VERSION = intPreferencesKey("important_info_version")
         private val KEY_OFFLINE_MODE = booleanPreferencesKey("offline_mode")
         private val KEY_DELETE_AFTER_MARK_READ = booleanPreferencesKey("delete_after_mark_read")
         private val KEY_DELETE_AFTER_READ_DEPTH = intPreferencesKey("delete_after_read_depth")
@@ -209,6 +210,8 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_MAX_CONCURRENT] ?: 2 }
     val preferOfflinePagesFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFER_OFFLINE_PAGES] ?: true }
+    val importantInfoVersionFlow: Flow<Int> =
+        context.dataStore.data.map { prefs -> prefs[KEY_IMPORTANT_INFO_VERSION] ?: 0 }
     val downloadRetryEnabledFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_RETRY_ENABLED] ?: true }
     val downloadRetryMaxAttemptsFlow: Flow<Int> =
@@ -546,6 +549,12 @@ class AppPreferences(
     suspend fun setPreferOfflinePages(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[KEY_PREFER_OFFLINE_PAGES] = enabled
+        }
+    }
+
+    suspend fun setImportantInfoVersion(versionCode: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_IMPORTANT_INFO_VERSION] = versionCode
         }
     }
 

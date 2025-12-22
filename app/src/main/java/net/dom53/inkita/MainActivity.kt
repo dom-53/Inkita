@@ -118,6 +118,9 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+private const val IMPORTANT_INFO_BODY =
+    "Image API key was added. Please fill it in Kavita Settings."
+
 private fun applyLocale(languageTag: String) {
     val locales =
         if (languageTag.isBlank() || languageTag == "system") {
@@ -149,6 +152,8 @@ fun InkitaApp(
     val notificationsEnabled =
         NotificationManagerCompat.from(context).areNotificationsEnabled()
     val showNotifDialog = remember { mutableStateOf(false) }
+    val lastImportantInfoVersion by appPreferences.importantInfoVersionFlow.collectAsState(initial = -1)
+    val showImportantInfoDialog = remember { mutableStateOf(false) }
     val appLanguage by appPreferences.appLanguageFlow.collectAsState(initial = initialLanguage)
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
@@ -163,6 +168,11 @@ fun InkitaApp(
         } else if (!notifPromptShown && notificationsEnabled) {
             appPreferences.setNotificationsPromptShown(true)
         }
+    }
+
+    LaunchedEffect(lastImportantInfoVersion) {
+        if (lastImportantInfoVersion < 0) return@LaunchedEffect
+        showImportantInfoDialog.value = BuildConfig.VERSION_CODE > lastImportantInfoVersion
     }
 
     LaunchedEffect(appLanguage) {
@@ -220,6 +230,21 @@ fun InkitaApp(
                             scope.launch { appPreferences.setNotificationsPromptShown(true) }
                         },
                     ) { Text(context.getString(R.string.notifications_prompt_dismiss)) }
+                },
+            )
+        }
+        if (showImportantInfoDialog.value) {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text(text = context.getString(R.string.update_info_title)) },
+                text = { Text(IMPORTANT_INFO_BODY) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showImportantInfoDialog.value = false
+                            scope.launch { appPreferences.setImportantInfoVersion(BuildConfig.VERSION_CODE) }
+                        },
+                    ) { Text(context.getString(R.string.general_close)) }
                 },
             )
         }
