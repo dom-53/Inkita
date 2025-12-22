@@ -9,6 +9,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -361,13 +362,14 @@ internal fun ChapterPagesSection(
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .height(IntrinsicSize.Min)
                         .swipeable(
                             state = swipeState,
                             anchors = anchors,
                             thresholds = { _, _ -> FractionalThreshold(0.25f) },
                             orientation = Orientation.Horizontal,
                         ),
-                ) {
+            ) {
                 val downloadIcon =
                     if (isDownloaded) {
                         Icons.Filled.Delete
@@ -395,23 +397,22 @@ internal fun ChapterPagesSection(
                 Box(
                     modifier =
                         Modifier
-                            .fillMaxSize()
+                            .matchParentSize()
                             .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
                         Icon(
                             imageVector = progressIcon,
                             contentDescription = null,
                             tint = progressTint,
+                            modifier = Modifier.align(Alignment.CenterStart),
                         )
                         Icon(
                             imageVector = downloadIcon,
                             contentDescription = null,
                             tint = downloadTint,
+                            modifier = Modifier.align(Alignment.CenterEnd),
                         )
                     }
                 }
@@ -420,6 +421,7 @@ internal fun ChapterPagesSection(
                         Modifier
                             .offset { IntOffset(swipeState.offset.value.roundToInt(), 0) }
                             .fillMaxWidth()
+                            .height(IntrinsicSize.Min)
                             .background(containerColor, shape)
                             .then(
                                 if (border != null) {
