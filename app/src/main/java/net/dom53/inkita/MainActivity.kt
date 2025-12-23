@@ -439,7 +439,22 @@ fun InkitaApp(
                     startDestination = MainScreen.LibraryV2.route,
                     modifier = Modifier.padding(innerPadding),
                 ) {
-                    composable(MainScreen.LibraryV2.route) {
+                    composable(
+                        route = "${MainScreen.LibraryV2.route}?collectionId={collectionId}&collectionName={collectionName}",
+                        arguments =
+                            listOf(
+                                navArgument("collectionId") {
+                                    type = NavType.IntType
+                                    defaultValue = -1
+                                },
+                                navArgument("collectionName") {
+                                    type = NavType.StringType
+                                    defaultValue = ""
+                                },
+                            ),
+                    ) {
+                        val collectionIdArg = it.arguments?.getInt("collectionId")?.takeIf { id -> id >= 0 }
+                        val collectionNameArg = it.arguments?.getString("collectionName")?.takeIf { name -> name.isNotBlank() }
                         LibraryV2Screen(
                             libraryRepository = libraryRepository,
                             seriesRepository = seriesRepository,
@@ -451,6 +466,8 @@ fun InkitaApp(
                             onOpenSeries = { seriesId ->
                                 navController.navigate("series/$seriesId")
                             },
+                            initialCollectionId = collectionIdArg,
+                            initialCollectionName = collectionNameArg,
                         )
                     }
                     composable(MainScreen.Updates.route) { UpdatesScreen() }
@@ -550,6 +567,10 @@ fun InkitaApp(
                             onOpenBrowseTag = { id, name ->
                                 val encoded = Uri.encode(name)
                                 navController.navigate("${MainScreen.Browse.route}?tagId=$id&tagName=$encoded")
+                            },
+                            onOpenCollection = { id, name ->
+                                val encoded = Uri.encode(name)
+                                navController.navigate("${MainScreen.LibraryV2.route}?collectionId=$id&collectionName=$encoded")
                             },
                             readerReturn = readerReturn.value,
                             onConsumeReaderReturn = { entry.savedStateHandle["reader_return"] = null },

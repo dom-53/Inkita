@@ -94,6 +94,8 @@ fun LibraryV2Screen(
     cacheManager: CacheManager,
     appPreferences: AppPreferences,
     onOpenSeries: (Int) -> Unit,
+    initialCollectionId: Int? = null,
+    initialCollectionName: String? = null,
 ) {
     val viewModel: LibraryV2ViewModel =
         viewModel(
@@ -109,6 +111,15 @@ fun LibraryV2Screen(
                 ),
         )
     val uiState by viewModel.state.collectAsState()
+    var presetApplied by remember { mutableStateOf(false) }
+
+    LaunchedEffect(initialCollectionId) {
+        if (presetApplied) return@LaunchedEffect
+        if (initialCollectionId != null) {
+            viewModel.openCollectionFromExternal(initialCollectionId, initialCollectionName)
+            presetApplied = true
+        }
+    }
     val context = LocalContext.current
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),

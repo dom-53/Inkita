@@ -102,6 +102,7 @@ fun SeriesDetailScreenV2(
     onOpenSeries: (Int) -> Unit,
     onOpenBrowseGenre: (id: Int, name: String) -> Unit,
     onOpenBrowseTag: (id: Int, name: String) -> Unit,
+    onOpenCollection: ((id: Int, name: String) -> Unit)? = null,
     readerReturn: net.dom53.inkita.ui.reader.ReaderReturn? = null,
     onConsumeReaderReturn: () -> Unit = {},
     refreshSignal: Boolean = false,
@@ -1057,6 +1058,7 @@ fun SeriesDetailScreenV2(
                                 collections = detail?.collections.orEmpty(),
                                 config = config,
                                 onOpenSeries = onOpenSeries,
+                                onOpenCollection = onOpenCollection,
                             )
                         }
                         Spacer(modifier = Modifier.height(24.dp))
@@ -1424,6 +1426,7 @@ private fun RelatedCollectionsSection(
     collections: List<net.dom53.inkita.data.api.dto.AppUserCollectionDto>,
     config: AppConfig,
     onOpenSeries: (Int) -> Unit,
+    onOpenCollection: ((Int, String) -> Unit)? = null,
 ) {
     val relatedGroups = relatedSeriesGroups(related)
     if (relatedGroups.isNotEmpty()) {
@@ -1493,7 +1496,10 @@ private fun RelatedCollectionsSection(
             collections.forEach { collection ->
                 val coverUrl = collectionCoverUrl(config, collection.id)
                 Column(
-                    modifier = Modifier.width(140.dp),
+                    modifier =
+                        Modifier
+                            .width(140.dp)
+                            .clickable { onOpenCollection?.invoke(collection.id, collection.title ?: "") },
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     CoverImage(
