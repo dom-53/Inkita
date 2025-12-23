@@ -76,6 +76,58 @@ class BrowseViewModel(
         observeConnectivity()
     }
 
+    fun applyQuickGenreFilter(
+        genreId: Int,
+        genreName: String? = null,
+    ) {
+        viewModelScope.launch {
+            val updated =
+                _state.value.draftFilter.copy(
+                    genres = mapOf(genreId to TriState.Include),
+                    smartFilterId = null,
+                    decodedSmartFilter = null,
+                )
+            _state.update {
+                it.copy(
+                    draftFilter = updated,
+                    appliedFilter = updated,
+                    appliedSearch = "",
+                    searchInput = TextFieldValue(""),
+                    currentPage = 1,
+                    canLoadMore = true,
+                    error = null,
+                )
+            }
+            reloadFirstPage()
+        }
+    }
+
+    fun applyQuickTagFilter(
+        tagId: Int,
+        tagName: String? = null,
+    ) {
+        viewModelScope.launch {
+            val updated =
+                _state.value.draftFilter.copy(
+                    tags = mapOf(tagId to TriState.Include),
+                    smartFilterId = null,
+                    decodedSmartFilter = null,
+                )
+            _state.update {
+                it.copy(
+                    draftFilter = updated,
+                    appliedFilter = updated,
+                    appliedSearch = "",
+                    searchInput = TextFieldValue(""),
+                    currentPage = 1,
+                    canLoadMore = true,
+                    error = null,
+                )
+            }
+            reloadFirstPage()
+        }
+    }
+
     fun updateSearch(text: TextFieldValue) {
         _state.update { it.copy(searchInput = text) }
     }

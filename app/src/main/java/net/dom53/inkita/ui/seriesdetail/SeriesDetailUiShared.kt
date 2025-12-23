@@ -656,10 +656,12 @@ internal fun CollectionDialogV2(
 @Composable
 internal fun SummarySectionV2(
     summary: String?,
-    genres: List<String>,
-    tags: List<String>,
+    genres: List<Pair<Int?, String>>,
+    tags: List<Pair<Int?, String>>,
     expanded: Boolean,
     onToggle: () -> Unit,
+    onGenreClick: (Int, String) -> Unit = { _, _ -> },
+    onTagClick: (Int, String) -> Unit = { _, _ -> },
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -688,10 +690,16 @@ internal fun SummarySectionV2(
             ChipGroup(
                 title = stringResource(R.string.general_genres),
                 items = genres,
+                onItemClick = { id, name ->
+                    if (id != null) onGenreClick(id, name)
+                },
             )
             ChipGroup(
                 title = stringResource(R.string.general_tags),
                 items = tags,
+                onItemClick = { id, name ->
+                    if (id != null) onTagClick(id, name)
+                },
             )
         }
     }
@@ -701,9 +709,10 @@ internal fun SummarySectionV2(
 @Composable
 internal fun ChipGroup(
     title: String,
-    items: List<String>,
+    items: List<Pair<Int?, String>>,
+    onItemClick: (Int?, String) -> Unit = { _, _ -> },
 ) {
-    val trimmed = items.mapNotNull { it.trim().takeIf { titleText -> titleText.isNotEmpty() } }
+    val trimmed = items.mapNotNull { (id, label) -> label.trim().takeIf { it.isNotEmpty() }?.let { id to it } }
     if (trimmed.isEmpty()) {
         return
     }
@@ -719,8 +728,11 @@ internal fun ChipGroup(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            trimmed.forEach { item ->
-                AssistChip(onClick = {}, label = { Text(item) })
+            trimmed.forEach { (id, label) ->
+                AssistChip(
+                    onClick = { onItemClick(id, label) },
+                    label = { Text(label) },
+                )
             }
         }
     }

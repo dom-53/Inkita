@@ -100,6 +100,8 @@ fun SeriesDetailScreenV2(
     onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
     onOpenVolume: (Int) -> Unit,
     onOpenSeries: (Int) -> Unit,
+    onOpenBrowseGenre: (id: Int, name: String) -> Unit,
+    onOpenBrowseTag: (id: Int, name: String) -> Unit,
     readerReturn: net.dom53.inkita.ui.reader.ReaderReturn? = null,
     onConsumeReaderReturn: () -> Unit = {},
     refreshSignal: Boolean = false,
@@ -506,10 +508,24 @@ fun SeriesDetailScreenV2(
                         Spacer(modifier = Modifier.height(10.dp))
                         SummarySectionV2(
                             summary = cleanHtml(metadata?.summary),
-                            genres = metadata?.genres?.mapNotNull { it.title }.orEmpty(),
-                            tags = metadata?.tags?.mapNotNull { it.title }.orEmpty(),
+                            genres =
+                                metadata
+                                    ?.genres
+                                    ?.mapNotNull { genre ->
+                                        val title = genre.title ?: return@mapNotNull null
+                                        genre.id to title
+                                    }.orEmpty(),
+                            tags =
+                                metadata
+                                    ?.tags
+                                    ?.mapNotNull { tag ->
+                                        val title = tag.title ?: return@mapNotNull null
+                                        tag.id to title
+                                    }.orEmpty(),
                             expanded = summaryExpanded,
                             onToggle = { summaryExpanded = !summaryExpanded },
+                            onGenreClick = { id, name -> onOpenBrowseGenre(id, name) },
+                            onTagClick = { id, name -> onOpenBrowseTag(id, name) },
                         )
                         val continuePoint = detail?.continuePoint
                         val readerProgress = detail?.readerProgress

@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.ImageNotSupported
 import androidx.compose.material3.Button
+import android.widget.Toast
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -103,12 +104,17 @@ fun BrowseScreen(
     appPreferences: AppPreferences,
     cacheManager: CacheManager,
     onOpenSeries: (Int) -> Unit,
+    initialGenreId: Int? = null,
+    initialGenreName: String? = null,
+    initialTagId: Int? = null,
+    initialTagName: String? = null,
 ) {
     val viewModel: BrowseViewModel =
         viewModel(
             factory = BrowseViewModel.provideFactory(seriesRepository, appPreferences, cacheManager),
         )
     val uiState by viewModel.state.collectAsState()
+    var presetApplied by remember { mutableStateOf(false) }
 
     var showFilterSheet by remember { mutableStateOf(false) }
     var sheetHasFocus by remember { mutableStateOf(false) }
@@ -132,6 +138,38 @@ fun BrowseScreen(
     )
     val browsePageSize by appPreferences.browsePageSizeFlow.collectAsState(initial = 25)
     val disableBrowseThumbnails by appPreferences.disableBrowseThumbnailsFlow.collectAsState(initial = false)
+    val context = LocalContext.current
+
+    LaunchedEffect(initialGenreId, initialTagId) {
+        if (presetApplied) return@LaunchedEffect
+        when {
+            initialGenreId != null -> {
+                viewModel.applyQuickGenreFilter(initialGenreId, initialGenreName)
+                Toast
+                    .makeText(
+                        context,
+                        context.getString(
+                            R.string.browse_filter_applied_genre,
+                            initialGenreName ?: initialGenreId.toString(),
+                        ),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+            }
+            initialTagId != null -> {
+                viewModel.applyQuickTagFilter(initialTagId, initialTagName)
+                Toast
+                    .makeText(
+                        context,
+                        context.getString(
+                            R.string.browse_filter_applied_tag,
+                            initialTagName ?: initialTagId.toString(),
+                        ),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+            }
+        }
+        presetApplied = initialGenreId != null || initialTagId != null
+    }
 
     LaunchedEffect(gridState) {
         snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }

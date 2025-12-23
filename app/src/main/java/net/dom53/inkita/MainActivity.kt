@@ -2,6 +2,7 @@ package net.dom53.inkita
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -458,7 +459,32 @@ fun InkitaApp(
                             appPreferences = appPreferences,
                         )
                     }
-                    composable(MainScreen.Browse.route) {
+                    composable(
+                        route = "${MainScreen.Browse.route}?genreId={genreId}&tagId={tagId}&genreName={genreName}&tagName={tagName}",
+                        arguments =
+                            listOf(
+                                navArgument("genreId") {
+                                    type = NavType.IntType
+                                    defaultValue = -1
+                                },
+                                navArgument("tagId") {
+                                    type = NavType.IntType
+                                    defaultValue = -1
+                                },
+                                navArgument("genreName") {
+                                    type = NavType.StringType
+                                    defaultValue = ""
+                                },
+                                navArgument("tagName") {
+                                    type = NavType.StringType
+                                    defaultValue = ""
+                                },
+                            ),
+                    ) { entry ->
+                        val genreIdArg = entry.arguments?.getInt("genreId")?.takeIf { it >= 0 }
+                        val tagIdArg = entry.arguments?.getInt("tagId")?.takeIf { it >= 0 }
+                        val genreNameArg = entry.arguments?.getString("genreName")?.takeIf { it.isNotBlank() }
+                        val tagNameArg = entry.arguments?.getString("tagName")?.takeIf { it.isNotBlank() }
                         BrowseScreen(
                             seriesRepository = seriesRepository,
                             appPreferences = appPreferences,
@@ -466,6 +492,10 @@ fun InkitaApp(
                             onOpenSeries = { seriesId ->
                                 navController.navigate("series/$seriesId")
                             },
+                            initialGenreId = genreIdArg,
+                            initialGenreName = genreNameArg,
+                            initialTagId = tagIdArg,
+                            initialTagName = tagNameArg,
                         )
                     }
                     composable(MainScreen.Downloads.route) {
@@ -512,6 +542,14 @@ fun InkitaApp(
                             },
                             onOpenSeries = { id ->
                                 navController.navigate("series/$id")
+                            },
+                            onOpenBrowseGenre = { id, name ->
+                                val encoded = Uri.encode(name)
+                                navController.navigate("${MainScreen.Browse.route}?genreId=$id&genreName=$encoded")
+                            },
+                            onOpenBrowseTag = { id, name ->
+                                val encoded = Uri.encode(name)
+                                navController.navigate("${MainScreen.Browse.route}?tagId=$id&tagName=$encoded")
                             },
                             readerReturn = readerReturn.value,
                             onConsumeReaderReturn = { entry.savedStateHandle["reader_return"] = null },

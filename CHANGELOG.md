@@ -4,6 +4,13 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Added
+- Series Detail V2: Tapping a genre or tag opens Browse with the filter pre-applied.
+
+### Changed
+
+### Fixed
+
 ## v0.3.0-beta
 
 ### Added

@@ -84,6 +84,8 @@
     <string name="general_no_results">No results</string>
     <string name="general_search">Search</string>
     <string name="general_clear">Clear</string>
+    <string name="browse_filter_applied_genre">Filtered by genre: %1$s</string>
+    <string name="browse_filter_applied_tag">Filtered by tag: %1$s</string>
     <string name="general_combination">Combination</string>
     <string name="general_min">Min</string>
     <string name="general_max">Max</string>
