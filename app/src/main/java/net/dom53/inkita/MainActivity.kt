@@ -280,6 +280,7 @@ fun InkitaApp(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val mainRoutes = MainScreen.items.map { it.route }
+    val isMainRoute = MainScreen.items.any { item -> currentRoute?.startsWith(item.route) == true }
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
@@ -403,11 +404,12 @@ fun InkitaApp(
             }
             Scaffold(
                 bottomBar = {
-                    if (currentRoute in mainRoutes) {
+                    if (isMainRoute) {
                         NavigationBar {
                             MainScreen.items.forEach { screen ->
+                                val selected = currentRoute?.startsWith(screen.route) == true
                                 NavigationBarItem(
-                                    selected = currentRoute == screen.route,
+                                    selected = selected,
                                     onClick = {
                                         navController.navigate(screen.route) {
                                             popUpTo(navController.graph.startDestinationId) {
