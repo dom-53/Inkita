@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented here.
 
+## Unreleased
+
 ## v0.3.0-beta
 
 ### Added
