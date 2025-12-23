@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -253,6 +254,7 @@ fun VolumeDetailScreenV2(
                             Modifier
                                 .width(140.dp)
                                 .aspectRatio(2f / 3f)
+                                .clip(RoundedCornerShape(8.dp))
                                 .clickable { coverExpanded = true },
                     )
                     Column(
@@ -645,6 +647,7 @@ fun VolumeDetailScreenV2(
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp)
                             .aspectRatio(2f / 3f)
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable { coverExpanded = false },
                 )
             }

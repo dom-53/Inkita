@@ -56,6 +56,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -511,7 +512,7 @@ private fun SeriesCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(170.dp),
+                    .height(170.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -608,7 +609,7 @@ private fun WantToReadCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(160.dp),
+                    .height(160.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -705,7 +706,7 @@ private fun CollectionCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(160.dp),
+                    .height(160.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -841,7 +842,7 @@ private fun ReadingListCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(160.dp),
+                    .height(160.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(

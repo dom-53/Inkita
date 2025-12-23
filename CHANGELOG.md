@@ -9,6 +9,7 @@ All notable changes to this project will be documented here.
 - Series Detail V2: Tapping a genre or tag opens Browse with the filter pre-applied.
 
 ### Changed
+- UI: Rounded corners aligned across Library V2, Series Detail V2, and Volume Detail V2 covers.
 
 ### Fixed
 - Navigation: Bottom bar now remains visible when opening Library/Browse with query params (collections/tags/genres).
@@ -43,7 +44,7 @@ All notable changes to this project will be documented here.
 - Settings: Prefetch switches in Advanced are temporarily disabled until the new prefetch pipeline is implemented.
 - Logging: Added verbose logs for Library V2 cache decisions, Series/Volume Detail V2 flows, and Download V2 enqueue/worker events.
 - Downloads: Download settings now use dedicated metered/low-battery preferences; download workers respect those constraints.
-- Cache: “Cache stale after” now supports minutes or hours with a 15-minute default.
+- Cache: "Cache stale after" now supports minutes or hours with a 15-minute default.
 - Network: Increased global HTTP timeouts to 30 seconds.
 
 ### Fixed

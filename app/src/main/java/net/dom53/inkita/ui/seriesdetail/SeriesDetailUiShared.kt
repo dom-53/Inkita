@@ -55,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
@@ -478,13 +479,16 @@ internal fun CoverImage(
                     .crossfade(true)
                     .build(),
             contentDescription = null,
-            modifier = modifier,
+            modifier =
+                modifier
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
             contentScale = ContentScale.Crop,
         )
     } else {
         androidx.compose.foundation.layout.Box(
             modifier =
                 modifier
+                    .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
         )
     }
