@@ -5,11 +5,13 @@ All notable changes to this project will be documented here.
 ## Unreleased
 
 ### Added
+- Series Detail V2: Clicking a collection opens Library V2 collections with that collection selected.
 - Series Detail V2: Tapping a genre or tag opens Browse with the filter pre-applied.
 
 ### Changed
 
 ### Fixed
+- Navigation: Bottom bar now remains visible when opening Library/Browse with query params (collections/tags/genres).
 
 ## v0.3.0-beta
 
