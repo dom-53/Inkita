@@ -1,13 +1,15 @@
-package net.dom53.inkita.ui.reader
+package net.dom53.inkita.ui.reader.screen
 
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.domain.repository.ReaderRepository
+import net.dom53.inkita.ui.reader.viewmodel.PdfReaderViewModel
+import net.dom53.inkita.ui.reader.renderer.PdfReader
 
 @Composable
-fun EpubReaderScreen(
+fun PdfReaderScreen(
     chapterId: Int,
     initialPage: Int?,
     readerRepository: ReaderRepository,
@@ -20,7 +22,6 @@ fun EpubReaderScreen(
     onNavigateToChapter: (Int, Int?, Int?, Int?) -> Unit = { _, _, _, _ -> },
     topBarContent: (@Composable (String, String, () -> Unit) -> Unit)? = null,
     bottomBarContent: (@Composable (ReaderBottomBarState, ReaderBottomBarCallbacks) -> Unit)? = null,
-    settingsContent: (@Composable (ReaderSettingsState, ReaderSettingsCallbacks) -> Unit)? = null,
     overlayExtras: @Composable BoxScope.() -> Unit = {},
 ) {
     BaseReaderScreen(
@@ -30,7 +31,7 @@ fun EpubReaderScreen(
             viewModel(
                 key = "reader-$chapterId",
                 factory =
-                    EpubReaderViewModel.provideFactory(
+                    PdfReaderViewModel.Companion.provideFactory(
                         chapterId = chapterId,
                         initialPage = initialPage ?: 0,
                         readerRepository = readerRepository,
@@ -43,12 +44,12 @@ fun EpubReaderScreen(
         volumeId = volumeId,
         serverUrl = serverUrl,
         apiKey = apiKey,
-        renderer = EpubReader,
+        renderer = PdfReader,
         onBack = onBack,
         onNavigateToChapter = onNavigateToChapter,
         topBarContent = topBarContent,
         bottomBarContent = bottomBarContent,
-        settingsContent = settingsContent,
+        settingsContent = null,
         overlayExtras = overlayExtras,
     )
 }

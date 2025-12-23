@@ -1,4 +1,4 @@
-package net.dom53.inkita.ui.reader
+package net.dom53.inkita.ui.reader.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.model.ReaderBookInfo
+import net.dom53.inkita.domain.model.ReaderChapterNav
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.ReaderTimeLeft
 import net.dom53.inkita.domain.reader.BaseReader
@@ -141,7 +142,7 @@ abstract class BaseReaderViewModel(
         }
     }
 
-    suspend fun getNextChapter(): net.dom53.inkita.domain.model.ReaderChapterNav? {
+    suspend fun getNextChapter(): ReaderChapterNav? {
         val info = _state.value.bookInfo
         val sid = info?.seriesId ?: seriesId ?: return null
         val vid = info?.volumeId ?: volumeId ?: return null
@@ -154,7 +155,7 @@ abstract class BaseReaderViewModel(
             val pages = nextInfo.pages ?: 0
             _state.update { it.copy(bookInfo = nextInfo, pageCount = pages, pageIndex = 0, content = null) }
         }
-        return net.dom53.inkita.domain.model.ReaderChapterNav(
+        return ReaderChapterNav(
             seriesId = nextInfo?.seriesId ?: nextNav.seriesId ?: sid,
             volumeId = nextInfo?.volumeId ?: nextNav.volumeId ?: vid,
             chapterId = nextId,
@@ -162,7 +163,7 @@ abstract class BaseReaderViewModel(
         )
     }
 
-    suspend fun getPreviousChapter(): net.dom53.inkita.domain.model.ReaderChapterNav? {
+    suspend fun getPreviousChapter(): ReaderChapterNav? {
         val info = _state.value.bookInfo
         val sid = info?.seriesId ?: seriesId ?: return null
         val vid = info?.volumeId ?: volumeId ?: return null
@@ -174,7 +175,7 @@ abstract class BaseReaderViewModel(
             val pages = prevInfo.pages ?: 0
             _state.update { it.copy(bookInfo = prevInfo, pageCount = pages, pageIndex = 0, content = null) }
         }
-        return net.dom53.inkita.domain.model.ReaderChapterNav(
+        return ReaderChapterNav(
             seriesId = prevInfo?.seriesId ?: prevNav.seriesId ?: sid,
             volumeId = prevInfo?.volumeId ?: prevNav.volumeId ?: vid,
             chapterId = prevId,

@@ -2,7 +2,6 @@ package net.dom53.inkita.ui.seriesdetail
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -14,18 +13,13 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DownloadDone
-import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -51,7 +45,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -72,6 +65,7 @@ import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.repository.ReaderRepository
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
+import net.dom53.inkita.ui.reader.model.ReaderReturn
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
 
 @Suppress("CyclomaticComplexMethod")
@@ -80,7 +74,7 @@ fun VolumeDetailScreenV2(
     volumeId: Int,
     appPreferences: AppPreferences,
     readerRepository: ReaderRepository,
-    readerReturn: net.dom53.inkita.ui.reader.ReaderReturn? = null,
+    readerReturn: ReaderReturn? = null,
     onConsumeReaderReturn: () -> Unit = {},
     onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
     onBack: () -> Unit,

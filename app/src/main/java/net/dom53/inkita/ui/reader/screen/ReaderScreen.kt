@@ -1,4 +1,4 @@
-﻿package net.dom53.inkita.ui.reader
+﻿package net.dom53.inkita.ui.reader.screen
 
 import android.app.Activity
 import android.content.Context
@@ -16,6 +16,7 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
@@ -64,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -91,7 +94,18 @@ import net.dom53.inkita.core.storage.ReaderPrefs
 import net.dom53.inkita.core.storage.ReaderThemeMode
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.repository.ReaderRepository
+import net.dom53.inkita.ui.reader.viewmodel.BaseReaderViewModel
+import net.dom53.inkita.ui.reader.viewmodel.PdfReaderViewModel
+import net.dom53.inkita.ui.reader.model.ReaderFontOption
+import net.dom53.inkita.ui.reader.viewmodel.ReaderUiState
+import net.dom53.inkita.ui.reader.model.readerFontOptions
+import net.dom53.inkita.ui.reader.model.readerThemeOptions
+import net.dom53.inkita.ui.reader.renderer.BaseReader
+import net.dom53.inkita.ui.reader.renderer.ReaderRenderCallbacks
+import net.dom53.inkita.ui.reader.renderer.ReaderRenderParams
 import java.io.File
+import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.max
 
 @Composable
@@ -520,7 +534,7 @@ internal fun BaseReaderScreen(
 
 private fun ReaderUiState.timeLeftText(context: Context): String? {
     val tl = timeLeft ?: return null
-    val rounded = String.format(java.util.Locale.getDefault(), "%.1f", tl.avgHours)
+    val rounded = String.format(Locale.getDefault(), "%.1f", tl.avgHours)
     return "${context.resources.getString(R.string.reader_time_left)}: $rounded h"
 }
 
@@ -782,7 +796,7 @@ public enum class ReaderSettingsTab(
 }
 
 @Composable
-@OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 private fun FontSettings(
     fontSize: Float,
     onFontSizeChange: (Float) -> Unit,
@@ -1087,9 +1101,9 @@ internal fun ReaderWebView(
                             if (e1 == null) return false
                             val diffX = e2.x - e1.x
                             val diffY = e2.y - e1.y
-                            if (kotlin.math.abs(diffX) > kotlin.math.abs(diffY) &&
-                                kotlin.math.abs(diffX) > swipeThreshold &&
-                                kotlin.math.abs(velocityX) > swipeVelocityThreshold
+                            if (abs(diffX) > abs(diffY) &&
+                                abs(diffX) > swipeThreshold &&
+                                abs(velocityX) > swipeVelocityThreshold
                             ) {
                                 if (diffX < 0) onSwipeNext() else onSwipePrev()
                                 return true
@@ -1239,7 +1253,7 @@ internal fun PdfPageViewer(
 
     var pageIndex by remember { mutableStateOf(currentPage.coerceAtLeast(0)) }
     var pageCount by remember { mutableStateOf(0) }
-    var imageBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
     val rendererHolder = remember { mutableStateOf<Pair<PdfRenderer, ParcelFileDescriptor>?>(null) }
 
@@ -1309,7 +1323,7 @@ internal fun PdfPageViewer(
                             onDragStart = { totalDrag = 0f },
                             onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
                             onDragEnd = {
-                                if (kotlin.math.abs(totalDrag) > swipeThresholdPx) {
+                                if (abs(totalDrag) > swipeThresholdPx) {
                                     if (totalDrag < 0 && pageIndex < pageCount - 1) {
                                         pageIndex += 1
                                     } else if (totalDrag > 0 && pageIndex > 0) {
@@ -1326,7 +1340,7 @@ internal fun PdfPageViewer(
             when {
                 imageBitmap != null -> {
                     val ratio = imageBitmap!!.width.toFloat() / imageBitmap!!.height.toFloat()
-                    androidx.compose.foundation.Image(
+                    Image(
                         bitmap = imageBitmap!!,
                         contentDescription = null,
                         modifier =

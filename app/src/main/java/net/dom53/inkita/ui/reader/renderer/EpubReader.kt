@@ -1,4 +1,4 @@
-package net.dom53.inkita.ui.reader
+package net.dom53.inkita.ui.reader.renderer
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import net.dom53.inkita.R
+import net.dom53.inkita.ui.reader.screen.ReaderWebView
 
 object EpubReader : BaseReader {
     override val supportsTextSettings: Boolean = true

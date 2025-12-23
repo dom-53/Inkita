@@ -45,9 +45,9 @@ import net.dom53.inkita.R
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.storage.ReaderPrefs
 import net.dom53.inkita.core.storage.ReaderThemeMode
-import net.dom53.inkita.ui.reader.ReaderFontOption
-import net.dom53.inkita.ui.reader.readerFontOptions
-import net.dom53.inkita.ui.reader.readerThemeOptions
+import net.dom53.inkita.ui.reader.model.ReaderFontOption
+import net.dom53.inkita.ui.reader.model.readerFontOptions
+import net.dom53.inkita.ui.reader.model.readerThemeOptions
 
 @Composable
 fun SettingsReaderScreen(

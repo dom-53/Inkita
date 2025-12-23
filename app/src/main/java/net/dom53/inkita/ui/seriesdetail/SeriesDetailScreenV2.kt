@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -88,6 +87,7 @@ import net.dom53.inkita.ui.common.chapterCoverUrl
 import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
+import net.dom53.inkita.ui.reader.model.ReaderReturn
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
@@ -104,7 +104,7 @@ fun SeriesDetailScreenV2(
     onOpenBrowseGenre: (id: Int, name: String) -> Unit,
     onOpenBrowseTag: (id: Int, name: String) -> Unit,
     onOpenCollection: ((id: Int, name: String) -> Unit)? = null,
-    readerReturn: net.dom53.inkita.ui.reader.ReaderReturn? = null,
+    readerReturn: ReaderReturn? = null,
     onConsumeReaderReturn: () -> Unit = {},
     refreshSignal: Boolean = false,
     onConsumeRefreshSignal: () -> Unit = {},

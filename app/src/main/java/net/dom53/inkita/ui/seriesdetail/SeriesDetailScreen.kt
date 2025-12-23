@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Share
@@ -118,6 +117,7 @@ import net.dom53.inkita.domain.repository.DownloadRepository
 import net.dom53.inkita.domain.repository.ReaderRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
 import net.dom53.inkita.ui.common.seriesCoverUrl
+import net.dom53.inkita.ui.reader.model.ReaderReturn
 import net.dom53.inkita.ui.seriesdetail.model.RelatedFilter
 import net.dom53.inkita.ui.seriesdetail.model.RelatedGroup
 import net.dom53.inkita.ui.seriesdetail.model.SwipeDirection
@@ -138,7 +138,7 @@ fun SeriesDetailScreen(
     appPreferences: AppPreferences,
     collectionsRepository: CollectionsRepository,
     readerRepository: ReaderRepository? = null,
-    readerReturn: net.dom53.inkita.ui.reader.ReaderReturn? = null,
+    readerReturn: ReaderReturn? = null,
     onConsumeReaderReturn: () -> Unit = {},
     onBack: () -> Unit = {},
     onOpenSeries: ((Int) -> Unit)? = null,

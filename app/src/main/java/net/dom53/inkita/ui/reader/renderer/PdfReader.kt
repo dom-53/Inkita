@@ -1,4 +1,4 @@
-package net.dom53.inkita.ui.reader
+package net.dom53.inkita.ui.reader.renderer
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import net.dom53.inkita.R
+import net.dom53.inkita.ui.reader.screen.PdfPageViewer
 
 object PdfReader : BaseReader {
     override val supportsTextSettings: Boolean = false

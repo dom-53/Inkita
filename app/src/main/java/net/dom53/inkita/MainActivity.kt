@@ -77,7 +77,8 @@ import net.dom53.inkita.ui.download.DownloadQueueViewModelFactory
 import net.dom53.inkita.ui.history.HistoryScreen
 import net.dom53.inkita.ui.library.LibraryV2Screen
 import net.dom53.inkita.ui.navigation.MainScreen
-import net.dom53.inkita.ui.reader.ReaderScreen
+import net.dom53.inkita.ui.reader.model.ReaderReturn
+import net.dom53.inkita.ui.reader.screen.ReaderScreen
 import net.dom53.inkita.ui.seriesdetail.SeriesDetailScreenV2
 import net.dom53.inkita.ui.settings.SettingsScreen
 import net.dom53.inkita.ui.theme.InkitaTheme
@@ -537,7 +538,7 @@ fun InkitaApp(
                         val seriesId = entry.arguments?.getInt("seriesId") ?: return@composable
                         val readerReturn =
                             entry.savedStateHandle
-                                .getStateFlow<net.dom53.inkita.ui.reader.ReaderReturn?>(
+                                .getStateFlow<ReaderReturn?>(
                                     "reader_return",
                                     null,
                                 ).collectAsState(initial = null)
@@ -588,7 +589,7 @@ fun InkitaApp(
                         val volumeId = entry.arguments?.getInt("volumeId") ?: return@composable
                         val readerReturn =
                             entry.savedStateHandle
-                                .getStateFlow<net.dom53.inkita.ui.reader.ReaderReturn?>(
+                                .getStateFlow<ReaderReturn?>(
                                     "reader_return",
                                     null,
                                 ).collectAsState(initial = null)
@@ -656,7 +657,7 @@ fun InkitaApp(
                             onBack = { _, pIdx, _, vIdBack ->
                                 navController.previousBackStackEntry?.savedStateHandle?.set(
                                     "reader_return",
-                                    net.dom53.inkita.ui.reader.ReaderReturn(
+                                    ReaderReturn(
                                         volumeId = vIdBack ?: 0,
                                         page = pIdx,
                                     ),
