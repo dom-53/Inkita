@@ -9,6 +9,7 @@ All notable changes to this project will be documented here.
 - Series Detail V2: Tapping a genre or tag opens Browse with the filter pre-applied.
 
 ### Changed
+- Reader: Split EpubReaderViewModel and PdfReaderViewModel into separate files.
 - UI: Rounded corners aligned across Library V2, Series Detail V2, and Volume Detail V2 covers.
 
 ### Fixed
