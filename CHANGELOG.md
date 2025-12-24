@@ -8,6 +8,7 @@ All notable changes to this project will be documented here.
 - Series Detail V2: Clicking a collection opens Library V2 collections with that collection selected.
 - Series Detail V2: Tapping a genre or tag opens Browse with the filter pre-applied.
 - Downloads V2: PDF download requests now enqueue and appear in the Download Queue.
+- Library/Browse: Download status badges now appear on series covers (complete/partial).
 
 ### Changed
 - Reader: Split EpubReaderViewModel and PdfReaderViewModel into separate files.
