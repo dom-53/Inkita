@@ -20,6 +20,7 @@ All notable changes to this project will be documented here.
 ### Fixed
 - Navigation: Bottom bar now remains visible when opening Library/Browse with query params (collections/tags/genres).
 - Cache: Series Detail V2 caching now defaults to enabled to prevent offline cache misses.
+- History: Reading history list no longer crashes due to duplicate LazyColumn keys.
 
 ## v0.3.0-beta
 
