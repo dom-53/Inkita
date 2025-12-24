@@ -5,8 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.domain.repository.ReaderRepository
-import net.dom53.inkita.ui.reader.viewmodel.EpubReaderViewModel
 import net.dom53.inkita.ui.reader.renderer.EpubReader
+import net.dom53.inkita.ui.reader.viewmodel.EpubReaderViewModel
 
 @Composable
 fun EpubReaderScreen(

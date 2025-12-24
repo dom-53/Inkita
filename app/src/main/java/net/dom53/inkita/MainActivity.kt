@@ -217,6 +217,7 @@ private fun InfoSection(
     }
 }
 
+@Suppress("UnusedPrivateProperty")
 @Composable
 fun InkitaApp(
     initialLanguage: String,

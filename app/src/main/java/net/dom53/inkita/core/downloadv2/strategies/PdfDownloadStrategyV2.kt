@@ -20,6 +20,7 @@ class PdfDownloadStrategyV2(
     private val appPreferences: AppPreferences,
 ) : DownloadStrategyV2 {
     override val key: String = FORMAT_PDF
+
     override suspend fun enqueue(request: DownloadRequestV2): Long {
         val chapterId = request.chapterId ?: return -1L
         // If we already have a completed item for this chapter, reuse it.
@@ -93,10 +94,11 @@ class PdfDownloadStrategyV2(
                 failJob(job, "HTTP ${resp.code()}")
                 return
             }
-            val body = resp.body() ?: run {
-                failJob(job, "Empty body")
-                return
-            }
+            val body =
+                resp.body() ?: run {
+                    failJob(job, "Empty body")
+                    return
+                }
             withContext(Dispatchers.IO) {
                 body.byteStream().use { input ->
                     target.outputStream().use { out -> input.copyTo(out) }
@@ -149,8 +151,7 @@ class PdfDownloadStrategyV2(
         }
     }
 
-    private fun pdfPath(chapterId: Int): File =
-        File(appContext.getExternalFilesDir("Inkita/downloads/pdfs"), "pdf-$chapterId.pdf")
+    private fun pdfPath(chapterId: Int): File = File(appContext.getExternalFilesDir("Inkita/downloads/pdfs"), "pdf-$chapterId.pdf")
 
     companion object {
         const val FORMAT_PDF = "pdf"

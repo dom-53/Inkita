@@ -481,7 +481,10 @@ internal fun CoverImage(
             contentDescription = null,
             modifier =
                 modifier
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                    .clip(
+                        androidx.compose.foundation.shape
+                            .RoundedCornerShape(8.dp),
+                    ),
             contentScale = ContentScale.Crop,
         )
     } else {

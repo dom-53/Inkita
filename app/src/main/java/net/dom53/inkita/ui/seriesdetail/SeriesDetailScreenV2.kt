@@ -1252,8 +1252,7 @@ fun SeriesDetailScreenV2(
                                     } else {
                                         volume.chapters
                                             ?.filter { (it.pages ?: 0) > 0 }
-                                    }
-                                        .orEmpty()
+                                    }.orEmpty()
                                 if (chapters.isEmpty()) {
                                     Toast
                                         .makeText(

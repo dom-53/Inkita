@@ -119,7 +119,10 @@ class LibraryV2ViewModel(
         }
     }
 
-    fun openCollectionFromExternal(collectionId: Int, collectionName: String?) {
+    fun openCollectionFromExternal(
+        collectionId: Int,
+        collectionName: String?,
+    ) {
         _state.update {
             it.copy(
                 selectedSection = LibraryV2Section.Collections,

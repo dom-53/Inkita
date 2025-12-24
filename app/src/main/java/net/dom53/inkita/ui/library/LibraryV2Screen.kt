@@ -512,7 +512,11 @@ private fun SeriesCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(170.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                    .height(170.dp)
+                    .clip(
+                        androidx.compose.foundation.shape
+                            .RoundedCornerShape(8.dp),
+                    ),
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -609,7 +613,11 @@ private fun WantToReadCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(160.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                    .height(160.dp)
+                    .clip(
+                        androidx.compose.foundation.shape
+                            .RoundedCornerShape(8.dp),
+                    ),
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -706,7 +714,11 @@ private fun CollectionCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(160.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                    .height(160.dp)
+                    .clip(
+                        androidx.compose.foundation.shape
+                            .RoundedCornerShape(8.dp),
+                    ),
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -842,7 +854,11 @@ private fun ReadingListCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(160.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                    .height(160.dp)
+                    .clip(
+                        androidx.compose.foundation.shape
+                            .RoundedCornerShape(8.dp),
+                    ),
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(

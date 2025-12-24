@@ -1028,7 +1028,9 @@ private suspend fun applyLocalProgress(
 }
 
 private fun formatKeyForVolume(formatId: Int?): String =
-    if (net.dom53.inkita.domain.model.Format.fromId(formatId) == net.dom53.inkita.domain.model.Format.Pdf) {
+    if (net.dom53.inkita.domain.model.Format
+            .fromId(formatId) == net.dom53.inkita.domain.model.Format.Pdf
+    ) {
         PdfDownloadStrategyV2.FORMAT_PDF
     } else {
         EpubDownloadStrategyV2.FORMAT_EPUB

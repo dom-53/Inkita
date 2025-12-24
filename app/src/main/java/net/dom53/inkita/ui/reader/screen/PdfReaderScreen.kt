@@ -5,8 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.domain.repository.ReaderRepository
-import net.dom53.inkita.ui.reader.viewmodel.PdfReaderViewModel
 import net.dom53.inkita.ui.reader.renderer.PdfReader
+import net.dom53.inkita.ui.reader.viewmodel.PdfReaderViewModel
 
 @Composable
 fun PdfReaderScreen(
