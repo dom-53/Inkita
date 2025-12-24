@@ -594,16 +594,13 @@ class BrowseViewModel(
         return state
     }
 
-    private fun countChapters(detail: SeriesDetailDto?): Int =
-        collectChapters(detail).size
+    private fun countChapters(detail: SeriesDetailDto?): Int = collectChapters(detail).size
 
     private fun sumPages(detail: SeriesDetailDto?): Int =
         collectChapters(detail)
             .sumOf { it.pages ?: 0 }
 
-    private fun collectChapters(
-        detail: SeriesDetailDto?,
-    ): List<net.dom53.inkita.data.api.dto.ChapterDto> {
+    private fun collectChapters(detail: SeriesDetailDto?): List<net.dom53.inkita.data.api.dto.ChapterDto> {
         if (detail == null) return emptyList()
         return buildList {
             detail.volumes?.forEach { volume ->
@@ -615,8 +612,7 @@ class BrowseViewModel(
         }.distinctBy { it.id }
     }
 
-    private fun isItemPathPresent(path: String?): Boolean =
-        path?.let { java.io.File(it).exists() } == true
+    private fun isItemPathPresent(path: String?): Boolean = path?.let { java.io.File(it).exists() } == true
 
     private suspend fun browseCacheAllowed(): Boolean = cacheManager.policy().browseEnabled
 

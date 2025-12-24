@@ -92,6 +92,7 @@ data class LibraryV2UiState(
     val downloadStates: Map<Int, DownloadState> = emptyMap(),
 )
 
+@Suppress("LargeClass")
 class LibraryV2ViewModel(
     private val libraryRepository: LibraryRepository,
     private val seriesRepository: SeriesRepository,
@@ -303,17 +304,17 @@ class LibraryV2ViewModel(
             )
             val showDebugToast = appPreferences.debugToastsFlow.first()
             if (cachedHasData) {
-                    _state.update {
-                        it.copy(
-                            onDeck = cachedOnDeck.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
-                            recentlyUpdated = cachedUpdated.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
-                            recentlyAdded = cachedAdded.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
-                            isHomeLoading = true,
-                            homeError = null,
-                        )
-                    }
-                    updateDownloadStates(lastDownloadedItems)
-                    if (!isOnline || (!alwaysRefresh && !isStale)) {
+                _state.update {
+                    it.copy(
+                        onDeck = cachedOnDeck.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
+                        recentlyUpdated = cachedUpdated.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
+                        recentlyAdded = cachedAdded.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
+                        isHomeLoading = true,
+                        homeError = null,
+                    )
+                }
+                updateDownloadStates(lastDownloadedItems)
+                if (!isOnline || (!alwaysRefresh && !isStale)) {
                     logCacheDecision("home", "using cached data only")
                     if (showDebugToast) {
                         android.widget.Toast
@@ -700,15 +701,15 @@ class LibraryV2ViewModel(
             }
             val result = runCatching { personRepository.getBrowsePeople(pageNumber = 1, pageSize = 50) }
             val pageItems = result.getOrDefault(emptyList())
-                _state.update {
-                    it.copy(
-                        people = pageItems,
-                        isPeopleLoading = false,
-                        peopleError = result.exceptionOrNull()?.message,
-                        peoplePage = 1,
-                        canLoadMorePeople = pageItems.size == 50,
-                    )
-                }
+            _state.update {
+                it.copy(
+                    people = pageItems,
+                    isPeopleLoading = false,
+                    peopleError = result.exceptionOrNull()?.message,
+                    peoplePage = 1,
+                    canLoadMorePeople = pageItems.size == 50,
+                )
+            }
             updateDownloadStates(lastDownloadedItems)
             cacheManager.cacheLibraryV2People(
                 LibraryV2CacheKeys.BROWSE_PEOPLE,
@@ -976,6 +977,7 @@ class LibraryV2ViewModel(
 
     private fun buildSeriesInfoMap(state: LibraryV2UiState): Map<Int, SeriesDownloadInfo> {
         val map = mutableMapOf<Int, SeriesDownloadInfo>()
+
         fun add(
             id: Int,
             format: Format?,
@@ -1057,16 +1059,13 @@ class LibraryV2ViewModel(
         return state
     }
 
-    private fun countChapters(detail: SeriesDetailDto?): Int =
-        collectChapters(detail).size
+    private fun countChapters(detail: SeriesDetailDto?): Int = collectChapters(detail).size
 
     private fun sumPages(detail: SeriesDetailDto?): Int =
         collectChapters(detail)
             .sumOf { it.pages ?: 0 }
 
-    private fun collectChapters(
-        detail: SeriesDetailDto?,
-    ): List<net.dom53.inkita.data.api.dto.ChapterDto> {
+    private fun collectChapters(detail: SeriesDetailDto?): List<net.dom53.inkita.data.api.dto.ChapterDto> {
         if (detail == null) return emptyList()
         return buildList {
             detail.volumes?.forEach { volume ->
@@ -1078,8 +1077,7 @@ class LibraryV2ViewModel(
         }.distinctBy { it.id }
     }
 
-    private fun isItemPathPresent(path: String?): Boolean =
-        path?.let { java.io.File(it).exists() } == true
+    private fun isItemPathPresent(path: String?): Boolean = path?.let { java.io.File(it).exists() } == true
 
     companion object {
         fun provideFactory(

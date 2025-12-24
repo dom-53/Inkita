@@ -93,10 +93,10 @@ import net.dom53.inkita.domain.repository.SeriesRepository
 import net.dom53.inkita.domain.usecase.AppliedFilter
 import net.dom53.inkita.domain.usecase.ReadStatusFilter
 import net.dom53.inkita.domain.usecase.SpecialFilter
-import net.dom53.inkita.ui.common.DownloadState
-import net.dom53.inkita.ui.common.DownloadStateBadge
 import net.dom53.inkita.ui.browse.utils.AgeRatings
 import net.dom53.inkita.ui.browse.utils.PublicationState
+import net.dom53.inkita.ui.common.DownloadState
+import net.dom53.inkita.ui.common.DownloadStateBadge
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -125,9 +125,10 @@ class DownloadQueueViewModel(
         }
         val details =
             withContext(Dispatchers.IO) {
-                seriesIds.mapNotNull { id ->
-                    cacheManager.getCachedSeriesDetailV2(id)?.let { id to it }
-                }.toMap()
+                seriesIds
+                    .mapNotNull { id ->
+                        cacheManager.getCachedSeriesDetailV2(id)?.let { id to it }
+                    }.toMap()
             }
         val seriesNames = mutableMapOf<Int, String>()
         val volumeNames = mutableMapOf<Int, String>()
