@@ -6,13 +6,17 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import net.dom53.inkita.core.cache.CacheManager
+import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.notification.AppNotificationManager
@@ -24,6 +28,10 @@ import net.dom53.inkita.data.api.dto.FilterV2Dto
 import net.dom53.inkita.data.api.dto.LanguageDto
 import net.dom53.inkita.data.api.dto.LibraryDto
 import net.dom53.inkita.data.api.dto.NamedDto
+import net.dom53.inkita.data.api.dto.SeriesDetailDto
+import net.dom53.inkita.data.local.db.InkitaDatabase
+import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
+import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.domain.model.filter.KavitaCombination
 import net.dom53.inkita.domain.model.filter.KavitaSortField
@@ -33,6 +41,8 @@ import net.dom53.inkita.domain.usecase.AppliedFilter
 import net.dom53.inkita.domain.usecase.ReadStatusFilter
 import net.dom53.inkita.domain.usecase.SpecialFilter
 import net.dom53.inkita.domain.usecase.buildQueries
+import net.dom53.inkita.ui.common.DownloadState
+import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 import java.io.IOException
 import java.util.LinkedHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -57,6 +67,7 @@ data class BrowseUiState(
     val decodedSmartFilter: FilterV2Dto? = null,
     val isMetadataLoading: Boolean = false,
     val metadataError: String? = null,
+    val downloadStates: Map<Int, DownloadState> = emptyMap(),
 )
 
 class BrowseViewModel(
@@ -70,10 +81,14 @@ class BrowseViewModel(
     private val networkMonitor = NetworkMonitor.getInstance(appPreferences.appContext, appPreferences)
     private var lastOfflineError = false
     private val pagingInFlight = AtomicBoolean(false)
+    private val downloadDao =
+        InkitaDatabase.getInstance(appPreferences.appContext).downloadV2Dao()
+    private var lastDownloadedItems: List<DownloadedItemV2Entity> = emptyList()
 
     init {
         reloadFirstPage()
         observeConnectivity()
+        observeDownloadStates()
     }
 
     fun applyQuickGenreFilter(
@@ -189,6 +204,7 @@ class BrowseViewModel(
                             error = null,
                         )
                     }
+                    updateDownloadStates(lastDownloadedItems)
                 }
             }
 
@@ -203,6 +219,7 @@ class BrowseViewModel(
                         isLoadingMore = false,
                     )
                 }
+                updateDownloadStates(lastDownloadedItems)
                 return@launch
             }
 
@@ -239,6 +256,7 @@ class BrowseViewModel(
                     isLoadingMore = false,
                 )
             }
+            updateDownloadStates(lastDownloadedItems)
             if (cacheEnabled) {
                 runCatching { appPreferences.setLastBrowseRefresh(System.currentTimeMillis()) }
             }
@@ -288,6 +306,7 @@ class BrowseViewModel(
                         isLoadingMore = false,
                     )
                 }
+                updateDownloadStates(lastDownloadedItems)
                 if (cacheEnabled) {
                     runCatching { appPreferences.setLastBrowseRefresh(System.currentTimeMillis()) }
                 }
@@ -344,6 +363,53 @@ class BrowseViewModel(
         val search = _state.value.appliedSearch
         // simple stable fingerprint
         return "s=$search|f=$filter|p=$page"
+    }
+
+    private fun observeDownloadStates() {
+        viewModelScope.launch {
+            downloadDao
+                .observeItemsByStatus(DownloadedItemV2Entity.STATUS_COMPLETED)
+                .collectLatest { items ->
+                    lastDownloadedItems = items
+                    updateDownloadStates(items)
+                }
+        }
+    }
+
+    private suspend fun updateDownloadStates(items: List<DownloadedItemV2Entity>) {
+        val series = _state.value.series
+        if (series.isEmpty()) {
+            _state.update { it.copy(downloadStates = emptyMap()) }
+            return
+        }
+        val seriesInfoById =
+            series.associate { entry ->
+                entry.id to SeriesDownloadInfo(entry.id, entry.format, entry.pages)
+            }
+        val cacheIds =
+            seriesInfoById.values
+                .filter { info ->
+                    info.format == null ||
+                        info.format == Format.Pdf ||
+                        (info.pages ?: 0) <= 0
+                }.map { it.id }
+                .distinct()
+                .sorted()
+        val cachedDetails =
+            withContext(Dispatchers.IO) {
+                val result = mutableMapOf<Int, InkitaDetailV2>()
+                cacheIds.forEach { id ->
+                    cacheManager.getCachedSeriesDetailV2(id)?.let { result[id] = it }
+                }
+                result
+            }
+        val states =
+            buildSeriesDownloadStates(
+                seriesInfoById = seriesInfoById,
+                downloadedItems = items,
+                cachedDetails = cachedDetails,
+            )
+        _state.update { it.copy(downloadStates = states) }
     }
 
     fun setCombination(value: KavitaCombination) = updateDraftFilter { it.copy(combination = value) }
@@ -459,6 +525,98 @@ class BrowseViewModel(
             api.decodeFilter(DecodeFilterRequest(def.filter)).body()
         }.getOrNull()
     }
+
+    private data class SeriesDownloadInfo(
+        val id: Int,
+        val format: Format?,
+        val pages: Int?,
+    )
+
+    private fun buildSeriesDownloadStates(
+        seriesInfoById: Map<Int, SeriesDownloadInfo>,
+        downloadedItems: List<DownloadedItemV2Entity>,
+        cachedDetails: Map<Int, InkitaDetailV2>,
+    ): Map<Int, DownloadState> {
+        val itemsBySeries =
+            downloadedItems
+                .filter { it.seriesId != null }
+                .groupBy { it.seriesId!! }
+        val result = mutableMapOf<Int, DownloadState>()
+        seriesInfoById.forEach { (id, info) ->
+            val items = itemsBySeries[id].orEmpty()
+            val detail = cachedDetails[id]
+            result[id] = resolveSeriesDownloadState(info, items, detail)
+        }
+        return result
+    }
+
+    private fun resolveSeriesDownloadState(
+        info: SeriesDownloadInfo,
+        items: List<DownloadedItemV2Entity>,
+        detail: InkitaDetailV2?,
+    ): DownloadState {
+        val format = info.format ?: Format.fromId(detail?.series?.format)
+        val completedPages =
+            items
+                .filter { it.type == DownloadedItemV2Entity.TYPE_PAGE }
+                .count { isItemPathPresent(it.localPath) }
+        val completedFiles =
+            items
+                .filter { it.type == DownloadedItemV2Entity.TYPE_FILE }
+                .count { isItemPathPresent(it.localPath) }
+        val expected =
+            if (format == Format.Pdf) {
+                val chapters = countChapters(detail?.detail)
+                if (chapters > 0) chapters else 0
+            } else {
+                val pages = info.pages?.takeIf { it > 0 } ?: sumPages(detail?.detail)
+                if (pages > 0) pages else 0
+            }
+        val completed =
+            when {
+                format == Format.Pdf -> completedFiles
+                completedPages > 0 -> completedPages
+                else -> completedFiles
+            }
+        val state =
+            when {
+                expected > 0 && completed >= expected -> DownloadState.Complete
+                completed > 0 -> DownloadState.Partial
+                else -> DownloadState.None
+            }
+        if (LoggingManager.isDebugEnabled()) {
+            val source = if (detail != null) "cache" else "fallback"
+            LoggingManager.d(
+                "BrowseBadge",
+                "series=${info.id} format=${format?.id} expected=$expected completed=$completed state=$state source=$source",
+            )
+        }
+        return state
+    }
+
+    private fun countChapters(detail: SeriesDetailDto?): Int =
+        collectChapters(detail).size
+
+    private fun sumPages(detail: SeriesDetailDto?): Int =
+        collectChapters(detail)
+            .sumOf { it.pages ?: 0 }
+
+    private fun collectChapters(
+        detail: SeriesDetailDto?,
+    ): List<net.dom53.inkita.data.api.dto.ChapterDto> {
+        if (detail == null) return emptyList()
+        return buildList {
+            detail.volumes?.forEach { volume ->
+                volume.chapters?.let { addAll(it) }
+            }
+            detail.chapters?.let { addAll(it) }
+            detail.specials?.let { addAll(it) }
+            detail.storylineChapters?.let { addAll(it) }
+        }.distinctBy { it.id }
+    }
+
+    private fun isItemPathPresent(path: String?): Boolean =
+        path?.let { java.io.File(it).exists() } == true
 
     private suspend fun browseCacheAllowed(): Boolean = cacheManager.policy().browseEnabled
 

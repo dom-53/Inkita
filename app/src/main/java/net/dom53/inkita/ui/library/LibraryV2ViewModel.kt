@@ -5,18 +5,25 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.data.api.dto.SeriesDetailDto
+import net.dom53.inkita.data.local.db.InkitaDatabase
+import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.domain.model.Collection
+import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.model.Library
 import net.dom53.inkita.domain.model.Person
 import net.dom53.inkita.domain.model.ReadingList
@@ -25,6 +32,8 @@ import net.dom53.inkita.domain.repository.LibraryRepository
 import net.dom53.inkita.domain.repository.PersonRepository
 import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
+import net.dom53.inkita.ui.common.DownloadState
+import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 
 data class HomeSeriesItem(
     val id: Int,
@@ -80,6 +89,7 @@ data class LibraryV2UiState(
     val canLoadMoreLibrarySeries: Boolean = true,
     val libraryAccessDenied: Boolean = false,
     val selectedSection: LibraryV2Section = LibraryV2Section.Home,
+    val downloadStates: Map<Int, DownloadState> = emptyMap(),
 )
 
 class LibraryV2ViewModel(
@@ -93,10 +103,14 @@ class LibraryV2ViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(LibraryV2UiState())
     val state: StateFlow<LibraryV2UiState> = _state
+    private val downloadDao =
+        InkitaDatabase.getInstance(appPreferences.appContext).downloadV2Dao()
+    private var lastDownloadedItems: List<DownloadedItemV2Entity> = emptyList()
 
     init {
         loadLibraries()
         loadHome()
+        observeDownloadStates()
     }
 
     fun selectSection(section: LibraryV2Section) {
@@ -289,16 +303,17 @@ class LibraryV2ViewModel(
             )
             val showDebugToast = appPreferences.debugToastsFlow.first()
             if (cachedHasData) {
-                _state.update {
-                    it.copy(
-                        onDeck = cachedOnDeck.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
-                        recentlyUpdated = cachedUpdated.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
-                        recentlyAdded = cachedAdded.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
-                        isHomeLoading = true,
-                        homeError = null,
-                    )
-                }
-                if (!isOnline || (!alwaysRefresh && !isStale)) {
+                    _state.update {
+                        it.copy(
+                            onDeck = cachedOnDeck.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
+                            recentlyUpdated = cachedUpdated.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
+                            recentlyAdded = cachedAdded.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
+                            isHomeLoading = true,
+                            homeError = null,
+                        )
+                    }
+                    updateDownloadStates(lastDownloadedItems)
+                    if (!isOnline || (!alwaysRefresh && !isStale)) {
                     logCacheDecision("home", "using cached data only")
                     if (showDebugToast) {
                         android.widget.Toast
@@ -417,6 +432,7 @@ class LibraryV2ViewModel(
                     homeError = error?.message,
                 )
             }
+            updateDownloadStates(lastDownloadedItems)
         }
     }
 
@@ -455,6 +471,7 @@ class LibraryV2ViewModel(
                     logCacheDecision("want", "using cached data only")
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isWantToReadLoading = false) }
+                    updateDownloadStates(lastDownloadedItems)
                     return@launch
                 }
                 val message =
@@ -482,6 +499,7 @@ class LibraryV2ViewModel(
                     wantToReadError = result.exceptionOrNull()?.message,
                 )
             }
+            updateDownloadStates(lastDownloadedItems)
             cacheManager.cacheLibraryV2SeriesList(
                 LibraryV2CacheKeys.WANT_TO_READ,
                 "",
@@ -660,6 +678,7 @@ class LibraryV2ViewModel(
                     logCacheDecision("people", "using cached data only")
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isPeopleLoading = false) }
+                    updateDownloadStates(lastDownloadedItems)
                     return@launch
                 }
                 val message =
@@ -681,15 +700,16 @@ class LibraryV2ViewModel(
             }
             val result = runCatching { personRepository.getBrowsePeople(pageNumber = 1, pageSize = 50) }
             val pageItems = result.getOrDefault(emptyList())
-            _state.update {
-                it.copy(
-                    people = pageItems,
-                    isPeopleLoading = false,
-                    peopleError = result.exceptionOrNull()?.message,
-                    peoplePage = 1,
-                    canLoadMorePeople = pageItems.size == 50,
-                )
-            }
+                _state.update {
+                    it.copy(
+                        people = pageItems,
+                        isPeopleLoading = false,
+                        peopleError = result.exceptionOrNull()?.message,
+                        peoplePage = 1,
+                        canLoadMorePeople = pageItems.size == 50,
+                    )
+                }
+            updateDownloadStates(lastDownloadedItems)
             cacheManager.cacheLibraryV2People(
                 LibraryV2CacheKeys.BROWSE_PEOPLE,
                 1,
@@ -735,6 +755,7 @@ class LibraryV2ViewModel(
                     canLoadMoreLibrarySeries = pageItems.size == 25,
                 )
             }
+            updateDownloadStates(lastDownloadedItems)
         }
     }
 
@@ -777,6 +798,7 @@ class LibraryV2ViewModel(
                     canLoadMorePeople = pageItems.size == 50,
                 )
             }
+            updateDownloadStates(lastDownloadedItems)
         }
     }
 
@@ -816,6 +838,7 @@ class LibraryV2ViewModel(
                     logCacheDecision("collection:$collectionId", "using cached data only")
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isCollectionSeriesLoading = false) }
+                    updateDownloadStates(lastDownloadedItems)
                     return@launch
                 }
                 val message =
@@ -843,6 +866,7 @@ class LibraryV2ViewModel(
                     collectionSeriesError = result.exceptionOrNull()?.message,
                 )
             }
+            updateDownloadStates(lastDownloadedItems)
             cacheManager.cacheLibraryV2SeriesList(
                 LibraryV2CacheKeys.COLLECTION_SERIES,
                 cacheKey,
@@ -900,6 +924,162 @@ class LibraryV2ViewModel(
             maybeShowDebugToast(message)
         }
     }
+
+    private fun observeDownloadStates() {
+        viewModelScope.launch {
+            downloadDao
+                .observeItemsByStatus(DownloadedItemV2Entity.STATUS_COMPLETED)
+                .collectLatest { items ->
+                    lastDownloadedItems = items
+                    updateDownloadStates(items)
+                }
+        }
+    }
+
+    private suspend fun updateDownloadStates(items: List<DownloadedItemV2Entity>) {
+        val seriesInfoById = buildSeriesInfoMap(_state.value)
+        if (seriesInfoById.isEmpty()) {
+            _state.update { it.copy(downloadStates = emptyMap()) }
+            return
+        }
+        val cacheIds =
+            seriesInfoById.values
+                .filter { info ->
+                    info.format == null ||
+                        info.format == Format.Pdf ||
+                        (info.pages ?: 0) <= 0
+                }.map { it.id }
+                .distinct()
+                .sorted()
+        val cachedDetails =
+            withContext(Dispatchers.IO) {
+                val result = mutableMapOf<Int, InkitaDetailV2>()
+                cacheIds.forEach { id ->
+                    cacheManager.getCachedSeriesDetailV2(id)?.let { result[id] = it }
+                }
+                result
+            }
+        val states =
+            buildSeriesDownloadStates(
+                seriesInfoById = seriesInfoById,
+                downloadedItems = items,
+                cachedDetails = cachedDetails,
+            )
+        _state.update { it.copy(downloadStates = states) }
+    }
+
+    private data class SeriesDownloadInfo(
+        val id: Int,
+        val format: Format?,
+        val pages: Int?,
+    )
+
+    private fun buildSeriesInfoMap(state: LibraryV2UiState): Map<Int, SeriesDownloadInfo> {
+        val map = mutableMapOf<Int, SeriesDownloadInfo>()
+        fun add(
+            id: Int,
+            format: Format?,
+            pages: Int?,
+        ) {
+            val current = map[id]
+            val resolvedFormat = format ?: current?.format
+            val resolvedPages = pages ?: current?.pages
+            map[id] = SeriesDownloadInfo(id, resolvedFormat, resolvedPages)
+        }
+        state.onDeck.forEach { add(it.id, null, null) }
+        state.recentlyUpdated.forEach { add(it.id, null, null) }
+        state.recentlyAdded.forEach { add(it.id, null, null) }
+        state.wantToRead.forEach { add(it.id, it.format, it.pages) }
+        state.collectionSeries.forEach { add(it.id, it.format, it.pages) }
+        state.librarySeries.forEach { add(it.id, it.format, it.pages) }
+        return map
+    }
+
+    private fun buildSeriesDownloadStates(
+        seriesInfoById: Map<Int, SeriesDownloadInfo>,
+        downloadedItems: List<DownloadedItemV2Entity>,
+        cachedDetails: Map<Int, InkitaDetailV2>,
+    ): Map<Int, DownloadState> {
+        val itemsBySeries =
+            downloadedItems
+                .filter { it.seriesId != null }
+                .groupBy { it.seriesId!! }
+        val result = mutableMapOf<Int, DownloadState>()
+        seriesInfoById.forEach { (id, info) ->
+            val items = itemsBySeries[id].orEmpty()
+            val detail = cachedDetails[id]
+            result[id] = resolveSeriesDownloadState(info, items, detail)
+        }
+        return result
+    }
+
+    private fun resolveSeriesDownloadState(
+        info: SeriesDownloadInfo,
+        items: List<DownloadedItemV2Entity>,
+        detail: InkitaDetailV2?,
+    ): DownloadState {
+        val format = info.format ?: Format.fromId(detail?.series?.format)
+        val completedPages =
+            items
+                .filter { it.type == DownloadedItemV2Entity.TYPE_PAGE }
+                .count { isItemPathPresent(it.localPath) }
+        val completedFiles =
+            items
+                .filter { it.type == DownloadedItemV2Entity.TYPE_FILE }
+                .count { isItemPathPresent(it.localPath) }
+        val expected =
+            if (format == Format.Pdf) {
+                val chapters = countChapters(detail?.detail)
+                if (chapters > 0) chapters else 0
+            } else {
+                val pages = info.pages?.takeIf { it > 0 } ?: sumPages(detail?.detail)
+                if (pages > 0) pages else 0
+            }
+        val completed =
+            when {
+                format == Format.Pdf -> completedFiles
+                completedPages > 0 -> completedPages
+                else -> completedFiles
+            }
+        val state =
+            when {
+                expected > 0 && completed >= expected -> DownloadState.Complete
+                completed > 0 -> DownloadState.Partial
+                else -> DownloadState.None
+            }
+        if (LoggingManager.isDebugEnabled()) {
+            val source = if (detail != null) "cache" else "fallback"
+            LoggingManager.d(
+                "LibraryV2Badge",
+                "series=${info.id} format=${format?.id} expected=$expected completed=$completed state=$state source=$source",
+            )
+        }
+        return state
+    }
+
+    private fun countChapters(detail: SeriesDetailDto?): Int =
+        collectChapters(detail).size
+
+    private fun sumPages(detail: SeriesDetailDto?): Int =
+        collectChapters(detail)
+            .sumOf { it.pages ?: 0 }
+
+    private fun collectChapters(
+        detail: SeriesDetailDto?,
+    ): List<net.dom53.inkita.data.api.dto.ChapterDto> {
+        if (detail == null) return emptyList()
+        return buildList {
+            detail.volumes?.forEach { volume ->
+                volume.chapters?.let { addAll(it) }
+            }
+            detail.chapters?.let { addAll(it) }
+            detail.specials?.let { addAll(it) }
+            detail.storylineChapters?.let { addAll(it) }
+        }.distinctBy { it.id }
+    }
+
+    private fun isItemPathPresent(path: String?): Boolean =
+        path?.let { java.io.File(it).exists() } == true
 
     companion object {
         fun provideFactory(

@@ -50,7 +50,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -69,29 +68,22 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
 import net.dom53.inkita.core.cache.CacheManager
-import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
-import net.dom53.inkita.data.local.db.InkitaDatabase
-import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
 import net.dom53.inkita.domain.repository.PersonRepository
 import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
-import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.ui.common.DownloadState
 import net.dom53.inkita.ui.common.DownloadStateBadge
 import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.personCoverUrl
 import net.dom53.inkita.ui.common.readingListCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
-import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items as rowItems
 
@@ -135,49 +127,7 @@ fun LibraryV2Screen(
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
-    val downloadDao =
-        remember(context.applicationContext) {
-            InkitaDatabase.getInstance(context.applicationContext).downloadV2Dao()
-        }
-    val downloadedItems by
-        downloadDao
-            .observeItemsByStatus(DownloadedItemV2Entity.STATUS_COMPLETED)
-            .collectAsState(initial = emptyList())
-    val seriesInfoById =
-        remember(uiState) {
-            buildSeriesInfoMap(uiState)
-        }
-    val cacheIds =
-        remember(seriesInfoById) {
-            seriesInfoById.values
-                .filter { info ->
-                    info.format == null ||
-                        info.format == Format.Pdf ||
-                        (info.pages ?: 0) <= 0
-                }.map { it.id }
-                .distinct()
-                .sorted()
-        }
-    val cachedDetails by produceState(
-        initialValue = emptyMap<Int, InkitaDetailV2>(),
-        key1 = cacheIds,
-    ) {
-        val result = mutableMapOf<Int, InkitaDetailV2>()
-        withContext(Dispatchers.IO) {
-            cacheIds.forEach { id ->
-                cacheManager.getCachedSeriesDetailV2(id)?.let { result[id] = it }
-            }
-        }
-        value = result
-    }
-    val downloadStates =
-        remember(seriesInfoById, downloadedItems, cachedDetails) {
-            buildSeriesDownloadStates(
-                seriesInfoById = seriesInfoById,
-                downloadedItems = downloadedItems,
-                cachedDetails = cachedDetails,
-            )
-        }
+    val downloadStates = uiState.downloadStates
     val showDrawerDebug = false
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -1098,119 +1048,6 @@ private fun PersonCard(
         )
     }
 }
-
-private data class SeriesDownloadInfo(
-    val id: Int,
-    val format: Format?,
-    val pages: Int?,
-)
-
-private fun buildSeriesInfoMap(uiState: LibraryV2UiState): Map<Int, SeriesDownloadInfo> {
-    val map = mutableMapOf<Int, SeriesDownloadInfo>()
-    fun add(
-        id: Int,
-        format: Format?,
-        pages: Int?,
-    ) {
-        val current = map[id]
-        val resolvedFormat = format ?: current?.format
-        val resolvedPages = pages ?: current?.pages
-        map[id] = SeriesDownloadInfo(id, resolvedFormat, resolvedPages)
-    }
-    uiState.onDeck.forEach { add(it.id, null, null) }
-    uiState.recentlyUpdated.forEach { add(it.id, null, null) }
-    uiState.recentlyAdded.forEach { add(it.id, null, null) }
-    uiState.wantToRead.forEach { add(it.id, it.format, it.pages) }
-    uiState.collectionSeries.forEach { add(it.id, it.format, it.pages) }
-    uiState.librarySeries.forEach { add(it.id, it.format, it.pages) }
-    return map
-}
-
-private fun buildSeriesDownloadStates(
-    seriesInfoById: Map<Int, SeriesDownloadInfo>,
-    downloadedItems: List<DownloadedItemV2Entity>,
-    cachedDetails: Map<Int, InkitaDetailV2>,
-): Map<Int, DownloadState> {
-    val itemsBySeries =
-        downloadedItems
-            .filter { it.seriesId != null }
-            .groupBy { it.seriesId!! }
-    val result = mutableMapOf<Int, DownloadState>()
-    seriesInfoById.forEach { (id, info) ->
-        val items = itemsBySeries[id].orEmpty()
-        val detail = cachedDetails[id]
-        result[id] = resolveSeriesDownloadState(info, items, detail)
-    }
-    return result
-}
-
-private fun resolveSeriesDownloadState(
-    info: SeriesDownloadInfo,
-    items: List<DownloadedItemV2Entity>,
-    detail: InkitaDetailV2?,
-): DownloadState {
-    val format = info.format ?: Format.fromId(detail?.series?.format)
-    val completedPages =
-        items
-            .filter { it.type == DownloadedItemV2Entity.TYPE_PAGE }
-            .count { isItemPathPresent(it.localPath) }
-    val completedFiles =
-        items
-            .filter { it.type == DownloadedItemV2Entity.TYPE_FILE }
-            .count { isItemPathPresent(it.localPath) }
-    val expected =
-        if (format == Format.Pdf) {
-            val chapters = countChapters(detail?.detail)
-            if (chapters > 0) chapters else 0
-        } else {
-            val pages = info.pages?.takeIf { it > 0 } ?: sumPages(detail?.detail)
-            if (pages > 0) pages else 0
-        }
-    val completed =
-        when {
-            format == Format.Pdf -> completedFiles
-            completedPages > 0 -> completedPages
-            else -> completedFiles
-        }
-    val state =
-        when {
-            expected > 0 && completed >= expected -> DownloadState.Complete
-            completed > 0 -> DownloadState.Partial
-            else -> DownloadState.None
-        }
-    if (LoggingManager.isDebugEnabled()) {
-        val source = if (detail != null) "cache" else "fallback"
-        LoggingManager.d(
-            "LibraryV2Badge",
-            "series=${info.id} format=${format?.id} expected=$expected completed=$completed state=$state source=$source",
-        )
-    }
-    return state
-}
-
-private fun countChapters(detail: net.dom53.inkita.data.api.dto.SeriesDetailDto?): Int =
-    collectChapters(detail).size
-
-private fun sumPages(detail: net.dom53.inkita.data.api.dto.SeriesDetailDto?): Int =
-    collectChapters(detail)
-        .sumOf { it.pages ?: 0 }
-
-private fun collectChapters(
-    detail: net.dom53.inkita.data.api.dto.SeriesDetailDto?,
-): List<net.dom53.inkita.data.api.dto.ChapterDto> {
-    if (detail == null) return emptyList()
-    return buildList {
-        detail.volumes?.forEach { volume ->
-            volume.chapters?.let { addAll(it) }
-        }
-        detail.chapters?.let { addAll(it) }
-        detail.specials?.let { addAll(it) }
-        detail.storylineChapters?.let { addAll(it) }
-    }.distinctBy { it.id }
-}
-
-private fun isItemPathPresent(path: String?): Boolean =
-    path?.let { java.io.File(it).exists() } == true
 
 @Composable
 private fun LibrarySeriesGrid(
