@@ -521,7 +521,7 @@ fun InkitaApp(
                     }
                     composable(MainScreen.Downloads.route) {
                         val ctx = LocalContext.current
-                        val vm = remember { DownloadQueueViewModelFactory.create(ctx) }
+                        val vm = remember { DownloadQueueViewModelFactory.create(ctx, cacheManager) }
                         DownloadQueueScreen(viewModel = vm)
                     }
                     composable(MainScreen.Settings.route) {

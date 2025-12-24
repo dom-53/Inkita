@@ -266,6 +266,9 @@
     <string name="download_item_updated">Aktualizováno: %1$s</string>
     <string name="download_item_chapter_pages">Kapitola %1$s stránky %2$s..%3$s</string>
     <string name="download_type_volume">Svazek</string>
+    <string name="download_info_series">Série: %1$s</string>
+    <string name="download_info_volume">Svazek: %1$s</string>
+    <string name="download_info_chapter">Kapitola: %1$s</string>
     <string name="download_completed_title">Série %1$s · Kapitola %2$s · Strana %3$s</string>
     <string name="download_completed_status">Stav: %1$s</string>
     <string name="download_completed_size">Velikost: %1$s</string>

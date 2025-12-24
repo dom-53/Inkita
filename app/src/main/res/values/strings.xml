@@ -449,6 +449,9 @@
     <string name="download_type_volume">Volume</string>
     <string name="download_item_title">Series %1$s · %2$s</string>
     <string name="download_item_chapter_pages">Chapter %1$s pages %2$s..%3$s</string>
+    <string name="download_info_series">Series: %1$s</string>
+    <string name="download_info_volume">Volume: %1$s</string>
+    <string name="download_info_chapter">Chapter: %1$s</string>
     <string name="download_item_state">State: %1$s</string>
     <string name="download_item_created">Created: %1$s</string>
     <string name="download_item_updated">Updated: %1$s</string>
