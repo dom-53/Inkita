@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
+import net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
@@ -76,6 +77,12 @@ class DownloadWorkerV2(
             when (job.strategy) {
                 EpubDownloadStrategyV2.FORMAT_EPUB ->
                     EpubDownloadStrategyV2(
+                        appContext = applicationContext,
+                        downloadDao = dao,
+                        appPreferences = appPreferences,
+                    )
+                PdfDownloadStrategyV2.FORMAT_PDF ->
+                    PdfDownloadStrategyV2(
                         appContext = applicationContext,
                         downloadDao = dao,
                         appPreferences = appPreferences,

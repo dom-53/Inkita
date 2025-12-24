@@ -81,6 +81,21 @@ interface DownloadV2Dao {
     @Query("DELETE FROM download_items_v2 WHERE id = :itemId")
     suspend fun deleteItemById(itemId: Long)
 
+    @Query(
+        """
+        SELECT * FROM download_items_v2
+        WHERE chapterId = :chapterId
+          AND type = :type
+          AND status = :status
+        LIMIT 1
+        """,
+    )
+    suspend fun getDownloadedFileForChapter(
+        chapterId: Int,
+        type: String = net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.TYPE_FILE,
+        status: String = net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED,
+    ): net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity?
+
     @Query("DELETE FROM download_items_v2 WHERE jobId IN (SELECT id FROM download_jobs_v2 WHERE seriesId = :seriesId)")
     suspend fun deleteItemsForSeries(seriesId: Int)
 

@@ -198,7 +198,7 @@ class AppPreferences(
     val libraryCacheBrowsePeopleFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_BROWSE_PEOPLE] ?: false }
     val libraryCacheDetailsFlow: Flow<Boolean> =
-        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_DETAILS] ?: false }
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_DETAILS] ?: true }
     val offlineModeFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_OFFLINE_MODE] ?: false }
     val cacheRefreshTtlMinutesFlow: Flow<Int> =

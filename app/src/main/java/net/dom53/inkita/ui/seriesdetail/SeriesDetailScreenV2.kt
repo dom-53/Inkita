@@ -74,6 +74,7 @@ import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
+import net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
@@ -169,8 +170,14 @@ fun SeriesDetailScreenV2(
             .collectAsState(initial = emptyList())
     val downloadManagerV2 =
         remember(context.applicationContext) {
-            val strategy =
+            val epubStrategy =
                 EpubDownloadStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                )
+            val pdfStrategy =
+                PdfDownloadStrategyV2(
                     appContext = context.applicationContext,
                     downloadDao = downloadDao,
                     appPreferences = appPreferences,
@@ -178,7 +185,8 @@ fun SeriesDetailScreenV2(
             DownloadManagerV2(
                 appContext = context.applicationContext,
                 downloadDao = downloadDao,
-                strategies = mapOf(strategy.key to strategy),
+                strategies =
+                    listOf(epubStrategy, pdfStrategy).associateBy { it.key },
             )
         }
     LaunchedEffect(selectedSpecialChapter?.id, offlineMode, config.serverUrl, config.apiKey) {
@@ -235,7 +243,9 @@ fun SeriesDetailScreenV2(
                                 }
                                 val detail = uiState.detail
                                 val format = Format.fromId(detail?.series?.format)
-                                if (format != Format.Epub) {
+                                val isPdf = format == Format.Pdf
+                                val isEpub = format == Format.Epub
+                                if (!isPdf && !isEpub) {
                                     Toast
                                         .makeText(
                                             context,
@@ -272,7 +282,7 @@ fun SeriesDetailScreenV2(
                                                 add(chapter to chapter.volumeId)
                                             }
                                     }.distinctBy { it.first.id }
-                                        .filter { (it.first.pages ?: 0) > 0 }
+                                        .filter { isPdf || (it.first.pages ?: 0) > 0 }
                                 if (chaptersWithVolume.isEmpty()) {
                                     Toast
                                         .makeText(
@@ -285,11 +295,11 @@ fun SeriesDetailScreenV2(
                                 scope.launch {
                                     val sid = detail?.series?.id ?: seriesId
                                     chaptersWithVolume.forEach { (chapter, volumeId) ->
-                                        val pages = chapter.pages ?: return@forEach
+                                        val pages = if (isPdf) 1 else chapter.pages ?: return@forEach
                                         val request =
                                             DownloadRequestV2(
                                                 type = DownloadJobV2Entity.TYPE_CHAPTER,
-                                                format = EpubDownloadStrategyV2.FORMAT_EPUB,
+                                                format = formatKeyFor(detail?.series?.format),
                                                 seriesId = sid,
                                                 volumeId = volumeId,
                                                 chapterId = chapter.id,
@@ -618,6 +628,7 @@ fun SeriesDetailScreenV2(
                         if (selectedTab == SeriesDetailTab.Books) {
                             val volumes = detail?.detail?.volumes.orEmpty()
                             LaunchedEffect(volumes, downloadedItemsBySeries.value) {
+                                val isPdf = Format.fromId(detail?.series?.format) == Format.Pdf
                                 val items = downloadedItemsBySeries.value
                                 val grouped =
                                     items
@@ -631,12 +642,16 @@ fun SeriesDetailScreenV2(
                                                 isItemPathPresent(item.localPath)
                                         }
                                     val expected =
-                                        volume.pages
-                                            ?.takeIf { it > 0 }
-                                            ?: volume.chapters
-                                                ?.sumOf { it.pages ?: 0 }
+                                        if (isPdf) {
+                                            volume.chapters?.size ?: 0
+                                        } else {
+                                            volume.pages
                                                 ?.takeIf { it > 0 }
-                                            ?: 0
+                                                ?: volume.chapters
+                                                    ?.sumOf { it.pages ?: 0 }
+                                                    ?.takeIf { it > 0 }
+                                                ?: 0
+                                        }
                                     val state =
                                         when {
                                             expected > 0 && completed >= expected -> DownloadVolumeState.Complete
@@ -664,6 +679,7 @@ fun SeriesDetailScreenV2(
                                 },
                                 onLongPressVolume = { volume ->
                                     scope.launch {
+                                        val isPdf = Format.fromId(detail?.series?.format) == Format.Pdf
                                         val completed =
                                             downloadedItemsBySeries.value
                                                 .filter { it.volumeId == volume.id }
@@ -673,12 +689,16 @@ fun SeriesDetailScreenV2(
                                                         isItemPathPresent(item.localPath)
                                                 }
                                         val expected =
-                                            volume.pages
-                                                ?.takeIf { it > 0 }
-                                                ?: volume.chapters
-                                                    ?.sumOf { it.pages ?: 0 }
+                                            if (isPdf) {
+                                                volume.chapters?.size ?: 0
+                                            } else {
+                                                volume.pages
                                                     ?.takeIf { it > 0 }
-                                                ?: 0
+                                                    ?: volume.chapters
+                                                        ?.sumOf { it.pages ?: 0 }
+                                                        ?.takeIf { it > 0 }
+                                                    ?: 0
+                                            }
                                         downloadVolumeState =
                                             when {
                                                 expected > 0 && completed >= expected -> DownloadVolumeState.Complete
@@ -699,6 +719,7 @@ fun SeriesDetailScreenV2(
                             var selectedSpecial by remember { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
                             var specialDownloadState by remember { mutableStateOf(ChapterDownloadState.None) }
                             LaunchedEffect(specials, downloadedItemsBySeries.value) {
+                                val isPdf = Format.fromId(detail?.series?.format) == Format.Pdf
                                 val items = downloadedItemsBySeries.value
                                 val grouped = items.groupBy { it.chapterId }
                                 specials.forEach { chapter ->
@@ -709,7 +730,7 @@ fun SeriesDetailScreenV2(
                                                 net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
                                                 isItemPathPresent(item.localPath)
                                         }
-                                    val expected = chapter.pages?.takeIf { it > 0 } ?: 0
+                                    val expected = if (isPdf) 1 else chapter.pages?.takeIf { it > 0 } ?: 0
                                     val state =
                                         when {
                                             expected > 0 && completed >= expected -> ChapterDownloadState.Complete
@@ -765,7 +786,7 @@ fun SeriesDetailScreenV2(
                                                 val request =
                                                     DownloadRequestV2(
                                                         type = DownloadJobV2Entity.TYPE_CHAPTER,
-                                                        format = EpubDownloadStrategyV2.FORMAT_EPUB,
+                                                        format = formatKeyFor(detail?.series?.format),
                                                         seriesId = seriesId,
                                                         volumeId = target.volumeId,
                                                         chapterId = target.id,
@@ -849,7 +870,21 @@ fun SeriesDetailScreenV2(
                                         }
                                     },
                                     onOpenPage = { target, page ->
-                                        if ((offlineMode || !NetworkUtils.isOnline(context)) && !downloadedPages.contains(page)) {
+                                        val isPdf = Format.fromId(detail?.series?.format) == Format.Pdf
+                                        val pdfDownloaded =
+                                            if (isPdf) {
+                                                downloadedItemsBySeries.value.any { item ->
+                                                    item.chapterId == target.id &&
+                                                        item.type ==
+                                                        net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.TYPE_FILE &&
+                                                        item.status ==
+                                                        net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                        isItemPathPresent(item.localPath)
+                                                }
+                                            } else {
+                                                false
+                                            }
+                                        if ((offlineMode || !NetworkUtils.isOnline(context)) && !(isPdf && pdfDownloaded) && !downloadedPages.contains(page)) {
                                             Toast
                                                 .makeText(
                                                     context,
@@ -981,7 +1016,9 @@ fun SeriesDetailScreenV2(
                                                     return@Button
                                                 }
                                                 val format = Format.fromId(detail?.series?.format)
-                                                if (format != Format.Epub) {
+                                                val isPdf = format == Format.Pdf
+                                                val isEpub = format == Format.Epub
+                                                if (!isPdf && !isEpub) {
                                                     Toast
                                                         .makeText(
                                                             context,
@@ -990,8 +1027,8 @@ fun SeriesDetailScreenV2(
                                                         ).show()
                                                     return@Button
                                                 }
-                                                val pages = target.pages ?: 0
-                                                if (pages <= 0) {
+                                                val pages = if (isPdf) 1 else target.pages ?: 0
+                                                if (!isPdf && pages <= 0) {
                                                     Toast
                                                         .makeText(
                                                             context,
@@ -1004,7 +1041,7 @@ fun SeriesDetailScreenV2(
                                                     val request =
                                                         DownloadRequestV2(
                                                             type = DownloadJobV2Entity.TYPE_CHAPTER,
-                                                            format = EpubDownloadStrategyV2.FORMAT_EPUB,
+                                                            format = formatKeyFor(detail?.series?.format),
                                                             seriesId = seriesId,
                                                             volumeId = target.volumeId,
                                                             chapterId = target.id,
@@ -1198,7 +1235,9 @@ fun SeriesDetailScreenV2(
                                 }
                                 val detail = uiState.detail
                                 val format = Format.fromId(detail?.series?.format)
-                                if (format != Format.Epub) {
+                                val isPdf = format == Format.Pdf
+                                val isEpub = format == Format.Epub
+                                if (!isPdf && !isEpub) {
                                     Toast
                                         .makeText(
                                             context,
@@ -1208,8 +1247,12 @@ fun SeriesDetailScreenV2(
                                     return@Button
                                 }
                                 val chapters =
-                                    volume.chapters
-                                        ?.filter { (it.pages ?: 0) > 0 }
+                                    if (isPdf) {
+                                        volume.chapters.orEmpty()
+                                    } else {
+                                        volume.chapters
+                                            ?.filter { (it.pages ?: 0) > 0 }
+                                    }
                                         .orEmpty()
                                 if (chapters.isEmpty()) {
                                     Toast
@@ -1223,11 +1266,11 @@ fun SeriesDetailScreenV2(
                                 scope.launch {
                                     val seriesId = detail?.series?.id ?: seriesId
                                     chapters.forEach { chapter ->
-                                        val pages = chapter.pages ?: return@forEach
+                                        val pages = if (isPdf) 1 else chapter.pages ?: return@forEach
                                         val request =
                                             DownloadRequestV2(
                                                 type = DownloadJobV2Entity.TYPE_CHAPTER,
-                                                format = EpubDownloadStrategyV2.FORMAT_EPUB,
+                                                format = formatKeyFor(detail?.series?.format),
                                                 seriesId = seriesId,
                                                 volumeId = volume.id,
                                                 chapterId = chapter.id,
@@ -1539,6 +1582,13 @@ private fun webUrl(
     val base = if (config.serverUrl.endsWith("/")) config.serverUrl.dropLast(1) else config.serverUrl
     return "$base/library/$libraryId/series/$seriesId"
 }
+
+private fun formatKeyFor(formatId: Int?): String =
+    if (Format.fromId(formatId) == Format.Pdf) {
+        PdfDownloadStrategyV2.FORMAT_PDF
+    } else {
+        EpubDownloadStrategyV2.FORMAT_EPUB
+    }
 
 @Composable
 private fun ActionsRowV2(

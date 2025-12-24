@@ -135,9 +135,15 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
                                         } else {
                                             Uri.fromFile(File(path))
                                         }
+                                    val mime =
+                                        if (page.type == DownloadedItemV2Entity.TYPE_FILE || path.endsWith(".pdf")) {
+                                            "application/pdf"
+                                        } else {
+                                            "text/html"
+                                        }
                                     val intent =
                                         Intent(Intent.ACTION_VIEW)
-                                            .setDataAndType(uri, "text/html")
+                                            .setDataAndType(uri, mime)
                                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     runCatching { context.startActivity(intent) }
                                 },

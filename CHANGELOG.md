@@ -7,13 +7,16 @@ All notable changes to this project will be documented here.
 ### Added
 - Series Detail V2: Clicking a collection opens Library V2 collections with that collection selected.
 - Series Detail V2: Tapping a genre or tag opens Browse with the filter pre-applied.
+- Downloads V2: PDF download requests now enqueue and appear in the Download Queue.
 
 ### Changed
 - Reader: Split EpubReaderViewModel and PdfReaderViewModel into separate files.
 - UI: Rounded corners aligned across Library V2, Series Detail V2, and Volume Detail V2 covers.
+- Downloads V2: Downloaded PDF items now open with the correct MIME type.
 
 ### Fixed
 - Navigation: Bottom bar now remains visible when opening Library/Browse with query params (collections/tags/genres).
+- Cache: Series Detail V2 caching now defaults to enabled to prevent offline cache misses.
 
 ## v0.3.0-beta
 

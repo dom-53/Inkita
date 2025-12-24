@@ -2,7 +2,6 @@ package net.dom53.inkita.data.repository
 
 import android.content.Context
 import android.net.Uri
-import android.os.Environment
 import kotlinx.coroutines.flow.first
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkMonitor
@@ -12,6 +11,7 @@ import net.dom53.inkita.data.local.db.dao.DownloadDao
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
 import net.dom53.inkita.data.local.db.entity.CachedPageEntity
+import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
 import net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity
@@ -213,10 +213,19 @@ class ReaderRepositoryImpl(
         val config = appPreferences.configFlow.first()
         val target =
             File(
-                context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
-                "Inkita/pdfs/inkita-pdf-$chapterId.pdf",
+                context.getExternalFilesDir("Inkita/downloads/pdfs"),
+                "pdf-$chapterId.pdf",
             )
-        if (target.exists()) return target
+        val existing =
+            downloadV2Dao
+                ?.getDownloadedFileForChapter(chapterId)
+        if (existing != null && existing.localPath?.let { File(it).exists() } == true) {
+            return File(existing.localPath!!)
+        }
+        if (target.exists()) {
+            recordPdfDownloadIfMissing(chapterId, target)
+            return target
+        }
 
         val api =
             try {
@@ -238,7 +247,87 @@ class ReaderRepositoryImpl(
                 input.copyTo(out)
             }
         }
+        recordPdfDownloadIfMissing(chapterId, target)
         return target
+    }
+
+    private suspend fun recordPdfDownloadIfMissing(
+        chapterId: Int,
+        target: File,
+    ) {
+        val dao = downloadV2Dao ?: return
+        val now = System.currentTimeMillis()
+        val existingItems = dao.getItemsForChapter(chapterId)
+        val fileItem =
+            existingItems.firstOrNull { it.type == DownloadedItemV2Entity.TYPE_FILE }
+        val bookInfo = getBookInfo(chapterId)
+        val seriesId = fileItem?.seriesId ?: bookInfo?.seriesId
+        val volumeId = fileItem?.volumeId ?: bookInfo?.volumeId
+        val bytes = target.length()
+        if (fileItem != null) {
+            dao.upsertItems(
+                listOf(
+                    fileItem.copy(
+                        seriesId = seriesId,
+                        volumeId = volumeId,
+                        localPath = target.absolutePath,
+                        bytes = bytes,
+                        status = DownloadedItemV2Entity.STATUS_COMPLETED,
+                        updatedAt = now,
+                        error = null,
+                    ),
+                ),
+            )
+            val jobId = fileItem.jobId
+            dao.getJob(jobId)?.let { job ->
+                dao.updateJob(
+                    job.copy(
+                        seriesId = seriesId ?: job.seriesId,
+                        volumeId = volumeId ?: job.volumeId,
+                        status = DownloadJobV2Entity.STATUS_COMPLETED,
+                        completedItems = 1,
+                        updatedAt = now,
+                        error = null,
+                    ),
+                )
+            }
+            return
+        }
+        val job =
+            DownloadJobV2Entity(
+                type = DownloadJobV2Entity.TYPE_CHAPTER,
+                format = net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2.FORMAT_PDF,
+                strategy = net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2.FORMAT_PDF,
+                seriesId = seriesId,
+                volumeId = volumeId,
+                chapterId = chapterId,
+                status = DownloadJobV2Entity.STATUS_COMPLETED,
+                totalItems = 1,
+                completedItems = 1,
+                priority = 0,
+                createdAt = now,
+                updatedAt = now,
+                error = null,
+            )
+        val jobId = dao.insertJob(job)
+        val item =
+            DownloadedItemV2Entity(
+                jobId = jobId,
+                type = DownloadedItemV2Entity.TYPE_FILE,
+                seriesId = seriesId,
+                volumeId = volumeId,
+                chapterId = chapterId,
+                page = null,
+                url = null,
+                localPath = target.absolutePath,
+                bytes = bytes,
+                checksum = null,
+                status = DownloadedItemV2Entity.STATUS_COMPLETED,
+                createdAt = now,
+                updatedAt = now,
+                error = null,
+            )
+        dao.upsertItems(listOf(item))
     }
 
     override suspend fun getNextChapter(
