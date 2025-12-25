@@ -19,6 +19,7 @@ import net.dom53.inkita.data.mapper.toDomain
 import net.dom53.inkita.data.mapper.toDto
 import net.dom53.inkita.domain.model.ReaderBookInfo
 import net.dom53.inkita.domain.model.ReaderChapterNav
+import net.dom53.inkita.domain.model.ReaderImageResult
 import net.dom53.inkita.domain.model.ReaderPageResult
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.ReaderTimeLeft
@@ -103,6 +104,29 @@ class ReaderRepositoryImpl(
         if (cached != null) return ReaderPageResult(cached, false)
 
         throw PageNotDownloadedException("Page not downloaded for offline reading")
+    }
+
+    override suspend fun getImageResult(
+        chapterId: Int,
+        page: Int,
+    ): ReaderImageResult {
+        val downloadedV2 = downloadV2Dao?.getDownloadedPageForChapter(chapterId, page)
+        val downloadedPath =
+            downloadedV2?.localPath?.takeIf { isPathPresent(it) }
+        if (downloadedPath != null) {
+            return ReaderImageResult(downloadedPath, true)
+        }
+        if (!isOnlineAllowed()) {
+            throw PageNotDownloadedException("Page not downloaded for offline reading")
+        }
+        val config = appPreferences.configFlow.first()
+        if (!config.isConfigured) {
+            throw IOException("Server or API key not configured")
+        }
+        val base = if (config.serverUrl.endsWith("/")) config.serverUrl.dropLast(1) else config.serverUrl
+        val keyParam = config.apiKey.takeIf { it.isNotBlank() }?.let { "&apiKey=$it" } ?: ""
+        val url = "$base/api/reader/image?chapterId=$chapterId&page=$page$keyParam"
+        return ReaderImageResult(url, false)
     }
 
     override suspend fun getPage(

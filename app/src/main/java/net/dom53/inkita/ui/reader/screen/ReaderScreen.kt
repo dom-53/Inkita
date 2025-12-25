@@ -136,6 +136,19 @@ fun ReaderScreen(
             onBack = onBack,
             onNavigateToChapter = onNavigateToChapter,
         )
+    } else if (format == Format.Image || format == Format.Archive) {
+        ImageReaderScreen(
+            chapterId = chapterId,
+            initialPage = initialPage,
+            readerRepository = readerRepository,
+            appPreferences = appPreferences,
+            seriesId = seriesId,
+            volumeId = volumeId,
+            serverUrl = serverUrl,
+            apiKey = apiKey,
+            onBack = onBack,
+            onNavigateToChapter = onNavigateToChapter,
+        )
     } else {
         EpubReaderScreen(
             chapterId = chapterId,

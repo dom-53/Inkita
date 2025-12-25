@@ -2,6 +2,7 @@ package net.dom53.inkita.domain.repository
 
 import net.dom53.inkita.domain.model.ReaderBookInfo
 import net.dom53.inkita.domain.model.ReaderChapterNav
+import net.dom53.inkita.domain.model.ReaderImageResult
 import net.dom53.inkita.domain.model.ReaderPageResult
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.ReaderTimeLeft
@@ -11,6 +12,11 @@ interface ReaderRepository {
         chapterId: Int,
         page: Int,
     ): ReaderPageResult
+
+    suspend fun getImageResult(
+        chapterId: Int,
+        page: Int,
+    ): ReaderImageResult
 
     suspend fun isPageDownloaded(
         chapterId: Int,

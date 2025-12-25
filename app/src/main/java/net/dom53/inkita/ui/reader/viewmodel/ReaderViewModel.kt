@@ -19,6 +19,7 @@ data class ReaderUiState(
     val error: String? = null,
     val content: String? = null,
     val fromOffline: Boolean = false,
+    val imageUrl: String? = null,
     val pageIndex: Int = 0,
     val pageCount: Int = 0,
     val timeLeft: ReaderTimeLeft? = null,
@@ -133,7 +134,7 @@ abstract class BaseReaderViewModel(
             runCatching { reader.loadInitial(chapterId, initialPage) }
                 .onSuccess { result ->
                     applyLoadResult(result, initialPage)
-                    if (reader.format == Format.Epub) {
+                    if (reader.format != Format.Pdf) {
                         updateProgress(initialPage)
                     }
                 }.onFailure { e ->
@@ -201,6 +202,7 @@ abstract class BaseReaderViewModel(
                 isLoading = false,
                 error = null,
                 pdfPath = result.pdfPath ?: it.pdfPath,
+                imageUrl = result.imageUrl ?: it.imageUrl,
             )
         }
     }
