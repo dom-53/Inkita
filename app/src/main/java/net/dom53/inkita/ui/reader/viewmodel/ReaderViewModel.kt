@@ -188,6 +188,9 @@ abstract class BaseReaderViewModel(
         updateProgress(_state.value.pageIndex, bookScrollId)
     }
 
+    suspend fun getBookInfoFor(chapterId: Int): ReaderBookInfo? =
+        runCatching { reader.getBookInfo(chapterId) }.getOrNull()
+
     open suspend fun isPageDownloaded(pageIndex: Int): Boolean = runCatching { reader.isPageDownloaded(chapterId, pageIndex) }.getOrDefault(false)
 
     protected fun applyLoadResult(

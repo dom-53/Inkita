@@ -252,7 +252,13 @@ internal fun BaseReaderScreen(
                 val nav = readerViewModel.getPreviousChapter()
                 val chId = nav?.chapterId
                 if (chId != null && chId >= 0) {
-                    val targetPage = nav.pagesRead?.takeIf { it > 0 }
+                    val info = readerViewModel.getBookInfoFor(chId)
+                    val targetPage =
+                        info?.pages
+                            ?.takeIf { it > 0 }
+                            ?.let { it - 1 }
+                            ?: nav.pagesRead
+                            ?: 0
                     onNavigateToChapter(
                         chId,
                         targetPage,

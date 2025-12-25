@@ -17,6 +17,7 @@ All notable changes to this project will be documented here.
 - UI: Rounded corners aligned across Library V2, Series Detail V2, and Volume Detail V2 covers.
 - Downloads V2: Downloaded PDF items now open with the correct MIME type.
 - Downloads V2: Queue/Completed rows now wrap titles cleanly instead of truncating them.
+- Reader: Page navigation now jumps across chapters at the edges (next/previous).
 
 ### Fixed
 - Navigation: Bottom bar now remains visible when opening Library/Browse with query params (collections/tags/genres).
