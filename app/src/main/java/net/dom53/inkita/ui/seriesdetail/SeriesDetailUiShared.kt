@@ -261,6 +261,97 @@ internal fun ChapterListV2(
     }
 }
 
+@Composable
+internal fun ChapterCompactList(
+    chapters: List<net.dom53.inkita.data.api.dto.ChapterDto>,
+    downloadStates: Map<Int, ChapterDownloadState> = emptyMap(),
+    onChapterClick: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
+    onChapterLongPress: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
+) {
+    if (chapters.isEmpty()) return
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        val shape = RoundedCornerShape(10.dp)
+        chapters.forEachIndexed { index, chapter ->
+            val pagesRead = chapter.pagesRead ?: 0
+            val pagesTotal = chapter.pages ?: 0
+            val isRead = pagesTotal > 0 && pagesRead >= pagesTotal
+            val isCurrent = pagesRead in 1 until pagesTotal
+            val containerColor =
+                if (isRead) {
+                    MaterialTheme.colorScheme.surfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.surface
+                }
+            val textColor =
+                when {
+                    isCurrent -> MaterialTheme.colorScheme.primary
+                    isRead -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            val border =
+                if (isCurrent) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+            val title =
+                chapter.titleName?.takeIf { it.isNotBlank() }
+                    ?: chapter.title?.takeIf { it.isNotBlank() }
+                    ?: chapter.range?.takeIf { it.isNotBlank() }
+                    ?: stringResource(R.string.series_detail_chapter_fallback, index + 1)
+            val label = stringResource(R.string.series_detail_chapter_fallback, index + 1)
+            val downloadState = downloadStates[chapter.id]
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(containerColor, shape)
+                        .then(
+                            if (border != null) {
+                                Modifier.border(border, shape)
+                            } else {
+                                Modifier
+                            },
+                        ).combinedClickable(
+                            onClick = { onChapterClick(chapter, index) },
+                            onLongClick = { onChapterLongPress(chapter, index) },
+                        ).padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = textColor,
+                    modifier = Modifier.width(96.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = textColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (downloadState == ChapterDownloadState.Complete || downloadState == ChapterDownloadState.Partial) {
+                    Icon(
+                        imageVector =
+                            if (downloadState == ChapterDownloadState.Complete) {
+                                Icons.Filled.DownloadDone
+                            } else {
+                                Icons.Filled.Downloading
+                            },
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
 internal enum class ChapterDownloadState {
     None,
     Partial,

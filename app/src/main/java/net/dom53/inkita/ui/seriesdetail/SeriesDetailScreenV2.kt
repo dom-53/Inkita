@@ -712,6 +712,76 @@ fun SeriesDetailScreenV2(
                                 },
                             )
                         }
+                        if (selectedTab == SeriesDetailTab.Chapters) {
+                            val chapters = detail?.detail?.chapters.orEmpty()
+                            val chapterDownloadStates = remember { mutableStateMapOf<Int, ChapterDownloadState>() }
+                            LaunchedEffect(chapters, downloadedItemsBySeries.value) {
+                                val isPdf = Format.fromId(detail?.series?.format) == Format.Pdf
+                                val items = downloadedItemsBySeries.value
+                                val grouped = items.groupBy { it.chapterId }
+                                chapters.forEach { chapter ->
+                                    val list = grouped[chapter.id].orEmpty()
+                                    val completed =
+                                        list.count { item ->
+                                            item.status ==
+                                                net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                isItemPathPresent(item.localPath)
+                                        }
+                                    val expected = if (isPdf) 1 else chapter.pages?.takeIf { it > 0 } ?: 0
+                                    val state =
+                                        when {
+                                            expected > 0 && completed >= expected -> ChapterDownloadState.Complete
+                                            completed > 0 -> ChapterDownloadState.Partial
+                                            else -> ChapterDownloadState.None
+                                        }
+                                    chapterDownloadStates[chapter.id] = state
+                                }
+                            }
+                            ChapterCompactList(
+                                chapters = chapters,
+                                downloadStates = chapterDownloadStates,
+                                onChapterClick = onChapterClick@{ chapter, _ ->
+                                    val isPdf = Format.fromId(detail?.series?.format) == Format.Pdf
+                                    val pdfDownloaded =
+                                        if (isPdf) {
+                                            downloadedItemsBySeries.value.any { item ->
+                                                item.chapterId == chapter.id &&
+                                                    item.type ==
+                                                    net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.TYPE_FILE &&
+                                                    item.status ==
+                                                    net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                    isItemPathPresent(item.localPath)
+                                            }
+                                        } else {
+                                            false
+                                        }
+                                    val pagesDownloaded =
+                                        downloadedItemsBySeries.value.any { item ->
+                                            item.chapterId == chapter.id &&
+                                                item.status ==
+                                                net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                isItemPathPresent(item.localPath)
+                                        }
+                                    if ((offlineMode || !NetworkUtils.isOnline(context)) && !(isPdf && pdfDownloaded) && !pagesDownloaded) {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.reader_page_not_downloaded),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        return@onChapterClick
+                                    }
+                                    val page = chapter.pagesRead ?: 0
+                                    onOpenReader(
+                                        chapter.id,
+                                        page,
+                                        seriesId,
+                                        chapter.volumeId ?: 0,
+                                        detail?.series?.format,
+                                    )
+                                },
+                            )
+                        }
                         if (selectedTab == SeriesDetailTab.Specials) {
                             val specials = detail?.detail?.specials.orEmpty()
                             val specialDownloadStates = remember { mutableStateMapOf<Int, ChapterDownloadState>() }
