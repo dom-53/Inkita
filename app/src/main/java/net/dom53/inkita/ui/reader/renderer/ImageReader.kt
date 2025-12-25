@@ -67,8 +67,7 @@ object ImageReader : BaseReader {
                                     },
                                     onDragCancel = { totalDrag = 0f },
                                 )
-                            }
-                            .clickable { callbacks.onToggleOverlay() },
+                            }.clickable { callbacks.onToggleOverlay() },
                     contentScale = ContentScale.Fit,
                 )
             }

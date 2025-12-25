@@ -256,7 +256,8 @@ internal fun BaseReaderScreen(
                 if (chId != null && chId >= 0) {
                     val info = readerViewModel.getBookInfoFor(chId)
                     val targetPage =
-                        info?.pages
+                        info
+                            ?.pages
                             ?.takeIf { it > 0 }
                             ?.let { it - 1 }
                             ?: nav.pagesRead
@@ -1029,7 +1030,6 @@ private fun ThemeSettings(
                 )
             }
         }
-
     }
 }
 
