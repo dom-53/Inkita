@@ -20,6 +20,21 @@ class ImageReaderViewModel(
         volumeId = volumeId,
         anonymous = anonymous,
     ) {
+    override fun updateProgress(
+        pageIndex: Int,
+        bookScrollId: String?,
+        totalPagesOverride: Int?,
+    ) {
+        val pageCount = totalPagesOverride ?: _state.value.pageCount
+        val effectivePage =
+            if (pageCount > 0 && pageIndex >= pageCount - 1) {
+                pageCount
+            } else {
+                pageIndex
+            }
+        super.updateProgress(effectivePage, bookScrollId, totalPagesOverride)
+    }
+
     companion object {
         fun provideFactory(
             chapterId: Int,
