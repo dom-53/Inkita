@@ -408,6 +408,9 @@
     <string name="series_download_all">Download all</string>
     <string name="series_download_missing">Download missing</string>
     <string name="series_clear_downloads">Clear downloads</string>
+    <string name="series_detail_download_tree">Downloaded files</string>
+    <string name="series_detail_download_tree_title">Downloaded files</string>
+    <string name="series_detail_download_tree_empty">No downloaded files found.</string>
     <string name="series_open_download_queue">Download queue</string>
     <!-- Advanced settings -->
     <string name="advanced_clear_cache">Clear cache</string>

@@ -243,6 +243,9 @@
     <string name="series_download_missing">Stáhnout chybějící</string>
     <string name="series_open_download_queue">Fronta stahování</string>
     <string name="series_clear_downloads">Smazat stažené</string>
+    <string name="series_detail_download_tree">Stažené soubory</string>
+    <string name="series_detail_download_tree_title">Stažené soubory</string>
+    <string name="series_detail_download_tree_empty">Nebyly nalezeny žádné stažené soubory.</string>
     <!--  Settings  -->
     <string name="settings_title">Nastavení</string>
     <string name="settings_item_general">Obecné</string>

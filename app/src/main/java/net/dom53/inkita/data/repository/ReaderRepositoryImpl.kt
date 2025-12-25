@@ -7,6 +7,7 @@ import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.sync.ProgressSyncWorker
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.data.local.db.dao.DownloadDao
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
@@ -235,17 +236,21 @@ class ReaderRepositoryImpl(
 
     override suspend fun getPdfFile(chapterId: Int): File? {
         val config = appPreferences.configFlow.first()
-        val target =
-            File(
-                context.getExternalFilesDir("Inkita/downloads/pdfs"),
-                "pdf-$chapterId.pdf",
-            )
         val existing =
             downloadV2Dao
                 ?.getDownloadedFileForChapter(chapterId)
         if (existing != null && existing.localPath?.let { File(it).exists() } == true) {
             return File(existing.localPath!!)
         }
+        val bookInfo = getBookInfo(chapterId)
+        val target =
+            bookInfo
+                ?.seriesId
+                ?.let { DownloadPaths.pdfFile(context, it, bookInfo.volumeId, chapterId) }
+                ?: File(
+                    context.getExternalFilesDir("Inkita/downloads/pdfs"),
+                    "pdf-$chapterId.pdf",
+                )
         if (target.exists()) {
             recordPdfDownloadIfMissing(chapterId, target)
             return target
@@ -261,7 +266,7 @@ class ReaderRepositoryImpl(
             api.getPdf(
                 chapterId,
                 apiKey = config.apiKey.takeIf { it.isNotBlank() },
-                extractPdf = true,
+                extractPdf = false,
             )
         if (!response.isSuccessful) return null
         val body = response.body() ?: return null

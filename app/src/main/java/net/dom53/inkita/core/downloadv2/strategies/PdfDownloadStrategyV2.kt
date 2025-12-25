@@ -6,12 +6,20 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
 import net.dom53.inkita.core.downloadv2.DownloadStrategyV2
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.logging.LoggingManager
+import net.dom53.inkita.core.network.NetworkLoggingInterceptor
+import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okio.buffer
+import okio.sink
+import okio.source
 import java.io.File
 
 class PdfDownloadStrategyV2(
@@ -20,6 +28,12 @@ class PdfDownloadStrategyV2(
     private val appPreferences: AppPreferences,
 ) : DownloadStrategyV2 {
     override val key: String = FORMAT_PDF
+
+    private val httpClient =
+        OkHttpClient
+            .Builder()
+            .addInterceptor(NetworkLoggingInterceptor)
+            .build()
 
     override suspend fun enqueue(request: DownloadRequestV2): Long {
         val chapterId = request.chapterId ?: return -1L
@@ -79,29 +93,59 @@ class PdfDownloadStrategyV2(
         val job = downloadDao.getJob(jobId) ?: return
         if (job.status == DownloadJobV2Entity.STATUS_COMPLETED) return
         val chapterId = job.chapterId ?: return
+        val offlineMode = appPreferences.offlineModeFlow.first()
+        val networkStatus = NetworkMonitor.getInstance(appContext, appPreferences).status.value
+        if (offlineMode || !networkStatus.isOnlineAllowed) {
+            failJob(job, "Offline mode")
+            return
+        }
         val config = appPreferences.configFlow.first()
         if (!config.isConfigured) {
             failJob(job, "Not configured")
             return
         }
-        val target = pdfPath(chapterId)
+        var seriesId = job.seriesId
+        var volumeId = job.volumeId
+        if (seriesId == null || volumeId == null) {
+            val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+            val info = api.getBookInfo(chapterId).body()
+            if (seriesId == null) seriesId = info?.seriesId
+            if (volumeId == null) volumeId = info?.volumeId
+        }
+        val target =
+            seriesId?.let { DownloadPaths.pdfFile(appContext, it, volumeId, chapterId) }
+                ?: pdfFallbackPath(chapterId)
         target.parentFile?.mkdirs()
 
         try {
-            val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
-            val resp = api.getPdf(chapterId, apiKey = config.apiKey, extractPdf = true)
-            if (!resp.isSuccessful) {
-                failJob(job, "HTTP ${resp.code()}")
-                return
-            }
-            val body =
-                resp.body() ?: run {
-                    failJob(job, "Empty body")
+            val url =
+                buildString {
+                    val base = if (config.serverUrl.endsWith("/")) config.serverUrl.dropLast(1) else config.serverUrl
+                    append(base)
+                    append("/api/Download/chapter?chapterId=")
+                    append(chapterId)
+                }
+            val request =
+                Request
+                    .Builder()
+                    .url(url)
+                    .addHeader("x-api-key", config.apiKey)
+                    .get()
+                    .build()
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    failJob(job, "HTTP ${response.code}")
                     return
                 }
-            withContext(Dispatchers.IO) {
-                body.byteStream().use { input ->
-                    target.outputStream().use { out -> input.copyTo(out) }
+                val body =
+                    response.body ?: run {
+                        failJob(job, "Empty body")
+                        return
+                    }
+                withContext(Dispatchers.IO) {
+                    body.byteStream().use { input ->
+                        target.sink().buffer().use { sink -> sink.writeAll(input.source()) }
+                    }
                 }
             }
             val bytes = target.length()
@@ -151,7 +195,8 @@ class PdfDownloadStrategyV2(
         }
     }
 
-    private fun pdfPath(chapterId: Int): File = File(appContext.getExternalFilesDir("Inkita/downloads/pdfs"), "pdf-$chapterId.pdf")
+    private fun pdfFallbackPath(chapterId: Int): File =
+        File(appContext.getExternalFilesDir("Inkita/downloads/pdfs"), "pdf-$chapterId.pdf")
 
     companion object {
         const val FORMAT_PDF = "pdf"

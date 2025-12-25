@@ -18,16 +18,20 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Downloading
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Share
@@ -37,6 +41,7 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
@@ -69,9 +74,12 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
 import net.dom53.inkita.core.downloadv2.strategies.DownloadApiStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
@@ -91,6 +99,8 @@ import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.reader.model.ReaderReturn
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
+import java.io.File
+import java.util.Locale
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
 @Composable
@@ -155,10 +165,14 @@ fun SeriesDetailScreenV2(
     var showMenu by remember { mutableStateOf(false) }
     var showDownloadVolumeDialog by remember { mutableStateOf(false) }
     var showVolumeActionsDialog by remember { mutableStateOf(false) }
+    var showDownloadTreeDialog by remember { mutableStateOf(false) }
     var downloadVolumeState by remember { mutableStateOf(DownloadVolumeState.None) }
     var selectedVolume by remember { mutableStateOf<net.dom53.inkita.data.api.dto.VolumeDto?>(null) }
     var selectedSpecialChapter by remember { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
     var selectedSpecialIndex by remember { mutableStateOf<Int?>(null) }
+    var downloadTreeNodes by remember { mutableStateOf<List<FileNode>>(emptyList()) }
+    var downloadTreeLoading by remember { mutableStateOf(false) }
+    val expandedPaths = remember { mutableStateMapOf<String, Boolean>() }
     val specialPageTitleCache = remember(seriesId) { mutableStateMapOf<Int, Map<Int, String>>() }
     val volumeDownloadStates = remember { mutableStateMapOf<Int, DownloadVolumeState>() }
     val downloadDao =
@@ -212,6 +226,19 @@ fun SeriesDetailScreenV2(
         if (!tocResponse.isSuccessful) return@LaunchedEffect
         val tocItems = tocResponse.body().orEmpty().flatMap { flattenToc(it) }
         specialPageTitleCache[chapter.id] = buildPageTitleMap(context, pages, tocItems)
+    }
+    LaunchedEffect(showDownloadTreeDialog) {
+        if (!showDownloadTreeDialog) return@LaunchedEffect
+        downloadTreeLoading = true
+        val root =
+            withContext(Dispatchers.IO) {
+                val dir = DownloadPaths.seriesDir(context.applicationContext, seriesId)
+                if (dir.exists()) buildFileTree(dir) else null
+            }
+        downloadTreeNodes = root?.let { listOf(it) } ?: emptyList()
+        expandedPaths.clear()
+        root?.let { expandedPaths[it.path] = true }
+        downloadTreeLoading = false
     }
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -338,6 +365,13 @@ fun SeriesDetailScreenV2(
                                             Toast.LENGTH_SHORT,
                                         ).show()
                                 }
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(net.dom53.inkita.R.string.series_detail_download_tree)) },
+                            onClick = {
+                                showMenu = false
+                                showDownloadTreeDialog = true
                             },
                         )
                         DropdownMenuItem(
@@ -1614,6 +1648,82 @@ fun SeriesDetailScreenV2(
                 },
             )
         }
+        if (showDownloadTreeDialog) {
+            AlertDialog(
+                onDismissRequest = { showDownloadTreeDialog = false },
+                title = { Text(stringResource(net.dom53.inkita.R.string.series_detail_download_tree_title)) },
+                text = {
+                    if (downloadTreeLoading) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    } else if (downloadTreeNodes.isEmpty()) {
+                        Text(stringResource(net.dom53.inkita.R.string.series_detail_download_tree_empty))
+                    } else {
+                        val expandedSnapshot = expandedPaths.toMap()
+                        val flatNodes = remember(downloadTreeNodes, expandedSnapshot) {
+                            flattenTree(downloadTreeNodes, expandedSnapshot)
+                        }
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            modifier = Modifier.heightIn(max = 420.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            items(flatNodes) { (node, depth) ->
+                                val indent = (depth * 12).dp
+                                val isExpanded = expandedPaths[node.path] == true
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = indent, top = 2.dp, bottom = 2.dp)
+                                            .clickable(enabled = node.isDir) {
+                                                expandedPaths[node.path] = !isExpanded
+                                            },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    if (node.isDir) {
+                                        Icon(
+                                            imageVector =
+                                                if (isExpanded) {
+                                                    Icons.Filled.ExpandLess
+                                                } else {
+                                                    Icons.Filled.ExpandMore
+                                                },
+                                            contentDescription = null,
+                                        )
+                                    } else {
+                                        Spacer(modifier = Modifier.width(24.dp))
+                                    }
+                                    Text(
+                                        text = node.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (!node.isDir) {
+                                        Text(
+                                            text = formatBytes(node.size),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showDownloadTreeDialog = false }) {
+                        Text(stringResource(net.dom53.inkita.R.string.general_close))
+                    }
+                },
+            )
+        }
     }
 }
 
@@ -1756,6 +1866,61 @@ private fun formatKeyFor(formatId: Int?): String =
         Format.Epub -> EpubDownloadStrategyV2.FORMAT_EPUB
         else -> DownloadApiStrategyV2.FORMAT_DOWNLOAD
     }
+
+private data class FileNode(
+    val name: String,
+    val path: String,
+    val isDir: Boolean,
+    val size: Long,
+    val children: List<FileNode> = emptyList(),
+)
+
+private fun buildFileTree(root: File): FileNode {
+    val children =
+        if (root.isDirectory) {
+            root
+                .listFiles()
+                ?.sortedWith(compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase(Locale.getDefault()) })
+                ?.map { buildFileTree(it) }
+                .orEmpty()
+        } else {
+            emptyList()
+        }
+    return FileNode(
+        name = root.name,
+        path = root.absolutePath,
+        isDir = root.isDirectory,
+        size = if (root.isFile) root.length() else 0L,
+        children = children,
+    )
+}
+
+private fun flattenTree(
+    nodes: List<FileNode>,
+    expanded: Map<String, Boolean>,
+    depth: Int = 0,
+    out: MutableList<Pair<FileNode, Int>> = mutableListOf(),
+): List<Pair<FileNode, Int>> {
+    nodes.forEach { node ->
+        out.add(node to depth)
+        if (node.isDir && expanded[node.path] == true) {
+            flattenTree(node.children, expanded, depth + 1, out)
+        }
+    }
+    return out
+}
+
+private fun formatBytes(value: Long): String {
+    if (value <= 0) return "0 B"
+    val units = arrayOf("B", "KB", "MB", "GB")
+    var v = value.toDouble()
+    var idx = 0
+    while (v >= 1024 && idx < units.lastIndex) {
+        v /= 1024
+        idx++
+    }
+    return String.format(Locale.getDefault(), "%.1f %s", v, units[idx])
+}
 
 @Composable
 private fun ActionsRowV2(

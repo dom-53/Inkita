@@ -13,6 +13,7 @@ All notable changes to this project will be documented here.
 - Reader: Added basic Image/Archive reader (image pages + swipe navigation).
 - Series Detail V2: Chapters list now supports swipe read/unread and download (download is placeholder).
 - Downloads V2: Added default Download API strategy for series/volume/chapter archives.
+- Series Detail V2: Added a downloaded-files tree view in the menu.
 
 ### Changed
 - Reader: Split EpubReaderViewModel and PdfReaderViewModel into separate files.

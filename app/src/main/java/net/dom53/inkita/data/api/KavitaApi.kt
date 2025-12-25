@@ -300,7 +300,7 @@ interface KavitaApi {
     suspend fun getPdf(
         @Query("chapterId") chapterId: Int,
         @Query("apiKey") apiKey: String? = null,
-        @Query("extractPdf") extractPdf: Boolean = true,
+        @Query("extractPdf") extractPdf: Boolean = false,
     ): Response<ResponseBody>
 
     @GET("api/Reader/get-progress")
