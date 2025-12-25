@@ -246,7 +246,30 @@ internal fun BaseReaderScreen(
         }
     }
 
-    val goPrevPage: () -> Unit = {
+    val goPrevPage: () -> Unit = goPrevPage@{
+        if (uiState.pageIndex <= 0) {
+            scope.launch {
+                val nav = readerViewModel.getPreviousChapter()
+                val chId = nav?.chapterId
+                if (chId != null && chId >= 0) {
+                    val targetPage = nav.pagesRead?.takeIf { it > 0 }
+                    onNavigateToChapter(
+                        chId,
+                        targetPage,
+                        nav.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
+                        nav.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
+                    )
+                } else {
+                    Toast
+                        .makeText(
+                            context,
+                            context.resources.getString(R.string.reader_no_previous_chapter),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                }
+            }
+            return@goPrevPage
+        }
         val prev = (uiState.pageIndex - 1).coerceAtLeast(0)
         if (uiState.isPdf) {
             (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(prev, uiState.pageCount)
@@ -260,7 +283,24 @@ internal fun BaseReaderScreen(
             }
         }
     }
-    val goNextPage: () -> Unit = {
+    val goNextPage: () -> Unit = goNextPage@{
+        if (uiState.pageCount > 0 && uiState.pageIndex >= uiState.pageCount - 1) {
+            scope.launch {
+                val nav = readerViewModel.getNextChapter()
+                val chId = nav?.chapterId
+                if (chId != null && chId >= 0) {
+                    onNavigateToChapter(
+                        chId,
+                        0,
+                        nav.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
+                        nav.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
+                    )
+                } else {
+                    Toast.makeText(context, context.resources.getString(R.string.reader_no_next_chapter), Toast.LENGTH_SHORT).show()
+                }
+            }
+            return@goNextPage
+        }
         val next =
             if (uiState.pageCount > 0) {
                 (uiState.pageIndex + 1).coerceAtMost((uiState.pageCount - 1).coerceAtLeast(0))
@@ -354,7 +394,13 @@ internal fun BaseReaderScreen(
             val bottomBarCallbacks =
                 ReaderBottomBarCallbacks(
                     onScrollTop = {
-                        if (uiState.isPdf) {
+                        if (renderer == net.dom53.inkita.ui.reader.renderer.ImageReader) {
+                            if (uiState.pageCount > 0) {
+                                readerViewModel.loadPage(0)
+                            } else {
+                                readerViewModel.loadPage(0)
+                            }
+                        } else if (uiState.isPdf) {
                             if (uiState.pageCount > 0) {
                                 (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(0, uiState.pageCount)
                             }
@@ -365,7 +411,11 @@ internal fun BaseReaderScreen(
                         }
                     },
                     onScrollBottom = {
-                        if (uiState.isPdf) {
+                        if (renderer == net.dom53.inkita.ui.reader.renderer.ImageReader) {
+                            if (uiState.pageCount > 0) {
+                                readerViewModel.loadPage((uiState.pageCount - 1).coerceAtLeast(0))
+                            }
+                        } else if (uiState.isPdf) {
                             if (uiState.pageCount > 0) {
                                 (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(uiState.pageCount - 1, uiState.pageCount)
                             }
