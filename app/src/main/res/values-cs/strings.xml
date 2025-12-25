@@ -195,6 +195,10 @@
     <string name="reader_next_page">Další strana</string>
     <string name="reader_jump_to_end">Přejít na konec</string>
     <string name="reader_next_chapter">Další kapitola</string>
+    <string name="reader_mark_chapter_read_title">Označit kapitolu jako přečtenou?</string>
+    <string name="reader_mark_chapter_read_body">Nejsi na konci této kapitoly.</string>
+    <string name="reader_mark_chapter_read_confirm">Označit jako přečtenou</string>
+    <string name="reader_mark_chapter_read_skip">Pokračovat bez označení</string>
     <string name="reader_font_selection">Vybrat font</string>
     <string name="reader_text_settings">Nastavení textu</string>
     <string name="reader_font_size">Velikost písma</string>

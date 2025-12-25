@@ -18,6 +18,7 @@ All notable changes to this project will be documented here.
 - Downloads V2: Downloaded PDF items now open with the correct MIME type.
 - Downloads V2: Queue/Completed rows now wrap titles cleanly instead of truncating them.
 - Reader: Page navigation now jumps across chapters at the edges (next/previous).
+- Reader: Next Chapter now prompts to mark the current chapter as read when leaving early.
 
 ### Fixed
 - Navigation: Bottom bar now remains visible when opening Library/Browse with query params (collections/tags/genres).

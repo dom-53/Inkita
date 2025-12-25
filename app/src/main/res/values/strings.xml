@@ -259,6 +259,10 @@
     <string name="reader_next_page">Next Page</string>
     <string name="reader_jump_to_end">Jump to end</string>
     <string name="reader_next_chapter">Next Chapter</string>
+    <string name="reader_mark_chapter_read_title">Mark chapter as read?</string>
+    <string name="reader_mark_chapter_read_body">You are not at the end of this chapter.</string>
+    <string name="reader_mark_chapter_read_confirm">Mark as read</string>
+    <string name="reader_mark_chapter_read_skip">Continue without marking</string>
     <string name="reader_font_selection">Select font</string>
     <string name="reader_text_settings">Text settings</string>
     <string name="reader_font_size">Font size</string>

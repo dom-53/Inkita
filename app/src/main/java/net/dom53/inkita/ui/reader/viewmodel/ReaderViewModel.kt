@@ -188,6 +188,12 @@ abstract class BaseReaderViewModel(
         updateProgress(_state.value.pageIndex, bookScrollId)
     }
 
+    fun markChapterRead() {
+        val total = _state.value.pageCount
+        val lastIndex = if (total > 0) total - 1 else _state.value.pageIndex
+        updateProgress(lastIndex, totalPagesOverride = total.takeIf { it > 0 })
+    }
+
     suspend fun getBookInfoFor(chapterId: Int): ReaderBookInfo? =
         runCatching { reader.getBookInfo(chapterId) }.getOrNull()
 

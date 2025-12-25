@@ -210,6 +210,8 @@ internal fun BaseReaderScreen(
     var fontFamilyId by remember { mutableStateOf(ReaderPrefs.DEFAULT_FONT_FAMILY) }
     var textAlign by remember { mutableStateOf(TextAlign.Justify) }
     var themeMode by remember { mutableStateOf(ReaderThemeMode.Light) }
+    var showNextChapterDialog by remember { mutableStateOf(false) }
+    var pendingNextChapter by remember { mutableStateOf<net.dom53.inkita.domain.model.ReaderChapterNav?>(null) }
     val scope = rememberCoroutineScope()
     val activity = LocalView.current.context as? Activity
     var showOverlay by remember { mutableStateOf(true) }
@@ -463,12 +465,17 @@ internal fun BaseReaderScreen(
                             val nav = readerViewModel.getNextChapter()
                             val chId = nav?.chapterId
                             if (chId != null && chId >= 0) {
-                                onNavigateToChapter(
-                                    chId,
-                                    nav.pagesRead ?: 0,
-                                    nav.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
-                                    nav.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
-                                )
+                                if (uiState.pageCount > 0 && uiState.pageIndex < uiState.pageCount - 1) {
+                                    pendingNextChapter = nav
+                                    showNextChapterDialog = true
+                                } else {
+                                    onNavigateToChapter(
+                                        chId,
+                                        nav.pagesRead ?: 0,
+                                        nav.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
+                                        nav.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
+                                    )
+                                }
                             } else {
                                 Toast.makeText(context, context.resources.getString(R.string.reader_no_next_chapter), Toast.LENGTH_SHORT).show()
                             }
@@ -597,6 +604,55 @@ internal fun BaseReaderScreen(
             }
 
             overlayExtras()
+        }
+
+        if (showNextChapterDialog) {
+            val nav = pendingNextChapter
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = {
+                    showNextChapterDialog = false
+                    pendingNextChapter = null
+                },
+                title = { Text(stringResource(R.string.reader_mark_chapter_read_title)) },
+                text = { Text(stringResource(R.string.reader_mark_chapter_read_body)) },
+                confirmButton = {
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            val next = nav
+                            showNextChapterDialog = false
+                            pendingNextChapter = null
+                            if (next == null) return@Button
+                            readerViewModel.markChapterRead()
+                            onNavigateToChapter(
+                                next.chapterId ?: return@Button,
+                                0,
+                                next.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
+                                next.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
+                            )
+                        },
+                    ) {
+                        Text(stringResource(R.string.reader_mark_chapter_read_confirm))
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            val next = nav
+                            showNextChapterDialog = false
+                            pendingNextChapter = null
+                            if (next == null) return@TextButton
+                            onNavigateToChapter(
+                                next.chapterId ?: return@TextButton,
+                                next.pagesRead ?: 0,
+                                next.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
+                                next.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
+                            )
+                        },
+                    ) {
+                        Text(stringResource(R.string.reader_mark_chapter_read_skip))
+                    }
+                },
+            )
         }
     }
 }
@@ -973,6 +1029,7 @@ private fun ThemeSettings(
                 )
             }
         }
+
     }
 }
 
