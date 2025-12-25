@@ -780,6 +780,97 @@ fun SeriesDetailScreenV2(
                                         detail?.series?.format,
                                     )
                                 },
+                                onToggleDownload = { _, _ ->
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                },
+                                onUpdateProgress = onUpdateProgress@{ chapter, pageNum ->
+                                    if (offlineMode) {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        return@onUpdateProgress
+                                    }
+                                    if (!config.isConfigured) {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        return@onUpdateProgress
+                                    }
+                                    val pages = chapter.pages ?: 0
+                                    if (pages <= 0) {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.series_detail_pages_unavailable),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        return@onUpdateProgress
+                                    }
+                                    val libraryId = detail?.series?.libraryId
+                                    if (libraryId == null || chapter.volumeId == null) {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.general_error),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        return@onUpdateProgress
+                                    }
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    scope.launch {
+                                        val api =
+                                            net.dom53.inkita.core.network.KavitaApiFactory.createAuthenticated(
+                                                config.serverUrl,
+                                                config.apiKey,
+                                            )
+                                        val targetPage = if (pageNum <= 0) 0 else pages
+                                        val resp =
+                                            api.setReaderProgress(
+                                                net.dom53.inkita.data.api.dto.ReaderProgressDto(
+                                                    libraryId = libraryId,
+                                                    seriesId = seriesId,
+                                                    volumeId = chapter.volumeId,
+                                                    chapterId = chapter.id,
+                                                    pageNum = targetPage,
+                                                    bookScrollId = null,
+                                                ),
+                                            )
+                                        if (resp.isSuccessful) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(
+                                                        if (targetPage > 0) {
+                                                            net.dom53.inkita.R.string.general_mark_read
+                                                        } else {
+                                                            net.dom53.inkita.R.string.general_mark_unread
+                                                        },
+                                                    ),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            viewModel.reload()
+                                        } else {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.general_error),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                        }
+                                    }
+                                },
                             )
                         }
                         if (selectedTab == SeriesDetailTab.Specials) {

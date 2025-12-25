@@ -11,6 +11,7 @@ All notable changes to this project will be documented here.
 - Library/Browse: Download status badges now appear on series covers (complete/partial).
 - Downloads V2: Download queue entries now show series/volume/chapter labels when available.
 - Reader: Added basic Image/Archive reader (image pages + swipe navigation).
+- Series Detail V2: Chapters list now supports swipe read/unread and download (download is placeholder).
 
 ### Changed
 - Reader: Split EpubReaderViewModel and PdfReaderViewModel into separate files.

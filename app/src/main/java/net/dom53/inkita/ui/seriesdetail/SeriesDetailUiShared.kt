@@ -261,12 +261,15 @@ internal fun ChapterListV2(
     }
 }
 
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 internal fun ChapterCompactList(
     chapters: List<net.dom53.inkita.data.api.dto.ChapterDto>,
     downloadStates: Map<Int, ChapterDownloadState> = emptyMap(),
     onChapterClick: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
     onChapterLongPress: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
+    onToggleDownload: (net.dom53.inkita.data.api.dto.ChapterDto, Boolean) -> Unit = { _, _ -> },
+    onUpdateProgress: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
 ) {
     if (chapters.isEmpty()) return
     Column(
@@ -279,6 +282,8 @@ internal fun ChapterCompactList(
             val pagesTotal = chapter.pages ?: 0
             val isRead = pagesTotal > 0 && pagesRead >= pagesTotal
             val isCurrent = pagesRead in 1 until pagesTotal
+            val downloadState = downloadStates[chapter.id]
+            val isDownloaded = downloadState == ChapterDownloadState.Complete || downloadState == ChapterDownloadState.Partial
             val containerColor =
                 if (isRead) {
                     MaterialTheme.colorScheme.surfaceVariant
@@ -299,53 +304,131 @@ internal fun ChapterCompactList(
                     ?: chapter.range?.takeIf { it.isNotBlank() }
                     ?: stringResource(R.string.series_detail_chapter_fallback, index + 1)
             val label = stringResource(R.string.series_detail_chapter_fallback, index + 1)
-            val downloadState = downloadStates[chapter.id]
-            Row(
+            val density = LocalDensity.current
+            val swipeDistance = with(density) { 160.dp.toPx() }
+            val swipeState = rememberSwipeableState(initialValue = 0)
+            val anchors = remember(swipeDistance) { mapOf(0f to 0, -swipeDistance to -1, swipeDistance to 1) }
+            var actionTriggered by remember { mutableStateOf(false) }
+            LaunchedEffect(swipeState.currentValue) {
+                if (swipeState.currentValue != 0 && !actionTriggered) {
+                    actionTriggered = true
+                    if (swipeState.currentValue == 1) {
+                        val targetPage = if (isRead) 0 else pagesTotal
+                        onUpdateProgress(chapter, targetPage)
+                    } else {
+                        onToggleDownload(chapter, isDownloaded)
+                    }
+                    swipeState.animateTo(0)
+                    actionTriggered = false
+                }
+            }
+            Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .background(containerColor, shape)
-                        .then(
-                            if (border != null) {
-                                Modifier.border(border, shape)
-                            } else {
-                                Modifier
-                            },
-                        ).combinedClickable(
-                            onClick = { onChapterClick(chapter, index) },
-                            onLongClick = { onChapterLongPress(chapter, index) },
-                        ).padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        .height(IntrinsicSize.Min)
+                        .swipeable(
+                            state = swipeState,
+                            anchors = anchors,
+                            thresholds = { _, _ -> FractionalThreshold(0.25f) },
+                            orientation = Orientation.Horizontal,
+                        ),
             ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = textColor,
-                    modifier = Modifier.width(96.dp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = textColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (downloadState == ChapterDownloadState.Complete || downloadState == ChapterDownloadState.Partial) {
-                    Icon(
-                        imageVector =
-                            if (downloadState == ChapterDownloadState.Complete) {
-                                Icons.Filled.DownloadDone
-                            } else {
-                                Icons.Filled.Downloading
-                            },
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
+                val downloadIcon =
+                    if (isDownloaded) {
+                        Icons.Filled.Delete
+                    } else {
+                        Icons.Filled.FileDownload
+                    }
+                val downloadTint =
+                    if (isDownloaded) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                val progressIcon =
+                    if (isRead) {
+                        Icons.Filled.Undo
+                    } else {
+                        Icons.Filled.Done
+                    }
+                val progressTint =
+                    if (isRead) {
+                        MaterialTheme.colorScheme.secondary
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                Box(
+                    modifier =
+                        Modifier
+                            .matchParentSize()
+                            .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            imageVector = progressIcon,
+                            contentDescription = null,
+                            tint = progressTint,
+                            modifier = Modifier.align(Alignment.CenterStart),
+                        )
+                        Icon(
+                            imageVector = downloadIcon,
+                            contentDescription = null,
+                            tint = downloadTint,
+                            modifier = Modifier.align(Alignment.CenterEnd),
+                        )
+                    }
+                }
+                Row(
+                    modifier =
+                        Modifier
+                            .offset { IntOffset(swipeState.offset.value.roundToInt(), 0) }
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min)
+                            .background(containerColor, shape)
+                            .then(
+                                if (border != null) {
+                                    Modifier.border(border, shape)
+                                } else {
+                                    Modifier
+                                },
+                            ).combinedClickable(
+                                onClick = { onChapterClick(chapter, index) },
+                                onLongClick = { onChapterLongPress(chapter, index) },
+                            ).padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = textColor,
+                        modifier = Modifier.width(96.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = textColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (downloadState == ChapterDownloadState.Complete || downloadState == ChapterDownloadState.Partial) {
+                        Icon(
+                            imageVector =
+                                if (downloadState == ChapterDownloadState.Complete) {
+                                    Icons.Filled.DownloadDone
+                                } else {
+                                    Icons.Filled.Downloading
+                                },
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                 }
             }
         }
