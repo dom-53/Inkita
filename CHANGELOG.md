@@ -10,6 +10,7 @@ All notable changes to this project will be documented here.
 - Downloads V2: PDF download requests now enqueue and appear in the Download Queue.
 - Library/Browse: Download status badges now appear on series covers (complete/partial).
 - Downloads V2: Download queue entries now show series/volume/chapter labels when available.
+- Reader: Added basic Image/Archive reader (image pages + swipe navigation).
 
 ### Changed
 - Reader: Split EpubReaderViewModel and PdfReaderViewModel into separate files.
