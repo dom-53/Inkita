@@ -73,6 +73,7 @@ import kotlinx.coroutines.launch
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
+import net.dom53.inkita.core.downloadv2.strategies.DownloadApiStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2
 import net.dom53.inkita.core.network.NetworkUtils
@@ -182,11 +183,17 @@ fun SeriesDetailScreenV2(
                     downloadDao = downloadDao,
                     appPreferences = appPreferences,
                 )
+            val downloadStrategy =
+                DownloadApiStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                )
             DownloadManagerV2(
                 appContext = context.applicationContext,
                 downloadDao = downloadDao,
                 strategies =
-                    listOf(epubStrategy, pdfStrategy).associateBy { it.key },
+                    listOf(epubStrategy, pdfStrategy, downloadStrategy).associateBy { it.key },
             )
         }
     LaunchedEffect(selectedSpecialChapter?.id, offlineMode, config.serverUrl, config.apiKey) {
@@ -1744,10 +1751,10 @@ private fun webUrl(
 }
 
 private fun formatKeyFor(formatId: Int?): String =
-    if (Format.fromId(formatId) == Format.Pdf) {
-        PdfDownloadStrategyV2.FORMAT_PDF
-    } else {
-        EpubDownloadStrategyV2.FORMAT_EPUB
+    when (Format.fromId(formatId)) {
+        Format.Pdf -> PdfDownloadStrategyV2.FORMAT_PDF
+        Format.Epub -> EpubDownloadStrategyV2.FORMAT_EPUB
+        else -> DownloadApiStrategyV2.FORMAT_DOWNLOAD
     }
 
 @Composable

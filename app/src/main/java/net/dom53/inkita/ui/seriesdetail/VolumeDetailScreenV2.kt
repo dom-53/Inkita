@@ -51,6 +51,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
+import net.dom53.inkita.core.downloadv2.strategies.DownloadApiStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2
 import net.dom53.inkita.core.logging.LoggingManager
@@ -117,11 +118,17 @@ fun VolumeDetailScreenV2(
                     downloadDao = downloadDao,
                     appPreferences = appPreferences,
                 )
+            val downloadStrategy =
+                DownloadApiStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                )
             DownloadManagerV2(
                 appContext = context.applicationContext,
                 downloadDao = downloadDao,
                 strategies =
-                    listOf(epubStrategy, pdfStrategy).associateBy { it.key },
+                    listOf(epubStrategy, pdfStrategy, downloadStrategy).associateBy { it.key },
             )
         }
 
@@ -1028,10 +1035,8 @@ private suspend fun applyLocalProgress(
 }
 
 private fun formatKeyForVolume(formatId: Int?): String =
-    if (net.dom53.inkita.domain.model.Format
-            .fromId(formatId) == net.dom53.inkita.domain.model.Format.Pdf
-    ) {
-        PdfDownloadStrategyV2.FORMAT_PDF
-    } else {
-        EpubDownloadStrategyV2.FORMAT_EPUB
+    when (net.dom53.inkita.domain.model.Format.fromId(formatId)) {
+        net.dom53.inkita.domain.model.Format.Pdf -> PdfDownloadStrategyV2.FORMAT_PDF
+        net.dom53.inkita.domain.model.Format.Epub -> EpubDownloadStrategyV2.FORMAT_EPUB
+        else -> DownloadApiStrategyV2.FORMAT_DOWNLOAD
     }

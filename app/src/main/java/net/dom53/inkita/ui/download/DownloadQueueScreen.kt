@@ -139,8 +139,12 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
                                             Uri.fromFile(File(path))
                                         }
                                     val mime =
-                                        if (page.type == DownloadedItemV2Entity.TYPE_FILE || path.endsWith(".pdf")) {
-                                            "application/pdf"
+                                        if (page.type == DownloadedItemV2Entity.TYPE_FILE) {
+                                            if (path.endsWith(".pdf")) {
+                                                "application/pdf"
+                                            } else {
+                                                "application/octet-stream"
+                                            }
                                         } else {
                                             "text/html"
                                         }
