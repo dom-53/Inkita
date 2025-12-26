@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import net.dom53.inkita.core.cache.CacheManager
+import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.notification.AppNotificationManager
@@ -191,7 +192,13 @@ class BrowseViewModel(
 
             var cachedPage: List<Series> = emptyList()
             if (cacheEnabled) {
-                cachedPage = runCatching { seriesRepository.getCachedBrowsePage(queryKey, 1) }.getOrNull().orEmpty()
+                cachedPage =
+                    runCatching {
+                        cacheManager.getCachedLibraryV2SeriesList(
+                            listType = LibraryV2CacheKeys.BROWSE,
+                            listKey = queryKey,
+                        )
+                    }.getOrNull().orEmpty()
                 if (cachedPage.isNotEmpty()) {
                     _state.update {
                         it.copy(
@@ -352,7 +359,11 @@ class BrowseViewModel(
         }
         val results = ordered.values.toList()
         if (cacheKey != null) {
-            seriesRepository.cacheBrowsePage(cacheKey, page, results)
+            cacheManager.cacheLibraryV2SeriesList(
+                listType = LibraryV2CacheKeys.BROWSE,
+                listKey = cacheKey,
+                series = results,
+            )
         }
         return results
     }

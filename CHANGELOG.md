@@ -25,6 +25,7 @@ All notable changes to this project will be documented here.
 - Reader: Split EpubReaderViewModel and PdfReaderViewModel into separate files.
 - Series Detail: Removed legacy Series Detail screen/viewmodel implementation.
 - Downloads: Removed legacy (v1) download manager/worker/DB tables in favor of V2.
+- Library: Removed legacy Library screen/viewmodel and legacy cache APIs; Browse now uses V2 cache lists.
 - UI: Rounded corners aligned across Library V2, Series Detail V2, and Volume Detail V2 covers.
 - Downloads V2: Downloaded PDF items now open with the correct MIME type.
 - Downloads V2: Queue/Completed rows now wrap titles cleanly instead of truncating them.

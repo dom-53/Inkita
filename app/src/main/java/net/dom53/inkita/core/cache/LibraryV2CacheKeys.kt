@@ -13,4 +13,5 @@ object LibraryV2CacheKeys {
     const val BROWSE_PEOPLE = "browse_people"
     const val COLLECTION_SERIES = "collection_series"
     const val LIBRARY_SERIES = "library_series"
+    const val BROWSE = "browse"
 }
