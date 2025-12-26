@@ -51,6 +51,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
+import net.dom53.inkita.core.downloadv2.strategies.ChapterArchiveDownloadStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.DownloadApiStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2
@@ -92,8 +93,8 @@ fun VolumeDetailScreenV2(
     var summaryExpanded by remember { mutableStateOf(false) }
     val offlineMode by appPreferences.offlineModeFlow.collectAsState(initial = false)
     val format = Format.fromId(payload?.formatId)
-    val isPdf = format == Format.Pdf
     val isEpub = format == Format.Epub
+    val isSingleFile = format == Format.Pdf || format == Format.Image || format == Format.Archive
     val haptics = LocalHapticFeedback.current
     var selectedChapter by remember(volumeId) { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
     var selectedChapterIndex by remember(volumeId) { mutableStateOf<Int?>(null) }
@@ -118,6 +119,20 @@ fun VolumeDetailScreenV2(
                     downloadDao = downloadDao,
                     appPreferences = appPreferences,
                 )
+            val imageStrategy =
+                ChapterArchiveDownloadStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                    key = ChapterArchiveDownloadStrategyV2.FORMAT_IMAGE,
+                )
+            val archiveStrategy =
+                ChapterArchiveDownloadStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                    key = ChapterArchiveDownloadStrategyV2.FORMAT_ARCHIVE,
+                )
             val downloadStrategy =
                 DownloadApiStrategyV2(
                     appContext = context.applicationContext,
@@ -128,7 +143,13 @@ fun VolumeDetailScreenV2(
                 appContext = context.applicationContext,
                 downloadDao = downloadDao,
                 strategies =
-                    listOf(epubStrategy, pdfStrategy, downloadStrategy).associateBy { it.key },
+                    listOf(
+                        epubStrategy,
+                        pdfStrategy,
+                        imageStrategy,
+                        archiveStrategy,
+                        downloadStrategy,
+                    ).associateBy { it.key },
             )
         }
 
@@ -403,7 +424,7 @@ fun VolumeDetailScreenV2(
                     ).filter { it.count > 0 }
                 if (selectedChapter != null) {
                     val pdfDownloaded =
-                        isPdf &&
+                        isSingleFile &&
                             downloadedItemsForChapter.value.any { item ->
                                 item.type == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.TYPE_FILE &&
                                     item.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
@@ -575,7 +596,7 @@ fun VolumeDetailScreenV2(
                                     item.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
                                         isItemPathPresent(item.localPath)
                                 }
-                            val expected = if (isPdf) 1 else chapter.pages?.takeIf { it > 0 } ?: 0
+                            val expected = if (isSingleFile) 1 else chapter.pages?.takeIf { it > 0 } ?: 0
                             val state =
                                 when {
                                     expected > 0 && completed >= expected -> ChapterDownloadState.Complete
@@ -621,7 +642,7 @@ fun VolumeDetailScreenV2(
                                                     net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
                                                     isItemPathPresent(item.localPath)
                                             }
-                                    val expected = if (isPdf) 1 else chapter.pages?.takeIf { it > 0 } ?: 0
+                                    val expected = if (isSingleFile) 1 else chapter.pages?.takeIf { it > 0 } ?: 0
                                     if (expected == 0 && completed == 0) {
                                         Toast
                                             .makeText(
@@ -750,8 +771,8 @@ fun VolumeDetailScreenV2(
                                         ).show()
                                     return@Button
                                 }
-                                val pages = if (isPdf) 1 else chapter.pages ?: 0
-                                if (!isPdf && pages <= 0) {
+                                val pages = if (isSingleFile) 1 else chapter.pages ?: 0
+                                if (!isSingleFile && pages <= 0) {
                                     Toast
                                         .makeText(
                                             context,
@@ -1038,5 +1059,7 @@ private fun formatKeyForVolume(formatId: Int?): String =
     when (net.dom53.inkita.domain.model.Format.fromId(formatId)) {
         net.dom53.inkita.domain.model.Format.Pdf -> PdfDownloadStrategyV2.FORMAT_PDF
         net.dom53.inkita.domain.model.Format.Epub -> EpubDownloadStrategyV2.FORMAT_EPUB
+        net.dom53.inkita.domain.model.Format.Image -> ChapterArchiveDownloadStrategyV2.FORMAT_IMAGE
+        net.dom53.inkita.domain.model.Format.Archive -> ChapterArchiveDownloadStrategyV2.FORMAT_ARCHIVE
         else -> DownloadApiStrategyV2.FORMAT_DOWNLOAD
     }

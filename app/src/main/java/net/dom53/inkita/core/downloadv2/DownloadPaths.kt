@@ -81,4 +81,27 @@ object DownloadPaths {
         context: Context,
         chapterId: Int,
     ): File = File(pdfTempDir(context), "pdf-$chapterId.pdf")
+
+    fun cbzFile(
+        context: Context,
+        seriesId: Int,
+        volumeId: Int?,
+        chapterId: Int,
+    ): File {
+        val chapterDir = chapterDir(context, seriesId, volumeId, chapterId)
+        val volume = volumeId ?: 0
+        return File(chapterDir, "${seriesId}_${volume}-${chapterId}.cbz")
+    }
+
+    fun imagePageCacheDir(
+        context: Context,
+        chapterId: Int,
+    ): File = File(context.cacheDir, "image-pages/$chapterId")
+
+    fun imagePageCacheFile(
+        context: Context,
+        chapterId: Int,
+        page: Int,
+        extension: String,
+    ): File = File(imagePageCacheDir(context, chapterId), "page-$page.$extension")
 }

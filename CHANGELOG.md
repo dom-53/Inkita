@@ -11,11 +11,13 @@ All notable changes to this project will be documented here.
 - Library/Browse: Download status badges now appear on series covers (complete/partial).
 - Downloads V2: Download queue entries now show series/volume/chapter labels when available.
 - Reader: Added basic Image/Archive reader (image pages + swipe navigation).
-- Series Detail V2: Chapters list now supports swipe read/unread and download (download is placeholder).
+- Series Detail V2: Chapters list now supports swipe read/unread and download.
 - Downloads V2: Added default Download API strategy for series/volume/chapter archives.
 - Series Detail V2: Menu now shows a tree view of downloaded files/structure.
 - Reader: PDF opened for reading no longer persists on disk unless downloaded; temp files are cleaned on exit/startup (with verbose logs).
 - Downloads V2: Normalized on-disk layout for series/volumes/chapters/specials to avoid duplicated files.
+- Downloads V2: Added image/archive chapter downloads that store CBZ files.
+- Reader: Offline Image/Archive reading now loads pages from downloaded CBZ files.
 
 ### Changed
 - Reader: Split EpubReaderViewModel and PdfReaderViewModel into separate files.
@@ -24,6 +26,7 @@ All notable changes to this project will be documented here.
 - Downloads V2: Queue/Completed rows now wrap titles cleanly instead of truncating them.
 - Reader: Page navigation now jumps across chapters at the edges (next/previous).
 - Reader: Next Chapter now prompts to mark the current chapter as read when leaving early.
+- Reader: Image/Archive format routing now preserves format id in navigation.
 
 ### Fixed
 - Navigation: Bottom bar now remains visible when opening Library/Browse with query params (collections/tags/genres).

@@ -556,7 +556,7 @@ fun InkitaApp(
                             readerRepository = readerRepository,
                             cacheManager = cacheManager,
                             onOpenReader = { chapterId, page, sid, vid, fmt ->
-                                navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: 0}")
+                                navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: -1}")
                             },
                             onOpenVolume = { volumeId ->
                                 navController.navigate("volume/$volumeId")
@@ -636,7 +636,7 @@ fun InkitaApp(
                                 },
                                 navArgument("fmt") {
                                     type = NavType.IntType
-                                    defaultValue = 0
+                                    defaultValue = -1
                                 },
                             ),
                     ) { entry ->
@@ -644,7 +644,7 @@ fun InkitaApp(
                         val page = entry.arguments?.getInt("page")
                         val sid = entry.arguments?.getInt("sid")?.takeIf { it != 0 }
                         val vid = entry.arguments?.getInt("vid")?.takeIf { it != 0 }
-                        val fmt = entry.arguments?.getInt("fmt")?.takeIf { it != 0 }
+                        val fmt = entry.arguments?.getInt("fmt")?.takeIf { it != -1 }
                         ReaderScreen(
                             chapterId = chId,
                             initialPage = page,
@@ -668,8 +668,9 @@ fun InkitaApp(
                             onNavigateToChapter = { targetChapter, targetPage, targetSid, targetVid ->
                                 val nextSid = targetSid ?: sid ?: 0
                                 val nextVid = targetVid ?: vid ?: 0
-                                navController.navigate("reader/$targetChapter?page=${targetPage ?: 0}&sid=$nextSid&vid=$nextVid&fmt=${fmt ?: 0}") {
-                                    popUpTo("reader/$chId?page=${page ?: 0}&sid=${sid ?: 0}&vid=${vid ?: 0}&fmt=${fmt ?: 0}") { inclusive = true }
+                                val fmtValue = fmt ?: -1
+                                navController.navigate("reader/$targetChapter?page=${targetPage ?: 0}&sid=$nextSid&vid=$nextVid&fmt=$fmtValue") {
+                                    popUpTo("reader/$chId?page=${page ?: 0}&sid=${sid ?: 0}&vid=${vid ?: 0}&fmt=$fmtValue") { inclusive = true }
                                 }
                             },
                         )

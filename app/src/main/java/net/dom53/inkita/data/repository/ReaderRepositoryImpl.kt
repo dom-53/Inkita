@@ -3,11 +3,11 @@ package net.dom53.inkita.data.repository
 import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.flow.first
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.sync.ProgressSyncWorker
-import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.data.local.db.dao.DownloadDao
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
@@ -27,6 +27,8 @@ import net.dom53.inkita.domain.model.ReaderTimeLeft
 import net.dom53.inkita.domain.repository.ReaderRepository
 import java.io.File
 import java.io.IOException
+import java.util.Locale
+import java.util.zip.ZipFile
 
 class ReaderRepositoryImpl(
     private val context: Context,
@@ -35,6 +37,8 @@ class ReaderRepositoryImpl(
     private val downloadDao: DownloadDao? = null,
     private val downloadV2Dao: DownloadV2Dao? = null,
 ) : ReaderRepository {
+    private val archiveEntryCache = mutableMapOf<String, List<String>>()
+
     class PageNotDownloadedException(
         message: String,
     ) : IOException(message)
@@ -117,6 +121,13 @@ class ReaderRepositoryImpl(
         if (downloadedPath != null) {
             return ReaderImageResult(downloadedPath, true)
         }
+        val archiveItem = downloadV2Dao?.getDownloadedFileForChapter(chapterId)
+        val archivePath = archiveItem?.localPath?.takeIf { isPathPresent(it) }
+        if (archivePath != null) {
+            extractImageFromArchive(archivePath, chapterId, page)?.let { path ->
+                return ReaderImageResult(path, true)
+            }
+        }
         if (!isOnlineAllowed()) {
             throw PageNotDownloadedException("Page not downloaded for offline reading")
         }
@@ -147,6 +158,12 @@ class ReaderRepositoryImpl(
                 if (!present) return false
                 return present
             }
+        }
+        val archiveItem = downloadV2Dao?.getDownloadedFileForChapter(chapterId)
+        val archivePath = archiveItem?.localPath?.takeIf { isPathPresent(it) }
+        if (archivePath != null) {
+            val entryNames = listArchiveImageEntries(archivePath)
+            return page in entryNames.indices
         }
         val downloaded = downloadDao?.getDownloadedPage(chapterId, page) ?: return false
         val present = isPathPresent(downloaded.htmlPath)
@@ -549,6 +566,94 @@ class ReaderRepositoryImpl(
         return File(path).exists()
     }
 
+    private fun extractImageFromArchive(
+        archivePath: String,
+        chapterId: Int,
+        page: Int,
+    ): String? {
+        val entries = listArchiveImageEntries(archivePath)
+        val entryName = entries.getOrNull(page) ?: return null
+        val extension =
+            entryName
+                .substringAfterLast('.', "jpg")
+                .lowercase(Locale.US)
+                .ifBlank { "jpg" }
+        val target =
+            DownloadPaths.imagePageCacheFile(
+                context = context,
+                chapterId = chapterId,
+                page = page,
+                extension = extension,
+            )
+        if (target.exists()) {
+            return target.absolutePath
+        }
+        target.parentFile?.mkdirs()
+        return runCatching {
+            ZipFile(archivePath).use { zip ->
+                val entry = zip.getEntry(entryName) ?: return@runCatching null
+                zip.getInputStream(entry).use { input ->
+                    target.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                target.absolutePath
+            }
+        }.getOrNull()
+    }
+
+    private fun listArchiveImageEntries(path: String): List<String> {
+        archiveEntryCache[path]?.let { return it }
+        val entries =
+            runCatching {
+                ZipFile(path).use { zip ->
+                    zip.entries()
+                        .asSequence()
+                        .filter { !it.isDirectory }
+                        .map { it.name }
+                        .filter { isImageFile(it) }
+                        .sortedWith { a, b -> naturalCompare(a, b) }
+                        .toList()
+                }
+            }.getOrDefault(emptyList())
+        archiveEntryCache[path] = entries
+        return entries
+    }
+
+    private fun isImageFile(name: String): Boolean {
+        val ext = name.substringAfterLast('.', "").lowercase(Locale.US)
+        return ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp")
+    }
+
+    private fun naturalCompare(
+        a: String,
+        b: String,
+    ): Int {
+        if (a == b) return 0
+        val partsA = splitNatural(a.lowercase(Locale.US))
+        val partsB = splitNatural(b.lowercase(Locale.US))
+        val max = maxOf(partsA.size, partsB.size)
+        for (i in 0 until max) {
+            val partA = partsA.getOrNull(i) ?: return -1
+            val partB = partsB.getOrNull(i) ?: return 1
+            val isNumA = partA.all { it.isDigit() }
+            val isNumB = partB.all { it.isDigit() }
+            val cmp =
+                if (isNumA && isNumB) {
+                    partA.toLong().compareTo(partB.toLong())
+                } else {
+                    partA.compareTo(partB)
+                }
+            if (cmp != 0) return cmp
+        }
+        return 0
+    }
+
+    private fun splitNatural(value: String): List<String> {
+        val regex = Regex("(\\d+)|(\\D+)")
+        return regex.findAll(value).map { it.value }.toList()
+    }
+
     private fun isOnlineAllowed(): Boolean =
         NetworkMonitor
             .getInstance(context, appPreferences)
@@ -562,9 +667,38 @@ class ReaderRepositoryImpl(
                 .filter { it.status == DownloadedItemV2Entity.STATUS_COMPLETED }
                 .filter { it.page != null }
                 .filter { isPathPresent(it.localPath ?: return@filter false) }
-        if (completed.isEmpty()) return null
-        val maxPage = completed.maxOf { it.page ?: 0 }
         val progress = readerDao.getLocalProgress(chapterId)
+        if (completed.isEmpty()) {
+            val fileItem =
+                items.firstOrNull { item ->
+                    item.status == DownloadedItemV2Entity.STATUS_COMPLETED &&
+                        item.type == DownloadedItemV2Entity.TYPE_FILE &&
+                        item.localPath?.let { isPathPresent(it) } == true
+                }
+            val archivePath = fileItem?.localPath
+            if (archivePath != null) {
+                val entries = listArchiveImageEntries(archivePath)
+                if (entries.isNotEmpty()) {
+                    val title =
+                        runCatching {
+                            context.getString(
+                                net.dom53.inkita.R.string.series_detail_chapter_fallback,
+                                chapterId,
+                            )
+                        }.getOrNull()
+                    return ReaderBookInfo(
+                        pages = entries.size,
+                        seriesId = progress?.seriesId ?: fileItem.seriesId,
+                        volumeId = progress?.volumeId ?: fileItem.volumeId,
+                        libraryId = progress?.libraryId,
+                        title = null,
+                        pageTitle = title,
+                    )
+                }
+            }
+            return null
+        }
+        val maxPage = completed.maxOf { it.page ?: 0 }
         val seriesId = progress?.seriesId ?: completed.firstOrNull()?.seriesId
         val volumeId = progress?.volumeId ?: completed.firstOrNull()?.volumeId
         val libraryId = progress?.libraryId
