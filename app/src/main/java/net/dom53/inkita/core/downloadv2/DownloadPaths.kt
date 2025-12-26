@@ -74,4 +74,11 @@ object DownloadPaths {
         val volume = volumeId ?: 0
         return File(chapterDir, "${seriesId}_${volume}-${chapterId}.pdf")
     }
+
+    fun pdfTempDir(context: Context): File = File(context.cacheDir, "pdf-temp")
+
+    fun pdfTempFile(
+        context: Context,
+        chapterId: Int,
+    ): File = File(pdfTempDir(context), "pdf-$chapterId.pdf")
 }

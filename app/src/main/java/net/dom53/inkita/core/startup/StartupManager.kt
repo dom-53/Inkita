@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.cache.CacheManagerImpl
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.notification.AppNotificationManager
@@ -133,6 +134,18 @@ object StartupManager {
         ProgressSyncWorker.enqueue(appContext)
         // Check for app updates and post a notification if available (best-effort).
         appScope.launch { UpdateChecker.checkForUpdate(appContext) }
+        appScope.launch(Dispatchers.IO) {
+            val tempDir = DownloadPaths.pdfTempDir(appContext)
+            if (tempDir.exists()) {
+                tempDir.deleteRecursively()
+                if (LoggingManager.isDebugEnabled()) {
+                    LoggingManager.d(
+                        "PdfReader",
+                        "Cleared temp PDF cache on startup: ${tempDir.absolutePath}",
+                    )
+                }
+            }
+        }
 
         val components =
             Components(

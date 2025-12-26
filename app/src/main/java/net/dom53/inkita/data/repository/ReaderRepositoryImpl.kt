@@ -243,17 +243,26 @@ class ReaderRepositoryImpl(
             return File(existing.localPath!!)
         }
         val bookInfo = getBookInfo(chapterId)
-        val target =
+        val storedPdf =
             bookInfo
                 ?.seriesId
                 ?.let { DownloadPaths.pdfFile(context, it, bookInfo.volumeId, chapterId) }
-                ?: File(
-                    context.getExternalFilesDir("Inkita/downloads/pdfs"),
-                    "pdf-$chapterId.pdf",
-                )
-        if (target.exists()) {
-            recordPdfDownloadIfMissing(chapterId, target)
-            return target
+        if (storedPdf?.exists() == true) {
+            recordPdfDownloadIfMissing(chapterId, storedPdf)
+            return storedPdf
+        }
+        val legacyTarget =
+            File(
+                context.getExternalFilesDir("Inkita/downloads/pdfs"),
+                "pdf-$chapterId.pdf",
+            )
+        if (legacyTarget.exists()) {
+            recordPdfDownloadIfMissing(chapterId, legacyTarget)
+            return legacyTarget
+        }
+        val tempTarget = DownloadPaths.pdfTempFile(context, chapterId)
+        if (tempTarget.exists()) {
+            return tempTarget
         }
 
         val api =
@@ -270,14 +279,19 @@ class ReaderRepositoryImpl(
             )
         if (!response.isSuccessful) return null
         val body = response.body() ?: return null
-        target.parentFile?.mkdirs()
-        target.outputStream().use { out ->
+        tempTarget.parentFile?.mkdirs()
+        tempTarget.outputStream().use { out ->
             body.byteStream().use { input ->
                 input.copyTo(out)
             }
         }
-        recordPdfDownloadIfMissing(chapterId, target)
-        return target
+        if (net.dom53.inkita.core.logging.LoggingManager.isDebugEnabled()) {
+            net.dom53.inkita.core.logging.LoggingManager.d(
+                "PdfReader",
+                "Saved temp PDF: ${tempTarget.absolutePath}",
+            )
+        }
+        return tempTarget
     }
 
     private suspend fun recordPdfDownloadIfMissing(
