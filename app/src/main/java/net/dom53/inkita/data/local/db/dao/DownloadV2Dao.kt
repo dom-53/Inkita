@@ -26,6 +26,12 @@ interface DownloadV2Dao {
     @Query("SELECT * FROM download_jobs_v2 WHERE status = :status ORDER BY updatedAt DESC")
     suspend fun getJobsByStatus(status: String): List<DownloadJobV2Entity>
 
+    @Query("SELECT COUNT(*) FROM download_jobs_v2")
+    suspend fun countJobs(): Int
+
+    @Query("SELECT COUNT(*) FROM download_jobs_v2 WHERE status = :status")
+    suspend fun countJobsByStatus(status: String): Int
+
     @Query("DELETE FROM download_jobs_v2 WHERE status = :status")
     suspend fun deleteJobsByStatus(status: String)
 
@@ -68,6 +74,9 @@ interface DownloadV2Dao {
 
     @Query("SELECT * FROM download_items_v2 WHERE status = :status ORDER BY updatedAt DESC")
     fun observeItemsByStatus(status: String): Flow<List<DownloadedItemV2Entity>>
+
+    @Query("SELECT * FROM download_items_v2 WHERE status = :status")
+    suspend fun getItemsByStatus(status: String): List<DownloadedItemV2Entity>
 
     @Query("SELECT * FROM download_items_v2 WHERE seriesId = :seriesId ORDER BY updatedAt DESC")
     fun observeItemsForSeries(seriesId: Int): Flow<List<DownloadedItemV2Entity>>

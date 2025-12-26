@@ -10,6 +10,7 @@ All notable changes to this project will be documented here.
 - Downloads V2: PDF download requests now enqueue and appear in the Download Queue.
 - Library/Browse: Download status badges now appear on series covers (complete/partial).
 - Settings: Toggle to show/hide download status badges in Download settings.
+- Settings: Added download stats dialog to Download settings.
 - Downloads V2: Download queue entries now show series/volume/chapter labels when available.
 - Reader: Added basic Image/Archive reader (image pages + swipe navigation).
 - Series Detail V2: Chapters list now supports swipe read/unread and download.

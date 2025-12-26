@@ -290,6 +290,16 @@
     <string name="settings_downloads_prefer_offline_subtitle">Pokud je to možné, čtečka použije stažené stránky, i když je online.</string>
     <string name="settings_downloads_show_badges_title">Zobrazovat ikony stažení</string>
     <string name="settings_downloads_show_badges_subtitle">Zobrazí stav stažení na obálkách sérií.</string>
+    <string name="settings_downloads_stats_title">Statistiky stahování</string>
+    <string name="settings_downloads_stats_button">Statistiky stahování</string>
+    <string name="settings_downloads_stats_series">Stažené série: %1$d</string>
+    <string name="settings_downloads_stats_volumes">Stažené svazky: %1$d</string>
+    <string name="settings_downloads_stats_chapters">Stažené kapitoly: %1$d</string>
+    <string name="settings_downloads_stats_pages">Stažené stránky: %1$d</string>
+    <string name="settings_downloads_stats_files">Stažené soubory: %1$d</string>
+    <string name="settings_downloads_stats_jobs">Úlohy: %1$d (čeká %2$d, běží %3$d, chyba %4$d, hotovo %5$d)</string>
+    <string name="settings_downloads_stats_items">Položky: %1$d (čeká %2$d, běží %3$d, chyba %4$d, hotovo %5$d)</string>
+    <string name="settings_downloads_stats_size">Velikost na disku: %1$s</string>
     <string name="settings_downloads_max_concurrent_title">Max současných stahování</string>
     <string name="settings_downloads_max_concurrent_subtitle">Omez počet paralelně běžících stahování stránek (1-6).</string>
     <string name="settings_downloads_auto_retry_title">Automatické opakování</string>

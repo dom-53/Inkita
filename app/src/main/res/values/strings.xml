@@ -496,6 +496,16 @@
     <string name="settings_downloads_max_retry_title">Max retry attempts</string>
     <string name="settings_downloads_max_retry_subtitle">Total attempts per task before it fails.</string>
     <string name="settings_downloads_limits_note">These limits are applied to download and prefetch workers.</string>
+    <string name="settings_downloads_stats_title">Download stats</string>
+    <string name="settings_downloads_stats_button">Download stats</string>
+    <string name="settings_downloads_stats_series">Downloaded series: %1$d</string>
+    <string name="settings_downloads_stats_volumes">Downloaded volumes: %1$d</string>
+    <string name="settings_downloads_stats_chapters">Downloaded chapters: %1$d</string>
+    <string name="settings_downloads_stats_pages">Downloaded pages: %1$d</string>
+    <string name="settings_downloads_stats_files">Downloaded files: %1$d</string>
+    <string name="settings_downloads_stats_jobs">Jobs: %1$d (pending %2$d, running %3$d, failed %4$d, completed %5$d)</string>
+    <string name="settings_downloads_stats_items">Items: %1$d (pending %2$d, running %3$d, failed %4$d, completed %5$d)</string>
+    <string name="settings_downloads_stats_size">Stored size: %1$s</string>
     <string name="settings_downloads_clear_downloaded">Clear downloaded pages</string>
     <string name="settings_downloads_clear_downloaded_confirm_title">Clear downloaded pages</string>
     <string name="settings_downloads_clear_downloaded_confirm_text">Remove all downloaded HTML pages and assets from device storage?</string>

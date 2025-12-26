@@ -1,6 +1,7 @@
 package net.dom53.inkita.ui.settings.screens
 
 import android.widget.Toast
+import android.text.format.Formatter
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,12 +18,14 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +48,9 @@ import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
+import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
+import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
+import java.io.File
 
 @Composable
 fun SettingsDownloadScreen(
@@ -61,6 +67,9 @@ fun SettingsDownloadScreen(
     var retryEnabled by remember { mutableStateOf(true) }
     var maxRetries by remember { mutableStateOf(3) }
     var showClearDialog by remember { mutableStateOf(false) }
+    var showStatsDialog by remember { mutableStateOf(false) }
+    var statsLoading by remember { mutableStateOf(false) }
+    var statsBody by remember { mutableStateOf("") }
     var deleteAfterMarkRead by remember { mutableStateOf(false) }
     var deleteAfterReadDepth by remember { mutableStateOf(1) }
 
@@ -218,8 +227,29 @@ fun SettingsDownloadScreen(
         )
 
         Divider(modifier = Modifier.padding(vertical = 8.dp))
-        Button(onClick = { showClearDialog = true }) {
+        Button(
+            onClick = { showClearDialog = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Text(stringResource(net.dom53.inkita.R.string.settings_downloads_clear_downloaded))
+        }
+        OutlinedButton(
+            onClick = {
+                showStatsDialog = true
+                statsLoading = true
+                statsBody = ""
+                scope.launch {
+                    val body =
+                        withContext(Dispatchers.IO) {
+                            buildDownloadStats(context, downloadV2Dao)
+                        }
+                    statsBody = body
+                    statsLoading = false
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(net.dom53.inkita.R.string.settings_downloads_stats_button))
         }
     }
 
@@ -250,6 +280,30 @@ fun SettingsDownloadScreen(
             },
         )
     }
+
+    if (showStatsDialog) {
+        AlertDialog(
+            onDismissRequest = { showStatsDialog = false },
+            title = { Text(stringResource(net.dom53.inkita.R.string.settings_downloads_stats_title)) },
+            text = {
+                if (statsLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    Text(statsBody)
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showStatsDialog = false }) {
+                    Text(stringResource(net.dom53.inkita.R.string.general_back))
+                }
+            },
+        )
+    }
 }
 
 private suspend fun clearDownloadV2(
@@ -262,6 +316,69 @@ private suspend fun clearDownloadV2(
     }
     downloadV2Dao.clearAllItems()
     downloadV2Dao.clearAllJobs()
+}
+
+private suspend fun buildDownloadStats(
+    context: android.content.Context,
+    downloadV2Dao: DownloadV2Dao,
+): String {
+    val completedItems = downloadV2Dao.getItemsByStatus(DownloadedItemV2Entity.STATUS_COMPLETED)
+    val pendingItems = downloadV2Dao.getItemsByStatus(DownloadedItemV2Entity.STATUS_PENDING)
+    val runningItems = downloadV2Dao.getItemsByStatus(DownloadedItemV2Entity.STATUS_RUNNING)
+    val failedItems = downloadV2Dao.getItemsByStatus(DownloadedItemV2Entity.STATUS_FAILED)
+
+    val pagesCompleted = completedItems.count { it.type == DownloadedItemV2Entity.TYPE_PAGE }
+    val filesCompleted = completedItems.count { it.type == DownloadedItemV2Entity.TYPE_FILE }
+    val seriesCount = completedItems.mapNotNull { it.seriesId }.toSet().size
+    val volumeCount = completedItems.mapNotNull { it.volumeId }.toSet().size
+    val chapterCount = completedItems.mapNotNull { it.chapterId }.toSet().size
+
+    val jobTotal = downloadV2Dao.countJobs()
+    val jobPending = downloadV2Dao.countJobsByStatus(DownloadJobV2Entity.STATUS_PENDING)
+    val jobRunning = downloadV2Dao.countJobsByStatus(DownloadJobV2Entity.STATUS_RUNNING)
+    val jobFailed = downloadV2Dao.countJobsByStatus(DownloadJobV2Entity.STATUS_FAILED)
+    val jobCompleted = downloadV2Dao.countJobsByStatus(DownloadJobV2Entity.STATUS_COMPLETED)
+
+    val itemsTotal = completedItems.size + pendingItems.size + runningItems.size + failedItems.size
+    val diskBytes = dirSize(DownloadPaths.baseDir(context))
+    val sizeText = Formatter.formatFileSize(context, diskBytes)
+
+    return buildString {
+        appendLine(context.getString(net.dom53.inkita.R.string.settings_downloads_stats_series, seriesCount))
+        appendLine(context.getString(net.dom53.inkita.R.string.settings_downloads_stats_volumes, volumeCount))
+        appendLine(context.getString(net.dom53.inkita.R.string.settings_downloads_stats_chapters, chapterCount))
+        appendLine(context.getString(net.dom53.inkita.R.string.settings_downloads_stats_pages, pagesCompleted))
+        appendLine(context.getString(net.dom53.inkita.R.string.settings_downloads_stats_files, filesCompleted))
+        appendLine(
+            context.getString(
+                net.dom53.inkita.R.string.settings_downloads_stats_jobs,
+                jobTotal,
+                jobPending,
+                jobRunning,
+                jobFailed,
+                jobCompleted,
+            ),
+        )
+        appendLine(
+            context.getString(
+                net.dom53.inkita.R.string.settings_downloads_stats_items,
+                itemsTotal,
+                pendingItems.size,
+                runningItems.size,
+                failedItems.size,
+                completedItems.size,
+            ),
+        )
+        appendLine(context.getString(net.dom53.inkita.R.string.settings_downloads_stats_size, sizeText))
+    }.trimEnd()
+}
+
+private fun dirSize(dir: File?): Long {
+    if (dir == null || !dir.exists()) return 0L
+    return dir
+        .walkBottomUp()
+        .filter { it.isFile }
+        .sumOf { it.length() }
 }
 
 @Composable
