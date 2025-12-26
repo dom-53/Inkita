@@ -81,7 +81,7 @@ import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
-import net.dom53.inkita.core.downloadv2.strategies.ChapterArchiveDownloadStrategyV2
+import net.dom53.inkita.core.downloadv2.strategies.ChapterImageArchiveDownloadStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.DownloadApiStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2
@@ -199,18 +199,18 @@ fun SeriesDetailScreenV2(
                     appPreferences = appPreferences,
                 )
             val imageStrategy =
-                ChapterArchiveDownloadStrategyV2(
+                ChapterImageArchiveDownloadStrategyV2(
                     appContext = context.applicationContext,
                     downloadDao = downloadDao,
                     appPreferences = appPreferences,
-                    key = ChapterArchiveDownloadStrategyV2.FORMAT_IMAGE,
+                    key = ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE,
                 )
             val archiveStrategy =
-                ChapterArchiveDownloadStrategyV2(
+                ChapterImageArchiveDownloadStrategyV2(
                     appContext = context.applicationContext,
                     downloadDao = downloadDao,
                     appPreferences = appPreferences,
-                    key = ChapterArchiveDownloadStrategyV2.FORMAT_ARCHIVE,
+                    key = ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE,
                 )
             val downloadStrategy =
                 DownloadApiStrategyV2(
@@ -300,8 +300,9 @@ fun SeriesDetailScreenV2(
                                 val format = Format.fromId(detail?.series?.format)
                                 val isPdf = format == Format.Pdf
                                 val isEpub = format == Format.Epub
-                                val isArchive = format == Format.Image || format == Format.Archive
-                                if (!isPdf && !isEpub && !isArchive) {
+                                val isImage = format == Format.Image
+                                val isArchive = format == Format.Archive
+                                if (!isPdf && !isEpub && !isImage && !isArchive) {
                                     Toast
                                         .makeText(
                                             context,
@@ -338,7 +339,7 @@ fun SeriesDetailScreenV2(
                                                 add(chapter to chapter.volumeId)
                                             }
                                     }.distinctBy { it.first.id }
-                                        .filter { isPdf || isArchive || (it.first.pages ?: 0) > 0 }
+                                        .filter { isPdf || isImage || isArchive || (it.first.pages ?: 0) > 0 }
                                 if (chaptersWithVolume.isEmpty()) {
                                     Toast
                                         .makeText(
@@ -351,7 +352,7 @@ fun SeriesDetailScreenV2(
                                 scope.launch {
                                     val sid = detail?.series?.id ?: seriesId
                                     chaptersWithVolume.forEach { (chapter, volumeId) ->
-                                        val pages = if (isPdf || isArchive) 1 else chapter.pages ?: return@forEach
+                                        val pages = if (isPdf || isImage || isArchive) 1 else chapter.pages ?: return@forEach
                                         val request =
                                             DownloadRequestV2(
                                                 type = DownloadJobV2Entity.TYPE_CHAPTER,
@@ -1298,8 +1299,9 @@ fun SeriesDetailScreenV2(
                                                 val format = Format.fromId(detail?.series?.format)
                                                 val isPdf = format == Format.Pdf
                                                 val isEpub = format == Format.Epub
-                                                val isArchive = format == Format.Image || format == Format.Archive
-                                                if (!isPdf && !isEpub && !isArchive) {
+                                                val isImage = format == Format.Image
+                                                val isArchive = format == Format.Archive
+                                                if (!isPdf && !isEpub && !isImage && !isArchive) {
                                                     Toast
                                                         .makeText(
                                                             context,
@@ -1308,8 +1310,8 @@ fun SeriesDetailScreenV2(
                                                         ).show()
                                                     return@Button
                                                 }
-                                                val pages = if (isPdf || isArchive) 1 else target.pages ?: 0
-                                                if (!isPdf && !isArchive && pages <= 0) {
+                                                val pages = if (isPdf || isImage || isArchive) 1 else target.pages ?: 0
+                                                if (!isPdf && !isImage && !isArchive && pages <= 0) {
                                                     Toast
                                                         .makeText(
                                                             context,
@@ -1518,8 +1520,9 @@ fun SeriesDetailScreenV2(
                                 val format = Format.fromId(detail?.series?.format)
                                 val isPdf = format == Format.Pdf
                                 val isEpub = format == Format.Epub
-                                val isArchive = format == Format.Image || format == Format.Archive
-                                if (!isPdf && !isEpub && !isArchive) {
+                                val isImage = format == Format.Image
+                                val isArchive = format == Format.Archive
+                                if (!isPdf && !isEpub && !isImage && !isArchive) {
                                     Toast
                                         .makeText(
                                             context,
@@ -1529,7 +1532,7 @@ fun SeriesDetailScreenV2(
                                     return@Button
                                 }
                                 val chapters =
-                                    if (isPdf || isArchive) {
+                                    if (isPdf || isImage || isArchive) {
                                         volume.chapters.orEmpty()
                                     } else {
                                         volume.chapters
@@ -1547,7 +1550,7 @@ fun SeriesDetailScreenV2(
                                 scope.launch {
                                     val seriesId = detail?.series?.id ?: seriesId
                                     chapters.forEach { chapter ->
-                                        val pages = if (isPdf || isArchive) 1 else chapter.pages ?: return@forEach
+                                        val pages = if (isPdf || isImage || isArchive) 1 else chapter.pages ?: return@forEach
                                         val request =
                                             DownloadRequestV2(
                                                 type = DownloadJobV2Entity.TYPE_CHAPTER,
@@ -1944,8 +1947,8 @@ private fun formatKeyFor(formatId: Int?): String =
     when (Format.fromId(formatId)) {
         Format.Pdf -> PdfDownloadStrategyV2.FORMAT_PDF
         Format.Epub -> EpubDownloadStrategyV2.FORMAT_EPUB
-        Format.Image -> ChapterArchiveDownloadStrategyV2.FORMAT_IMAGE
-        Format.Archive -> ChapterArchiveDownloadStrategyV2.FORMAT_ARCHIVE
+        Format.Image -> ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE
+        Format.Archive -> ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE
         else -> DownloadApiStrategyV2.FORMAT_DOWNLOAD
     }
 

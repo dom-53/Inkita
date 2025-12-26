@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import net.dom53.inkita.core.downloadv2.strategies.ChapterArchiveDownloadStrategyV2
+import net.dom53.inkita.core.downloadv2.strategies.ChapterImageArchiveDownloadStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.DownloadApiStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2
@@ -95,19 +95,19 @@ class DownloadWorkerV2(
                         downloadDao = dao,
                         appPreferences = appPreferences,
                     )
-                ChapterArchiveDownloadStrategyV2.FORMAT_IMAGE ->
-                    ChapterArchiveDownloadStrategyV2(
+                ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE ->
+                    ChapterImageArchiveDownloadStrategyV2(
                         appContext = applicationContext,
                         downloadDao = dao,
                         appPreferences = appPreferences,
-                        key = ChapterArchiveDownloadStrategyV2.FORMAT_IMAGE,
+                        key = ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE,
                     )
-                ChapterArchiveDownloadStrategyV2.FORMAT_ARCHIVE ->
-                    ChapterArchiveDownloadStrategyV2(
+                ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE ->
+                    ChapterImageArchiveDownloadStrategyV2(
                         appContext = applicationContext,
                         downloadDao = dao,
                         appPreferences = appPreferences,
-                        key = ChapterArchiveDownloadStrategyV2.FORMAT_ARCHIVE,
+                        key = ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE,
                     )
                 else -> null
             }

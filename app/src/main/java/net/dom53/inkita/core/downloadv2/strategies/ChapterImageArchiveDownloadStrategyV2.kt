@@ -22,7 +22,7 @@ import okio.sink
 import okio.source
 import java.io.File
 
-class ChapterArchiveDownloadStrategyV2(
+class ChapterImageArchiveDownloadStrategyV2(
     private val appContext: Context,
     private val downloadDao: DownloadV2Dao,
     private val appPreferences: AppPreferences,

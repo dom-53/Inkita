@@ -51,7 +51,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
-import net.dom53.inkita.core.downloadv2.strategies.ChapterArchiveDownloadStrategyV2
+import net.dom53.inkita.core.downloadv2.strategies.ChapterImageArchiveDownloadStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.DownloadApiStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2
@@ -94,7 +94,9 @@ fun VolumeDetailScreenV2(
     val offlineMode by appPreferences.offlineModeFlow.collectAsState(initial = false)
     val format = Format.fromId(payload?.formatId)
     val isEpub = format == Format.Epub
-    val isSingleFile = format == Format.Pdf || format == Format.Image || format == Format.Archive
+    val isImage = format == Format.Image
+    val isArchive = format == Format.Archive
+    val isSingleFile = format == Format.Pdf || isImage || isArchive
     val haptics = LocalHapticFeedback.current
     var selectedChapter by remember(volumeId) { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
     var selectedChapterIndex by remember(volumeId) { mutableStateOf<Int?>(null) }
@@ -120,18 +122,18 @@ fun VolumeDetailScreenV2(
                     appPreferences = appPreferences,
                 )
             val imageStrategy =
-                ChapterArchiveDownloadStrategyV2(
+                ChapterImageArchiveDownloadStrategyV2(
                     appContext = context.applicationContext,
                     downloadDao = downloadDao,
                     appPreferences = appPreferences,
-                    key = ChapterArchiveDownloadStrategyV2.FORMAT_IMAGE,
+                    key = ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE,
                 )
             val archiveStrategy =
-                ChapterArchiveDownloadStrategyV2(
+                ChapterImageArchiveDownloadStrategyV2(
                     appContext = context.applicationContext,
                     downloadDao = downloadDao,
                     appPreferences = appPreferences,
-                    key = ChapterArchiveDownloadStrategyV2.FORMAT_ARCHIVE,
+                    key = ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE,
                 )
             val downloadStrategy =
                 DownloadApiStrategyV2(
@@ -1059,7 +1061,7 @@ private fun formatKeyForVolume(formatId: Int?): String =
     when (net.dom53.inkita.domain.model.Format.fromId(formatId)) {
         net.dom53.inkita.domain.model.Format.Pdf -> PdfDownloadStrategyV2.FORMAT_PDF
         net.dom53.inkita.domain.model.Format.Epub -> EpubDownloadStrategyV2.FORMAT_EPUB
-        net.dom53.inkita.domain.model.Format.Image -> ChapterArchiveDownloadStrategyV2.FORMAT_IMAGE
-        net.dom53.inkita.domain.model.Format.Archive -> ChapterArchiveDownloadStrategyV2.FORMAT_ARCHIVE
+        net.dom53.inkita.domain.model.Format.Image -> ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE
+        net.dom53.inkita.domain.model.Format.Archive -> ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE
         else -> DownloadApiStrategyV2.FORMAT_DOWNLOAD
     }
