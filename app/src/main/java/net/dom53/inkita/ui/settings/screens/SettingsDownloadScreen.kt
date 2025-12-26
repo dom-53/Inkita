@@ -57,6 +57,7 @@ fun SettingsDownloadScreen(
     var allowLowBattery by remember { mutableStateOf(false) }
     var maxConcurrent by remember { mutableStateOf(2) }
     var preferOffline by remember { mutableStateOf(true) }
+    var showDownloadBadges by remember { mutableStateOf(true) }
     var retryEnabled by remember { mutableStateOf(true) }
     var maxRetries by remember { mutableStateOf(3) }
     var showClearDialog by remember { mutableStateOf(false) }
@@ -79,6 +80,9 @@ fun SettingsDownloadScreen(
     }
     LaunchedEffect(Unit) {
         appPreferences.preferOfflinePagesFlow.collectLatest { preferOffline = it }
+    }
+    LaunchedEffect(Unit) {
+        appPreferences.showDownloadBadgesFlow.collectLatest { showDownloadBadges = it }
     }
     LaunchedEffect(Unit) {
         appPreferences.downloadRetryEnabledFlow.collectLatest { retryEnabled = it }
@@ -134,6 +138,16 @@ fun SettingsDownloadScreen(
             onCheckedChange = {
                 preferOffline = it
                 scope.launch { appPreferences.setPreferOfflinePages(it) }
+            },
+        )
+
+        SettingToggleRow(
+            title = stringResource(net.dom53.inkita.R.string.settings_downloads_show_badges_title),
+            subtitle = stringResource(net.dom53.inkita.R.string.settings_downloads_show_badges_subtitle),
+            checked = showDownloadBadges,
+            onCheckedChange = {
+                showDownloadBadges = it
+                scope.launch { appPreferences.setShowDownloadBadges(it) }
             },
         )
 

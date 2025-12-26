@@ -127,6 +127,7 @@ fun LibraryV2Screen(
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
+    val showDownloadBadges by appPreferences.showDownloadBadgesFlow.collectAsState(initial = true)
     val downloadStates = uiState.downloadStates
     val showDrawerDebug = false
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -338,6 +339,7 @@ fun LibraryV2Screen(
                                     items = uiState.onDeck,
                                     config = config,
                                     downloadStates = downloadStates,
+                                    showDownloadBadges = showDownloadBadges,
                                     onOpenSeries = onOpenSeries,
                                 )
                                 HomeSection(
@@ -345,6 +347,7 @@ fun LibraryV2Screen(
                                     items = uiState.recentlyUpdated,
                                     config = config,
                                     downloadStates = downloadStates,
+                                    showDownloadBadges = showDownloadBadges,
                                     onOpenSeries = onOpenSeries,
                                 )
                                 HomeSection(
@@ -352,6 +355,7 @@ fun LibraryV2Screen(
                                     items = uiState.recentlyAdded,
                                     config = config,
                                     downloadStates = downloadStates,
+                                    showDownloadBadges = showDownloadBadges,
                                     onOpenSeries = onOpenSeries,
                                 )
                             }
@@ -366,6 +370,7 @@ fun LibraryV2Screen(
                         error = uiState.wantToReadError,
                         config = config,
                         downloadStates = downloadStates,
+                        showDownloadBadges = showDownloadBadges,
                         onOpenSeries = onOpenSeries,
                     )
                 }
@@ -379,6 +384,7 @@ fun LibraryV2Screen(
                             error = uiState.collectionSeriesError,
                             config = config,
                             downloadStates = downloadStates,
+                            showDownloadBadges = showDownloadBadges,
                             onBack = { viewModel.selectCollection(null) },
                             onOpenSeries = onOpenSeries,
                         )
@@ -420,6 +426,7 @@ fun LibraryV2Screen(
                         accessDenied = uiState.libraryAccessDenied,
                         config = config,
                         downloadStates = downloadStates,
+                        showDownloadBadges = showDownloadBadges,
                         onLoadMore = { viewModel.loadMoreLibrarySeries() },
                         onOpenSeries = onOpenSeries,
                     )
@@ -472,6 +479,7 @@ private fun HomeSection(
     items: List<HomeSeriesItem>,
     config: AppConfig,
     downloadStates: Map<Int, DownloadState>,
+    showDownloadBadges: Boolean,
     onOpenSeries: (Int) -> Unit,
 ) {
     Text(
@@ -490,6 +498,7 @@ private fun HomeSection(
                     item = item,
                     config = config,
                     downloadState = downloadStates[item.id] ?: DownloadState.None,
+                    showDownloadBadges = showDownloadBadges,
                     onOpenSeries = onOpenSeries,
                 )
             }
@@ -503,6 +512,7 @@ private fun SeriesCard(
     item: HomeSeriesItem,
     config: AppConfig,
     downloadState: DownloadState,
+    showDownloadBadges: Boolean,
     onOpenSeries: (Int) -> Unit,
 ) {
     val imageUrl = item.localThumbPath ?: seriesCoverUrl(config, item.id)
@@ -532,13 +542,15 @@ private fun SeriesCard(
                         ),
                 contentScale = ContentScale.Crop,
             )
-            DownloadStateBadge(
-                state = downloadState,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 6.dp, bottom = 10.dp),
-            )
+            if (showDownloadBadges) {
+                DownloadStateBadge(
+                    state = downloadState,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 6.dp, bottom = 10.dp),
+                )
+            }
         }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -557,6 +569,7 @@ private fun WantToReadGrid(
     error: String?,
     config: AppConfig,
     downloadStates: Map<Int, DownloadState>,
+    showDownloadBadges: Boolean,
     onOpenSeries: (Int) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -604,6 +617,7 @@ private fun WantToReadGrid(
                             series = series,
                             config = config,
                             downloadState = downloadStates[series.id] ?: DownloadState.None,
+                            showDownloadBadges = showDownloadBadges,
                             onOpenSeries = onOpenSeries,
                         )
                     }
@@ -618,6 +632,7 @@ private fun WantToReadCard(
     series: net.dom53.inkita.domain.model.Series,
     config: AppConfig,
     downloadState: DownloadState,
+    showDownloadBadges: Boolean,
     onOpenSeries: (Int) -> Unit,
 ) {
     val imageUrl = seriesCoverUrl(config, series.id)
@@ -646,13 +661,15 @@ private fun WantToReadCard(
                         ),
                 contentScale = ContentScale.Crop,
             )
-            DownloadStateBadge(
-                state = downloadState,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 6.dp, bottom = 10.dp),
-            )
+            if (showDownloadBadges) {
+                DownloadStateBadge(
+                    state = downloadState,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 6.dp, bottom = 10.dp),
+                )
+            }
         }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -773,6 +790,7 @@ private fun CollectionSeriesGrid(
     error: String?,
     config: AppConfig,
     downloadStates: Map<Int, DownloadState>,
+    showDownloadBadges: Boolean,
     onBack: () -> Unit,
     onOpenSeries: (Int) -> Unit,
 ) {
@@ -799,6 +817,7 @@ private fun CollectionSeriesGrid(
             error = error,
             config = config,
             downloadStates = downloadStates,
+            showDownloadBadges = showDownloadBadges,
             onOpenSeries = onOpenSeries,
         )
     }
@@ -1058,6 +1077,7 @@ private fun LibrarySeriesGrid(
     accessDenied: Boolean,
     config: AppConfig,
     downloadStates: Map<Int, DownloadState>,
+    showDownloadBadges: Boolean,
     onLoadMore: () -> Unit,
     onOpenSeries: (Int) -> Unit,
 ) {
@@ -1133,6 +1153,7 @@ private fun LibrarySeriesGrid(
                                 series = series,
                                 config = config,
                                 downloadState = downloadStates[series.id] ?: DownloadState.None,
+                                showDownloadBadges = showDownloadBadges,
                                 onOpenSeries = onOpenSeries,
                             )
                         }

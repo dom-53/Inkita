@@ -484,6 +484,8 @@
     <string name="settings_downloads_allow_low_battery_subtitle">When off, downloads wait until battery is not low.</string>
     <string name="settings_downloads_prefer_offline_title">Prefer offline pages</string>
     <string name="settings_downloads_prefer_offline_subtitle">When available, reader will use downloaded pages even when online.</string>
+    <string name="settings_downloads_show_badges_title">Show download badges</string>
+    <string name="settings_downloads_show_badges_subtitle">Display download status badges on series covers.</string>
     <string name="settings_downloads_delete_after_section">Delete after reading</string>
     <string name="settings_downloads_delete_after_mark_title">Delete when marked as read</string>
     <string name="settings_downloads_delete_after_mark_subtitle">Automatically remove downloads after you mark items as read.</string>

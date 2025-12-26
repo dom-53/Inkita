@@ -138,6 +138,7 @@ fun BrowseScreen(
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
+    val showDownloadBadges by appPreferences.showDownloadBadgesFlow.collectAsState(initial = true)
     val browsePageSize by appPreferences.browsePageSizeFlow.collectAsState(initial = 25)
     val disableBrowseThumbnails by appPreferences.disableBrowseThumbnailsFlow.collectAsState(initial = false)
     val context = LocalContext.current
@@ -274,6 +275,7 @@ fun BrowseScreen(
                             gridState = gridState,
                             disableThumbnails = disableBrowseThumbnails,
                             downloadStates = uiState.downloadStates,
+                            showDownloadBadges = showDownloadBadges,
                             onSeriesClick = { onOpenSeries(it.id) },
                             onLoadMore = { viewModel.loadNextPage() },
                         )
@@ -656,6 +658,7 @@ private fun SeriesGrid(
     gridState: LazyGridState,
     disableThumbnails: Boolean,
     downloadStates: Map<Int, DownloadState>,
+    showDownloadBadges: Boolean,
     onLoadMore: () -> Unit,
     onSeriesClick: (Series) -> Unit,
 ) {
@@ -736,13 +739,15 @@ private fun SeriesGrid(
                                 else -> SubcomposeAsyncImageContent()
                             }
                         }
-                        DownloadStateBadge(
-                            state = downloadStates[series.id] ?: DownloadState.None,
-                            modifier =
-                                Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(end = 6.dp, bottom = 10.dp),
-                        )
+                        if (showDownloadBadges) {
+                            DownloadStateBadge(
+                                state = downloadStates[series.id] ?: DownloadState.None,
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(end = 6.dp, bottom = 10.dp),
+                            )
+                        }
                     }
                 }
 

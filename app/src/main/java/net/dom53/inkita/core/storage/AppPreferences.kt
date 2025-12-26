@@ -111,6 +111,7 @@ class AppPreferences(
         private val KEY_BROWSE_PAGE_SIZE = intPreferencesKey("browse_page_size")
         private val KEY_MAX_THUMBNAILS_PARALLEL = intPreferencesKey("max_thumbnails_parallel")
         private val KEY_DISABLE_BROWSE_THUMBNAILS = booleanPreferencesKey("disable_browse_thumbnails")
+        private val KEY_SHOW_DOWNLOAD_BADGES = booleanPreferencesKey("show_download_badges")
 
         private const val REFRESH_CACHE_DEFAULT = 720
         private const val STALE_CACHE_DEFAULT_MIN = 15
@@ -245,6 +246,8 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> (prefs[KEY_MAX_THUMBNAILS_PARALLEL] ?: 4).coerceIn(2, 6) }
     val disableBrowseThumbnailsFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_DISABLE_BROWSE_THUMBNAILS] ?: false }
+    val showDownloadBadgesFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_SHOW_DOWNLOAD_BADGES] ?: true }
 
     val prefetchCollectionsAllFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_COLLECTIONS_ALL] ?: true }
@@ -608,6 +611,12 @@ class AppPreferences(
     suspend fun setDisableBrowseThumbnails(disabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[KEY_DISABLE_BROWSE_THUMBNAILS] = disabled
+        }
+    }
+
+    suspend fun setShowDownloadBadges(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_SHOW_DOWNLOAD_BADGES] = enabled
         }
     }
 

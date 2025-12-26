@@ -288,6 +288,8 @@
     <string name="settings_downloads_limits_note">Tato omezení platí pro stahování i přednačítání.</string>
     <string name="settings_downloads_prefer_offline_title">Preferovat offline stránky</string>
     <string name="settings_downloads_prefer_offline_subtitle">Pokud je to možné, čtečka použije stažené stránky, i když je online.</string>
+    <string name="settings_downloads_show_badges_title">Zobrazovat ikony stažení</string>
+    <string name="settings_downloads_show_badges_subtitle">Zobrazí stav stažení na obálkách sérií.</string>
     <string name="settings_downloads_max_concurrent_title">Max současných stahování</string>
     <string name="settings_downloads_max_concurrent_subtitle">Omez počet paralelně běžících stahování stránek (1-6).</string>
     <string name="settings_downloads_auto_retry_title">Automatické opakování</string>
