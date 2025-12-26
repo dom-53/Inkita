@@ -355,5 +355,4 @@ class SeriesRepositoryImpl(
         val domain = body.map { it.toDomain() }
         return cacheManager.enrichThumbnails(domain)
     }
-
 }
