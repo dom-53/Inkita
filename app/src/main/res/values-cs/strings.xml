@@ -200,6 +200,17 @@
     <string name="reader_mark_chapter_read_confirm">Označit jako přečtenou</string>
     <string name="reader_mark_chapter_read_skip">Pokračovat bez označení</string>
     <string name="reader_font_selection">Vybrat font</string>
+    <string name="reader_settings_general_section">Obecné</string>
+    <string name="reader_settings_image_section">Čtečka obrázků</string>
+    <string name="reader_image_default_mode">Výchozí režim čtení</string>
+    <string name="reader_image_default_mode_subtitle">Použije se pro kapitoly Image a Archive</string>
+    <string name="reader_image_mode_ltr">Zleva doprava</string>
+    <string name="reader_image_mode_rtl">Zprava doleva</string>
+    <string name="reader_image_mode_webtoon">Webtoon</string>
+    <string name="reader_image_prefetch_pages">Počet přednačtených stránek</string>
+    <string name="reader_image_prefetch_pages_subtitle">Kolik stránek připravit dopředu</string>
+    <string name="reader_image_prefetch_pages_short">%1$d str.</string>
+    <string name="reader_image_prefetch_pages_value">%1$d stránek</string>
     <string name="reader_text_settings">Nastavení textu</string>
     <string name="reader_font_size">Velikost písma</string>
     <string name="reader_line_height">Výška řádku</string>

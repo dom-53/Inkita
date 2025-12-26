@@ -264,6 +264,17 @@
     <string name="reader_mark_chapter_read_confirm">Mark as read</string>
     <string name="reader_mark_chapter_read_skip">Continue without marking</string>
     <string name="reader_font_selection">Select font</string>
+    <string name="reader_settings_general_section">General</string>
+    <string name="reader_settings_image_section">Image reader</string>
+    <string name="reader_image_default_mode">Default reading mode</string>
+    <string name="reader_image_default_mode_subtitle">Used for Image and Archive chapters</string>
+    <string name="reader_image_mode_ltr">Left to right</string>
+    <string name="reader_image_mode_rtl">Right to left</string>
+    <string name="reader_image_mode_webtoon">Webtoon</string>
+    <string name="reader_image_prefetch_pages">Preloaded pages</string>
+    <string name="reader_image_prefetch_pages_subtitle">How many pages to prepare ahead</string>
+    <string name="reader_image_prefetch_pages_short">%1$d pages</string>
+    <string name="reader_image_prefetch_pages_value">%1$d pages</string>
     <string name="reader_text_settings">Text settings</string>
     <string name="reader_font_size">Font size</string>
     <string name="reader_line_height">Line height</string>

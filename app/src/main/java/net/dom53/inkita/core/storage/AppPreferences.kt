@@ -22,6 +22,8 @@ enum class AppTheme { System, Light, Dark }
 
 enum class ReaderThemeMode { Light, Dark, DarkHighContrast, Sepia, SepiaHighContrast, Gray }
 
+enum class ImageReaderMode { LeftToRight, RightToLeft, Webtoon }
+
 data class AppConfig(
     val serverUrl: String,
     val apiKey: String,
@@ -40,9 +42,12 @@ data class ReaderPrefs(
     val useSerif: Boolean = true,
     val fontFamily: String = DEFAULT_FONT_FAMILY,
     val readerTheme: ReaderThemeMode = ReaderThemeMode.Light,
+    val imageReaderMode: ImageReaderMode = ImageReaderMode.LeftToRight,
+    val imagePrefetchPages: Int = 8,
 ) {
     companion object {
         const val DEFAULT_FONT_FAMILY = "literata"
+        const val DEFAULT_IMAGE_PREFETCH_PAGES = 8
     }
 }
 
@@ -68,6 +73,8 @@ class AppPreferences(
         private val KEY_USE_SERIF = booleanPreferencesKey("reader_use_serif")
         private val KEY_FONT_FAMILY = stringPreferencesKey("reader_font_family")
         private val KEY_READER_THEME = stringPreferencesKey("reader_theme")
+        private val KEY_IMAGE_READER_MODE = stringPreferencesKey("image_reader_mode")
+        private val KEY_IMAGE_PREFETCH_PAGES = intPreferencesKey("image_prefetch_pages")
 
         private val KEY_APP_LANGUAGE = stringPreferencesKey("app_language")
         private val KEY_APP_THEME = stringPreferencesKey("app_theme")
@@ -149,6 +156,8 @@ class AppPreferences(
                     prefs[KEY_FONT_FAMILY]
                         ?: if ((prefs[KEY_USE_SERIF] ?: true)) ReaderPrefs.DEFAULT_FONT_FAMILY else "noto_sans",
                 readerTheme = prefs.toReaderTheme(),
+                imageReaderMode = prefs.toImageReaderMode(),
+                imagePrefetchPages = prefs[KEY_IMAGE_PREFETCH_PAGES] ?: ReaderPrefs.DEFAULT_IMAGE_PREFETCH_PAGES,
             )
         }
 
@@ -343,6 +352,8 @@ class AppPreferences(
                         prefs[KEY_FONT_FAMILY]
                             ?: if ((prefs[KEY_USE_SERIF] ?: true)) ReaderPrefs.DEFAULT_FONT_FAMILY else "noto_sans",
                     readerTheme = prefs.toReaderTheme(),
+                    imageReaderMode = prefs.toImageReaderMode(),
+                    imagePrefetchPages = prefs[KEY_IMAGE_PREFETCH_PAGES] ?: ReaderPrefs.DEFAULT_IMAGE_PREFETCH_PAGES,
                 )
             val next = current.transform()
             prefs[KEY_FONT_SIZE] = next.fontSize
@@ -352,6 +363,8 @@ class AppPreferences(
             prefs[KEY_USE_SERIF] = next.useSerif
             prefs[KEY_FONT_FAMILY] = next.fontFamily
             prefs[KEY_READER_THEME] = encodeReaderTheme(next.readerTheme)
+            prefs[KEY_IMAGE_READER_MODE] = encodeImageReaderMode(next.imageReaderMode)
+            prefs[KEY_IMAGE_PREFETCH_PAGES] = next.imagePrefetchPages.coerceAtLeast(0)
         }
     }
 
@@ -675,5 +688,19 @@ class AppPreferences(
             ReaderThemeMode.Sepia -> "sepia"
             ReaderThemeMode.SepiaHighContrast -> "sepia_hc"
             ReaderThemeMode.Gray -> "gray"
+        }
+
+    private fun Preferences.toImageReaderMode(): ImageReaderMode =
+        when (this[KEY_IMAGE_READER_MODE]) {
+            "rtl" -> ImageReaderMode.RightToLeft
+            "webtoon" -> ImageReaderMode.Webtoon
+            else -> ImageReaderMode.LeftToRight
+        }
+
+    private fun encodeImageReaderMode(mode: ImageReaderMode): String =
+        when (mode) {
+            ImageReaderMode.LeftToRight -> "ltr"
+            ImageReaderMode.RightToLeft -> "rtl"
+            ImageReaderMode.Webtoon -> "webtoon"
         }
 }
