@@ -1744,13 +1744,11 @@ fun SeriesDetailScreenV2(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f),
                                     )
-                                    if (!node.isDir) {
-                                        Text(
-                                            text = formatBytes(node.size),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
+                                    Text(
+                                        text = formatBytes(node.size),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                 }
                             }
                         }
@@ -1925,7 +1923,7 @@ private fun buildFileTree(root: File): FileNode {
         name = root.name,
         path = root.absolutePath,
         isDir = root.isDirectory,
-        size = if (root.isFile) root.length() else 0L,
+        size = if (root.isFile) root.length() else children.sumOf { it.size },
         children = children,
     )
 }
