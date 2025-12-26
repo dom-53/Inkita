@@ -96,6 +96,8 @@ import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.ui.browse.utils.PublicationState
 import net.dom53.inkita.ui.common.chapterCoverUrl
 import net.dom53.inkita.ui.common.collectionCoverUrl
+import net.dom53.inkita.ui.common.DownloadState
+import net.dom53.inkita.ui.common.DownloadStateResolver
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.reader.model.ReaderReturn
@@ -167,7 +169,7 @@ fun SeriesDetailScreenV2(
     var showDownloadVolumeDialog by remember { mutableStateOf(false) }
     var showVolumeActionsDialog by remember { mutableStateOf(false) }
     var showDownloadTreeDialog by remember { mutableStateOf(false) }
-    var downloadVolumeState by remember { mutableStateOf(DownloadVolumeState.None) }
+    var downloadVolumeState by remember { mutableStateOf(DownloadState.None) }
     var selectedVolume by remember { mutableStateOf<net.dom53.inkita.data.api.dto.VolumeDto?>(null) }
     var selectedSpecialChapter by remember { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
     var selectedSpecialIndex by remember { mutableStateOf<Int?>(null) }
@@ -175,7 +177,7 @@ fun SeriesDetailScreenV2(
     var downloadTreeLoading by remember { mutableStateOf(false) }
     val expandedPaths = remember { mutableStateMapOf<String, Boolean>() }
     val specialPageTitleCache = remember(seriesId) { mutableStateMapOf<Int, Map<Int, String>>() }
-    val volumeDownloadStates = remember { mutableStateMapOf<Int, DownloadVolumeState>() }
+    val volumeDownloadStates = remember { mutableStateMapOf<Int, DownloadState>() }
     val downloadDao =
         remember(context.applicationContext) {
             InkitaDatabase.getInstance(context.applicationContext).downloadV2Dao()
@@ -692,7 +694,7 @@ fun SeriesDetailScreenV2(
                         if (selectedTab == SeriesDetailTab.Books) {
                             val volumes = detail?.detail?.volumes.orEmpty()
                             LaunchedEffect(volumes, downloadedItemsBySeries.value) {
-                                val isSingleFile = isSingleFileFormat(detail?.series?.format)
+                                val format = Format.fromId(detail?.series?.format)
                                 val items = downloadedItemsBySeries.value
                                 val grouped =
                                     items
@@ -700,28 +702,12 @@ fun SeriesDetailScreenV2(
                                         .groupBy { it.volumeId!! }
                                 volumes.forEach { volume ->
                                     val list = grouped[volume.id].orEmpty()
-                                    val completed =
-                                        list.count { item ->
-                                            item.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                                isItemPathPresent(item.localPath)
-                                        }
-                                    val expected =
-                                        if (isSingleFile) {
-                                            volume.chapters?.size ?: 0
-                                        } else {
-                                            volume.pages
-                                                ?.takeIf { it > 0 }
-                                                ?: volume.chapters
-                                                    ?.sumOf { it.pages ?: 0 }
-                                                    ?.takeIf { it > 0 }
-                                                ?: 0
-                                        }
                                     val state =
-                                        when {
-                                            expected > 0 && completed >= expected -> DownloadVolumeState.Complete
-                                            completed > 0 -> DownloadVolumeState.Partial
-                                            else -> DownloadVolumeState.None
-                                        }
+                                        DownloadStateResolver.resolveVolumeState(
+                                            format = format,
+                                            volume = volume,
+                                            items = list,
+                                        )
                                     volumeDownloadStates[volume.id] = state
                                 }
                             }
@@ -743,32 +729,15 @@ fun SeriesDetailScreenV2(
                                 },
                                 onLongPressVolume = { volume ->
                                     scope.launch {
-                                        val isSingleFile = isSingleFileFormat(detail?.series?.format)
-                                        val completed =
-                                            downloadedItemsBySeries.value
-                                                .filter { it.volumeId == volume.id }
-                                                .count { item ->
-                                                    item.status ==
-                                                        net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                                        isItemPathPresent(item.localPath)
-                                                }
-                                        val expected =
-                                            if (isSingleFile) {
-                                                volume.chapters?.size ?: 0
-                                            } else {
-                                                volume.pages
-                                                    ?.takeIf { it > 0 }
-                                                    ?: volume.chapters
-                                                        ?.sumOf { it.pages ?: 0 }
-                                                        ?.takeIf { it > 0 }
-                                                    ?: 0
-                                            }
+                                        val format = Format.fromId(detail?.series?.format)
+                                        val list =
+                                            downloadedItemsBySeries.value.filter { it.volumeId == volume.id }
                                         downloadVolumeState =
-                                            when {
-                                                expected > 0 && completed >= expected -> DownloadVolumeState.Complete
-                                                completed > 0 -> DownloadVolumeState.Partial
-                                                else -> DownloadVolumeState.None
-                                            }
+                                            DownloadStateResolver.resolveVolumeState(
+                                                format = format,
+                                                volume = volume,
+                                                items = list,
+                                            )
                                         selectedVolume = volume
                                         showDownloadVolumeDialog = true
                                         showVolumeActionsDialog = true
@@ -778,26 +747,19 @@ fun SeriesDetailScreenV2(
                         }
                         if (selectedTab == SeriesDetailTab.Chapters) {
                             val chapters = detail?.detail?.chapters.orEmpty()
-                            val chapterDownloadStates = remember { mutableStateMapOf<Int, ChapterDownloadState>() }
+                            val chapterDownloadStates = remember { mutableStateMapOf<Int, DownloadState>() }
                             LaunchedEffect(chapters, downloadedItemsBySeries.value) {
-                                val isSingleFile = isSingleFileFormat(detail?.series?.format)
+                                val format = Format.fromId(detail?.series?.format)
                                 val items = downloadedItemsBySeries.value
                                 val grouped = items.groupBy { it.chapterId }
                                 chapters.forEach { chapter ->
                                     val list = grouped[chapter.id].orEmpty()
-                                    val completed =
-                                        list.count { item ->
-                                            item.status ==
-                                                net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                                isItemPathPresent(item.localPath)
-                                        }
-                                    val expected = if (isSingleFile) 1 else chapter.pages?.takeIf { it > 0 } ?: 0
                                     val state =
-                                        when {
-                                            expected > 0 && completed >= expected -> ChapterDownloadState.Complete
-                                            completed > 0 -> ChapterDownloadState.Partial
-                                            else -> ChapterDownloadState.None
-                                        }
+                                        DownloadStateResolver.resolveChapterState(
+                                            format = format,
+                                            chapter = chapter,
+                                            items = list,
+                                        )
                                     chapterDownloadStates[chapter.id] = state
                                 }
                             }
@@ -805,7 +767,10 @@ fun SeriesDetailScreenV2(
                                 chapters = chapters,
                                 downloadStates = chapterDownloadStates,
                                 onChapterClick = onChapterClick@{ chapter, _ ->
-                                    val isSingleFile = isSingleFileFormat(detail?.series?.format)
+                                    val isSingleFile =
+                                        DownloadStateResolver.isSingleFileFormat(
+                                            Format.fromId(detail?.series?.format),
+                                        )
                                     val pdfDownloaded =
                                         if (isSingleFile) {
                                             downloadedItemsBySeries.value.any { item ->
@@ -857,7 +822,7 @@ fun SeriesDetailScreenV2(
                                     }
                                     val format = Format.fromId(detail?.series?.format)
                                     val isEpub = format == Format.Epub
-                                    val isSingleFile = isSingleFileFormat(detail?.series?.format)
+                                    val isSingleFile = DownloadStateResolver.isSingleFileFormat(format)
                                     if (!isEpub && !isSingleFile) {
                                         Toast
                                             .makeText(
@@ -995,29 +960,22 @@ fun SeriesDetailScreenV2(
                         }
                         if (selectedTab == SeriesDetailTab.Specials) {
                             val specials = detail?.detail?.specials.orEmpty()
-                            val specialDownloadStates = remember { mutableStateMapOf<Int, ChapterDownloadState>() }
+                            val specialDownloadStates = remember { mutableStateMapOf<Int, DownloadState>() }
                             var showSpecialDialog by remember { mutableStateOf(false) }
                             var selectedSpecial by remember { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
-                            var specialDownloadState by remember { mutableStateOf(ChapterDownloadState.None) }
+                            var specialDownloadState by remember { mutableStateOf(DownloadState.None) }
                             LaunchedEffect(specials, downloadedItemsBySeries.value) {
-                                val isSingleFile = isSingleFileFormat(detail?.series?.format)
+                                val format = Format.fromId(detail?.series?.format)
                                 val items = downloadedItemsBySeries.value
                                 val grouped = items.groupBy { it.chapterId }
                                 specials.forEach { chapter ->
                                     val list = grouped[chapter.id].orEmpty()
-                                    val completed =
-                                        list.count { item ->
-                                            item.status ==
-                                                net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                                isItemPathPresent(item.localPath)
-                                        }
-                                    val expected = if (isSingleFile) 1 else chapter.pages?.takeIf { it > 0 } ?: 0
                                     val state =
-                                        when {
-                                            expected > 0 && completed >= expected -> ChapterDownloadState.Complete
-                                            completed > 0 -> ChapterDownloadState.Partial
-                                            else -> ChapterDownloadState.None
-                                        }
+                                        DownloadStateResolver.resolveChapterState(
+                                            format = format,
+                                            chapter = chapter,
+                                            items = list,
+                                        )
                                     specialDownloadStates[chapter.id] = state
                                 }
                             }
@@ -1151,7 +1109,10 @@ fun SeriesDetailScreenV2(
                                         }
                                     },
                                     onOpenPage = { target, page ->
-                                        val isSingleFile = isSingleFileFormat(detail?.series?.format)
+                                        val isSingleFile =
+                                            DownloadStateResolver.isSingleFileFormat(
+                                                Format.fromId(detail?.series?.format),
+                                            )
                                         val pdfDownloaded =
                                             if (isSingleFile) {
                                                 downloadedItemsBySeries.value.any { item ->
@@ -1199,21 +1160,15 @@ fun SeriesDetailScreenV2(
                                     },
                                     onLongPressSpecial = { chapter ->
                                         scope.launch {
-                                            val completed =
-                                                downloadedItemsBySeries.value
-                                                    .filter { it.chapterId == chapter.id }
-                                                    .count { item ->
-                                                        item.status ==
-                                                            net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                                            isItemPathPresent(item.localPath)
-                                                    }
-                                            val expected = chapter.pages?.takeIf { it > 0 } ?: 0
+                                            val format = Format.fromId(detail?.series?.format)
+                                            val list =
+                                                downloadedItemsBySeries.value.filter { it.chapterId == chapter.id }
                                             specialDownloadState =
-                                                when {
-                                                    expected > 0 && completed >= expected -> ChapterDownloadState.Complete
-                                                    completed > 0 -> ChapterDownloadState.Partial
-                                                    else -> ChapterDownloadState.None
-                                                }
+                                                DownloadStateResolver.resolveChapterState(
+                                                    format = format,
+                                                    chapter = chapter,
+                                                    items = list,
+                                                )
                                             selectedSpecial = chapter
                                             showSpecialDialog = true
                                         }
@@ -1230,11 +1185,11 @@ fun SeriesDetailScreenV2(
                                     title = {
                                         val titleRes =
                                             when (specialDownloadState) {
-                                                ChapterDownloadState.Complete ->
+                                                DownloadState.Complete ->
                                                     net.dom53.inkita.R.string.series_detail_remove_chapter_title
-                                                ChapterDownloadState.Partial ->
+                                                DownloadState.Partial ->
                                                     net.dom53.inkita.R.string.series_detail_resume_chapter_title
-                                                ChapterDownloadState.None ->
+                                                DownloadState.None ->
                                                     net.dom53.inkita.R.string.series_detail_download_chapter_title
                                             }
                                         Text(stringResource(titleRes))
@@ -1256,11 +1211,11 @@ fun SeriesDetailScreenV2(
                                                 )
                                         val bodyRes =
                                             when (specialDownloadState) {
-                                                ChapterDownloadState.Complete ->
+                                                DownloadState.Complete ->
                                                     net.dom53.inkita.R.string.series_detail_remove_chapter_body
-                                                ChapterDownloadState.Partial ->
+                                                DownloadState.Partial ->
                                                     net.dom53.inkita.R.string.series_detail_resume_chapter_body
-                                                ChapterDownloadState.None ->
+                                                DownloadState.None ->
                                                     net.dom53.inkita.R.string.series_detail_download_chapter_body
                                             }
                                         Text(stringResource(bodyRes, label))
@@ -1268,18 +1223,18 @@ fun SeriesDetailScreenV2(
                                     confirmButton = {
                                         val confirmRes =
                                             when (specialDownloadState) {
-                                                ChapterDownloadState.Complete ->
+                                                DownloadState.Complete ->
                                                     net.dom53.inkita.R.string.series_detail_remove_chapter_confirm
-                                                ChapterDownloadState.Partial ->
+                                                DownloadState.Partial ->
                                                     net.dom53.inkita.R.string.series_detail_resume_chapter_confirm
-                                                ChapterDownloadState.None ->
+                                                DownloadState.None ->
                                                     net.dom53.inkita.R.string.series_detail_download_chapter_confirm
                                             }
                                         Button(
                                             onClick = {
                                                 showSpecialDialog = false
                                                 val target = chapter ?: return@Button
-                                                if (specialDownloadState == ChapterDownloadState.Complete) {
+                                                if (specialDownloadState == DownloadState.Complete) {
                                                     scope.launch {
                                                         downloadDao.deleteItemsForChapter(target.id)
                                                         downloadDao.deleteJobsForChapter(target.id)
@@ -1346,7 +1301,7 @@ fun SeriesDetailScreenV2(
                                     },
                                     dismissButton = {
                                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            if (specialDownloadState == ChapterDownloadState.Partial) {
+                                            if (specialDownloadState == DownloadState.Partial) {
                                                 Button(
                                                     onClick = {
                                                         showSpecialDialog = false
@@ -1452,9 +1407,9 @@ fun SeriesDetailScreenV2(
                 title = {
                     val titleRes =
                         when (downloadVolumeState) {
-                            DownloadVolumeState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_title
-                            DownloadVolumeState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_title
-                            DownloadVolumeState.None -> net.dom53.inkita.R.string.series_detail_download_volume_title
+                            DownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_title
+                            DownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_title
+                            DownloadState.None -> net.dom53.inkita.R.string.series_detail_download_volume_title
                         }
                     Text(stringResource(titleRes))
                 },
@@ -1471,9 +1426,9 @@ fun SeriesDetailScreenV2(
                             ?: context.getString(net.dom53.inkita.R.string.series_detail_vol_short_plain)
                     val bodyRes =
                         when (downloadVolumeState) {
-                            DownloadVolumeState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_body
-                            DownloadVolumeState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_body
-                            DownloadVolumeState.None -> net.dom53.inkita.R.string.series_detail_download_volume_body
+                            DownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_body
+                            DownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_body
+                            DownloadState.None -> net.dom53.inkita.R.string.series_detail_download_volume_body
                         }
                     Text(text = stringResource(bodyRes, volLabel))
                 },
@@ -1484,9 +1439,9 @@ fun SeriesDetailScreenV2(
                     ) {
                         val confirmRes =
                             when (downloadVolumeState) {
-                                DownloadVolumeState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_confirm
-                                DownloadVolumeState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_confirm
-                                DownloadVolumeState.None -> net.dom53.inkita.R.string.series_detail_download_volume_confirm
+                                DownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_confirm
+                                DownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_confirm
+                                DownloadState.None -> net.dom53.inkita.R.string.series_detail_download_volume_confirm
                             }
                         Button(
                             onClick = {
@@ -1494,7 +1449,7 @@ fun SeriesDetailScreenV2(
                                 showVolumeActionsDialog = false
                                 selectedVolume = null
                                 val volume = volume ?: return@Button
-                                if (downloadVolumeState == DownloadVolumeState.Complete) {
+                                if (downloadVolumeState == DownloadState.Complete) {
                                     scope.launch {
                                         downloadDao.deleteItemsForVolume(volume.id)
                                         downloadDao.deleteJobsForVolume(volume.id)
@@ -1694,7 +1649,7 @@ fun SeriesDetailScreenV2(
                                 Text(stringResource(net.dom53.inkita.R.string.series_detail_mark_volume_unread))
                             }
                         }
-                        if (downloadVolumeState == DownloadVolumeState.Partial) {
+                        if (downloadVolumeState == DownloadState.Partial) {
                             OutlinedButton(
                                 onClick = {
                                     showDownloadVolumeDialog = false
@@ -1810,11 +1765,6 @@ fun SeriesDetailScreenV2(
     }
 }
 
-private enum class DownloadVolumeState {
-    None,
-    Partial,
-    Complete,
-}
 
 private fun isItemPathPresent(path: String?): Boolean {
     if (path.isNullOrBlank()) return false
@@ -1952,13 +1902,6 @@ private fun formatKeyFor(formatId: Int?): String =
         else -> DownloadApiStrategyV2.FORMAT_DOWNLOAD
     }
 
-private fun isSingleFileFormat(formatId: Int?): Boolean =
-    when (Format.fromId(formatId)) {
-        Format.Pdf,
-        Format.Image,
-        Format.Archive -> true
-        else -> false
-    }
 
 private data class FileNode(
     val name: String,
@@ -2080,7 +2023,7 @@ private fun VolumeGridRow(
     volumes: List<net.dom53.inkita.data.api.dto.VolumeDto>,
     config: AppConfig,
     seriesCoverUrl: String?,
-    downloadStates: Map<Int, DownloadVolumeState>,
+    downloadStates: Map<Int, DownloadState>,
     onOpenVolume: (net.dom53.inkita.data.api.dto.VolumeDto) -> Unit,
     onLongPressVolume: (net.dom53.inkita.data.api.dto.VolumeDto) -> Unit,
 ) {
@@ -2117,7 +2060,7 @@ private fun VolumeGridRow(
                                 .aspectRatio(2f / 3f),
                     )
                     val downloadState = downloadStates[volume.id]
-                    if (downloadState == DownloadVolumeState.Complete || downloadState == DownloadVolumeState.Partial) {
+                    if (downloadState == DownloadState.Complete || downloadState == DownloadState.Partial) {
                         Box(
                             modifier =
                                 Modifier
@@ -2130,7 +2073,7 @@ private fun VolumeGridRow(
                         ) {
                             Icon(
                                 imageVector =
-                                    if (downloadState == DownloadVolumeState.Complete) {
+                                    if (downloadState == DownloadState.Complete) {
                                         Icons.Filled.DownloadDone
                                     } else {
                                         Icons.Filled.Downloading
@@ -2210,7 +2153,7 @@ private fun SpecialsGridRow(
     specials: List<net.dom53.inkita.data.api.dto.ChapterDto>,
     config: AppConfig,
     seriesCoverUrl: String?,
-    downloadStates: Map<Int, ChapterDownloadState>,
+    downloadStates: Map<Int, DownloadState>,
     onSelectSpecial: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit,
     onLongPressSpecial: (net.dom53.inkita.data.api.dto.ChapterDto) -> Unit,
 ) {
@@ -2249,7 +2192,7 @@ private fun SpecialsGridRow(
                                 .aspectRatio(2f / 3f),
                     )
                     val downloadState = downloadStates[chapter.id]
-                    if (downloadState == ChapterDownloadState.Complete || downloadState == ChapterDownloadState.Partial) {
+                    if (downloadState == DownloadState.Complete || downloadState == DownloadState.Partial) {
                         Box(
                             modifier =
                                 Modifier
@@ -2262,7 +2205,7 @@ private fun SpecialsGridRow(
                         ) {
                             Icon(
                                 imageVector =
-                                    if (downloadState == ChapterDownloadState.Complete) {
+                                    if (downloadState == DownloadState.Complete) {
                                         Icons.Filled.DownloadDone
                                     } else {
                                         Icons.Filled.Downloading

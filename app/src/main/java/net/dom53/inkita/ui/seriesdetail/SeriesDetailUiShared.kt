@@ -70,6 +70,7 @@ import coil.request.ImageRequest
 import net.dom53.inkita.R
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.data.mapper.TocItem
+import net.dom53.inkita.ui.common.DownloadState
 import net.dom53.inkita.ui.common.chapterCoverUrl
 import java.time.Instant
 import java.time.LocalDateTime
@@ -138,7 +139,7 @@ internal fun SectionChip(
 internal fun ChapterListV2(
     chapters: List<net.dom53.inkita.data.api.dto.ChapterDto>,
     config: AppConfig,
-    downloadStates: Map<Int, ChapterDownloadState> = emptyMap(),
+    downloadStates: Map<Int, DownloadState> = emptyMap(),
     onChapterClick: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
     onChapterLongPress: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
 ) {
@@ -179,7 +180,7 @@ internal fun ChapterListV2(
                                 .aspectRatio(2f / 3f),
                     )
                     val downloadState = downloadStates[chapter.id]
-                    if (downloadState == ChapterDownloadState.Complete || downloadState == ChapterDownloadState.Partial) {
+                    if (downloadState == DownloadState.Complete || downloadState == DownloadState.Partial) {
                         Box(
                             modifier =
                                 Modifier
@@ -192,7 +193,7 @@ internal fun ChapterListV2(
                         ) {
                             Icon(
                                 imageVector =
-                                    if (downloadState == ChapterDownloadState.Complete) {
+                                    if (downloadState == DownloadState.Complete) {
                                         Icons.Filled.DownloadDone
                                     } else {
                                         Icons.Filled.Downloading
@@ -265,7 +266,7 @@ internal fun ChapterListV2(
 @Composable
 internal fun ChapterCompactList(
     chapters: List<net.dom53.inkita.data.api.dto.ChapterDto>,
-    downloadStates: Map<Int, ChapterDownloadState> = emptyMap(),
+    downloadStates: Map<Int, DownloadState> = emptyMap(),
     onChapterClick: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
     onChapterLongPress: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
     onToggleDownload: (net.dom53.inkita.data.api.dto.ChapterDto, Boolean) -> Unit = { _, _ -> },
@@ -283,7 +284,7 @@ internal fun ChapterCompactList(
             val isRead = pagesTotal > 0 && pagesRead >= pagesTotal
             val isCurrent = pagesRead in 1 until pagesTotal
             val downloadState = downloadStates[chapter.id]
-            val isDownloaded = downloadState == ChapterDownloadState.Complete || downloadState == ChapterDownloadState.Partial
+            val isDownloaded = downloadState == DownloadState.Complete || downloadState == DownloadState.Partial
             val containerColor =
                 if (isRead) {
                     MaterialTheme.colorScheme.surfaceVariant
@@ -416,10 +417,10 @@ internal fun ChapterCompactList(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    if (downloadState == ChapterDownloadState.Complete || downloadState == ChapterDownloadState.Partial) {
+                    if (downloadState == DownloadState.Complete || downloadState == DownloadState.Partial) {
                         Icon(
                             imageVector =
-                                if (downloadState == ChapterDownloadState.Complete) {
+                                if (downloadState == DownloadState.Complete) {
                                     Icons.Filled.DownloadDone
                                 } else {
                                     Icons.Filled.Downloading
@@ -433,12 +434,6 @@ internal fun ChapterCompactList(
             }
         }
     }
-}
-
-internal enum class ChapterDownloadState {
-    None,
-    Partial,
-    Complete,
 }
 
 @OptIn(ExperimentalMaterialApi::class)

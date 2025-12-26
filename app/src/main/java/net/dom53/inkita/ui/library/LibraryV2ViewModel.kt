@@ -19,7 +19,6 @@ import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppPreferences
-import net.dom53.inkita.data.api.dto.SeriesDetailDto
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.domain.model.Collection
@@ -33,6 +32,7 @@ import net.dom53.inkita.domain.repository.PersonRepository
 import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
 import net.dom53.inkita.ui.common.DownloadState
+import net.dom53.inkita.ui.common.DownloadStateResolver
 import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 
 data class HomeSeriesItem(
@@ -1010,74 +1010,17 @@ class LibraryV2ViewModel(
         seriesInfoById.forEach { (id, info) ->
             val items = itemsBySeries[id].orEmpty()
             val detail = cachedDetails[id]
-            result[id] = resolveSeriesDownloadState(info, items, detail)
+            val format = info.format ?: Format.fromId(detail?.series?.format)
+            result[id] =
+                DownloadStateResolver.resolveSeriesState(
+                    format = format,
+                    pagesHint = info.pages,
+                    detail = detail?.detail,
+                    items = items,
+                )
         }
         return result
     }
-
-    private fun resolveSeriesDownloadState(
-        info: SeriesDownloadInfo,
-        items: List<DownloadedItemV2Entity>,
-        detail: InkitaDetailV2?,
-    ): DownloadState {
-        val format = info.format ?: Format.fromId(detail?.series?.format)
-        val completedPages =
-            items
-                .filter { it.type == DownloadedItemV2Entity.TYPE_PAGE }
-                .count { isItemPathPresent(it.localPath) }
-        val completedFiles =
-            items
-                .filter { it.type == DownloadedItemV2Entity.TYPE_FILE }
-                .count { isItemPathPresent(it.localPath) }
-        val expected =
-            if (format == Format.Pdf) {
-                val chapters = countChapters(detail?.detail)
-                if (chapters > 0) chapters else 0
-            } else {
-                val pages = info.pages?.takeIf { it > 0 } ?: sumPages(detail?.detail)
-                if (pages > 0) pages else 0
-            }
-        val completed =
-            when {
-                format == Format.Pdf -> completedFiles
-                completedPages > 0 -> completedPages
-                else -> completedFiles
-            }
-        val state =
-            when {
-                expected > 0 && completed >= expected -> DownloadState.Complete
-                completed > 0 -> DownloadState.Partial
-                else -> DownloadState.None
-            }
-        if (LoggingManager.isDebugEnabled()) {
-            val source = if (detail != null) "cache" else "fallback"
-            LoggingManager.d(
-                "LibraryV2Badge",
-                "series=${info.id} format=${format?.id} expected=$expected completed=$completed state=$state source=$source",
-            )
-        }
-        return state
-    }
-
-    private fun countChapters(detail: SeriesDetailDto?): Int = collectChapters(detail).size
-
-    private fun sumPages(detail: SeriesDetailDto?): Int =
-        collectChapters(detail)
-            .sumOf { it.pages ?: 0 }
-
-    private fun collectChapters(detail: SeriesDetailDto?): List<net.dom53.inkita.data.api.dto.ChapterDto> {
-        if (detail == null) return emptyList()
-        return buildList {
-            detail.volumes?.forEach { volume ->
-                volume.chapters?.let { addAll(it) }
-            }
-            detail.chapters?.let { addAll(it) }
-            detail.specials?.let { addAll(it) }
-            detail.storylineChapters?.let { addAll(it) }
-        }.distinctBy { it.id }
-    }
-
-    private fun isItemPathPresent(path: String?): Boolean = path?.let { java.io.File(it).exists() } == true
 
     companion object {
         fun provideFactory(

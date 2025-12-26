@@ -66,6 +66,8 @@ import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.mapper.flattenToc
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.repository.ReaderRepository
+import net.dom53.inkita.ui.common.DownloadState
+import net.dom53.inkita.ui.common.DownloadStateResolver
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.reader.model.ReaderReturn
@@ -84,7 +86,7 @@ fun VolumeDetailScreenV2(
 ) {
     val context = LocalContext.current
     val downloadDao = remember(context.applicationContext) { InkitaDatabase.getInstance(context.applicationContext).downloadV2Dao() }
-    val chapterDownloadStates = remember { mutableStateMapOf<Int, ChapterDownloadState>() }
+    val chapterDownloadStates = remember { mutableStateMapOf<Int, DownloadState>() }
     val payload = remember(volumeId) { VolumeDetailCache.get(volumeId) }
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
@@ -103,7 +105,7 @@ fun VolumeDetailScreenV2(
     var selectedChapterForDownload by remember(volumeId) { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
     var selectedChapterDownloadIndex by remember(volumeId) { mutableStateOf<Int?>(null) }
     var showDownloadChapterDialog by remember { mutableStateOf(false) }
-    var downloadChapterState by remember { mutableStateOf(ChapterDownloadState.None) }
+    var downloadChapterState by remember { mutableStateOf(DownloadState.None) }
     val pageTitleCache = remember(volumeId) { mutableStateMapOf<Int, Map<Int, String>>() }
     val scope = rememberCoroutineScope()
     val selectedChapterId = selectedChapter?.id
@@ -593,18 +595,12 @@ fun VolumeDetailScreenV2(
                         val grouped = items.groupBy { it.chapterId }
                         chapterList.forEach { chapter ->
                             val list = grouped[chapter.id].orEmpty()
-                            val completed =
-                                list.count { item ->
-                                    item.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                        isItemPathPresent(item.localPath)
-                                }
-                            val expected = if (isSingleFile) 1 else chapter.pages?.takeIf { it > 0 } ?: 0
                             val state =
-                                when {
-                                    expected > 0 && completed >= expected -> ChapterDownloadState.Complete
-                                    completed > 0 -> ChapterDownloadState.Partial
-                                    else -> ChapterDownloadState.None
-                                }
+                                DownloadStateResolver.resolveChapterState(
+                                    format = format,
+                                    chapter = chapter,
+                                    items = list,
+                                )
                             chapterDownloadStates[chapter.id] = state
                         }
                     }
@@ -636,15 +632,25 @@ fun VolumeDetailScreenV2(
                             },
                             onChapterLongPress = { chapter, index ->
                                 scope.launch {
+                                    val items = downloadDao.getItemsForChapter(chapter.id)
                                     val completed =
-                                        downloadDao
-                                            .getItemsForChapter(chapter.id)
-                                            .count { item ->
-                                                item.status ==
-                                                    net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                                    isItemPathPresent(item.localPath)
-                                            }
-                                    val expected = if (isSingleFile) 1 else chapter.pages?.takeIf { it > 0 } ?: 0
+                                        items.count { item ->
+                                            item.status ==
+                                                net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                isItemPathPresent(item.localPath)
+                                        }
+                                    val expected =
+                                        if (DownloadStateResolver.isSingleFileFormat(format)) {
+                                            1
+                                        } else {
+                                            chapter.pages?.takeIf { it > 0 } ?: 0
+                                        }
+                                    downloadChapterState =
+                                        DownloadStateResolver.resolveChapterState(
+                                            format = format,
+                                            chapter = chapter,
+                                            items = items,
+                                        )
                                     if (expected == 0 && completed == 0) {
                                         Toast
                                             .makeText(
@@ -654,12 +660,6 @@ fun VolumeDetailScreenV2(
                                             ).show()
                                         return@launch
                                     }
-                                    downloadChapterState =
-                                        when {
-                                            expected > 0 && completed >= expected -> ChapterDownloadState.Complete
-                                            completed > 0 -> ChapterDownloadState.Partial
-                                            else -> ChapterDownloadState.None
-                                        }
                                     selectedChapterForDownload = chapter
                                     selectedChapterDownloadIndex = index
                                     showDownloadChapterDialog = true
@@ -705,9 +705,9 @@ fun VolumeDetailScreenV2(
                 title = {
                     val titleRes =
                         when (downloadChapterState) {
-                            ChapterDownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_chapter_title
-                            ChapterDownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_chapter_title
-                            ChapterDownloadState.None -> net.dom53.inkita.R.string.series_detail_download_chapter_title
+                            DownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_chapter_title
+                            DownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_chapter_title
+                            DownloadState.None -> net.dom53.inkita.R.string.series_detail_download_chapter_title
                         }
                     Text(stringResource(titleRes))
                 },
@@ -728,9 +728,9 @@ fun VolumeDetailScreenV2(
                             )
                     val bodyRes =
                         when (downloadChapterState) {
-                            ChapterDownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_chapter_body
-                            ChapterDownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_chapter_body
-                            ChapterDownloadState.None -> net.dom53.inkita.R.string.series_detail_download_chapter_body
+                            DownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_chapter_body
+                            DownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_chapter_body
+                            DownloadState.None -> net.dom53.inkita.R.string.series_detail_download_chapter_body
                         }
                     Text(text = stringResource(bodyRes, label))
                 },
@@ -741,9 +741,9 @@ fun VolumeDetailScreenV2(
                     ) {
                         val confirmRes =
                             when (downloadChapterState) {
-                                ChapterDownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_chapter_confirm
-                                ChapterDownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_chapter_confirm
-                                ChapterDownloadState.None -> net.dom53.inkita.R.string.series_detail_download_chapter_confirm
+                                DownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_chapter_confirm
+                                DownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_chapter_confirm
+                                DownloadState.None -> net.dom53.inkita.R.string.series_detail_download_chapter_confirm
                             }
                         Button(
                             onClick = {
@@ -751,7 +751,7 @@ fun VolumeDetailScreenV2(
                                 selectedChapterForDownload = null
                                 selectedChapterDownloadIndex = null
                                 val chapter = chapter ?: return@Button
-                                if (downloadChapterState == ChapterDownloadState.Complete) {
+                                if (downloadChapterState == DownloadState.Complete) {
                                     scope.launch {
                                         downloadDao.deleteItemsForChapter(chapter.id)
                                         downloadDao.deleteJobsForChapter(chapter.id)
@@ -978,7 +978,7 @@ fun VolumeDetailScreenV2(
                                 Text(stringResource(net.dom53.inkita.R.string.general_mark_unread))
                             }
                         }
-                        if (downloadChapterState == ChapterDownloadState.Partial) {
+                        if (downloadChapterState == DownloadState.Partial) {
                             OutlinedButton(
                                 onClick = {
                                     showDownloadChapterDialog = false

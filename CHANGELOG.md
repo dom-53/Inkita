@@ -14,6 +14,7 @@ All notable changes to this project will be documented here.
 - Series Detail V2: Chapters list now supports swipe read/unread and download.
 - Downloads V2: Added default Download API strategy for series/volume/chapter archives.
 - Downloads V2: Added fallback DownloadApiStrategyV2 for unsupported formats.
+- Downloads V2: Centralized download state resolution for series/volume/chapter badges.
 - Series Detail V2: Menu now shows a tree view of downloaded files/structure.
 - Reader: PDF opened for reading no longer persists on disk unless downloaded; temp files are cleaned on exit/startup (with verbose logs).
 - Downloads V2: Normalized on-disk layout for series/volumes/chapters/specials to avoid duplicated files.
