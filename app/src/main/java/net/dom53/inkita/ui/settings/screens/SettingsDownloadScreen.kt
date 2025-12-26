@@ -1,7 +1,7 @@
 package net.dom53.inkita.ui.settings.screens
 
-import android.widget.Toast
 import android.text.format.Formatter
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
