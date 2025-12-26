@@ -59,7 +59,7 @@ object DownloadPaths {
         page: Int,
     ): String {
         val volume = volumeId ?: 0
-        return "${seriesId}_${volume}-${chapterId}-${page}.html"
+        return "${seriesId}_$volume-$chapterId-$page.html"
     }
 
     fun epubAssetsDir(chapterDir: File): File = File(chapterDir, "assets")
@@ -72,7 +72,7 @@ object DownloadPaths {
     ): File {
         val chapterDir = chapterDir(context, seriesId, volumeId, chapterId)
         val volume = volumeId ?: 0
-        return File(chapterDir, "${seriesId}_${volume}-${chapterId}.pdf")
+        return File(chapterDir, "${seriesId}_$volume-$chapterId.pdf")
     }
 
     fun pdfTempDir(context: Context): File = File(context.cacheDir, "pdf-temp")
@@ -90,7 +90,7 @@ object DownloadPaths {
     ): File {
         val chapterDir = chapterDir(context, seriesId, volumeId, chapterId)
         val volume = volumeId ?: 0
-        return File(chapterDir, "${seriesId}_${volume}-${chapterId}.cbz")
+        return File(chapterDir, "${seriesId}_$volume-$chapterId.cbz")
     }
 
     fun imagePageCacheDir(

@@ -1058,7 +1058,10 @@ private suspend fun applyLocalProgress(
 }
 
 private fun formatKeyForVolume(formatId: Int?): String =
-    when (net.dom53.inkita.domain.model.Format.fromId(formatId)) {
+    when (
+        net.dom53.inkita.domain.model.Format
+            .fromId(formatId)
+    ) {
         net.dom53.inkita.domain.model.Format.Pdf -> PdfDownloadStrategyV2.FORMAT_PDF
         net.dom53.inkita.domain.model.Format.Epub -> EpubDownloadStrategyV2.FORMAT_EPUB
         net.dom53.inkita.domain.model.Format.Image -> ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE

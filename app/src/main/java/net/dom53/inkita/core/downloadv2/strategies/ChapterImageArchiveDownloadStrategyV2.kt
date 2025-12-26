@@ -196,8 +196,7 @@ class ChapterImageArchiveDownloadStrategyV2(
         }
     }
 
-    private fun fallbackPath(chapterId: Int): File =
-        File(appContext.getExternalFilesDir("Inkita/downloads/archives"), "chapter_$chapterId.cbz")
+    private fun fallbackPath(chapterId: Int): File = File(appContext.getExternalFilesDir("Inkita/downloads/archives"), "chapter_$chapterId.cbz")
 
     companion object {
         const val FORMAT_IMAGE = "image"

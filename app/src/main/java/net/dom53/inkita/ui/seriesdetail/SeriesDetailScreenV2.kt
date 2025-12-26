@@ -22,8 +22,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -94,10 +94,10 @@ import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.mapper.flattenToc
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.ui.browse.utils.PublicationState
-import net.dom53.inkita.ui.common.chapterCoverUrl
-import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.DownloadState
 import net.dom53.inkita.ui.common.DownloadStateResolver
+import net.dom53.inkita.ui.common.chapterCoverUrl
+import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
 import net.dom53.inkita.ui.reader.model.ReaderReturn
@@ -1702,9 +1702,10 @@ fun SeriesDetailScreenV2(
                         Text(stringResource(net.dom53.inkita.R.string.series_detail_download_tree_empty))
                     } else {
                         val expandedSnapshot = expandedPaths.toMap()
-                        val flatNodes = remember(downloadTreeNodes, expandedSnapshot) {
-                            flattenTree(downloadTreeNodes, expandedSnapshot)
-                        }
+                        val flatNodes =
+                            remember(downloadTreeNodes, expandedSnapshot) {
+                                flattenTree(downloadTreeNodes, expandedSnapshot)
+                            }
                         androidx.compose.foundation.lazy.LazyColumn(
                             modifier = Modifier.heightIn(max = 420.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -1764,7 +1765,6 @@ fun SeriesDetailScreenV2(
         }
     }
 }
-
 
 private fun isItemPathPresent(path: String?): Boolean {
     if (path.isNullOrBlank()) return false
@@ -1901,7 +1901,6 @@ private fun formatKeyFor(formatId: Int?): String =
         Format.Archive -> ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE
         else -> DownloadApiStrategyV2.FORMAT_DOWNLOAD
     }
-
 
 private data class FileNode(
     val name: String,

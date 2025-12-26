@@ -4,13 +4,13 @@ import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
 import net.dom53.inkita.core.downloadv2.DownloadStrategyV2
-import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.logging.LoggingManager
+import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.network.NetworkMonitor
-import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
@@ -195,8 +195,7 @@ class PdfDownloadStrategyV2(
         }
     }
 
-    private fun pdfFallbackPath(chapterId: Int): File =
-        File(appContext.getExternalFilesDir("Inkita/downloads/pdfs"), "pdf-$chapterId.pdf")
+    private fun pdfFallbackPath(chapterId: Int): File = File(appContext.getExternalFilesDir("Inkita/downloads/pdfs"), "pdf-$chapterId.pdf")
 
     companion object {
         const val FORMAT_PDF = "pdf"

@@ -147,10 +147,11 @@ class DownloadApiStrategyV2(
                     failJob(job, "HTTP ${response.code}")
                     return
                 }
-                val body = response.body ?: run {
-                    failJob(job, "Empty body")
-                    return
-                }
+                val body =
+                    response.body ?: run {
+                        failJob(job, "Empty body")
+                        return
+                    }
                 withContext(Dispatchers.IO) {
                     body.byteStream().use { input ->
                         target.sink().buffer().use { sink -> sink.writeAll(input.source()) }
@@ -188,9 +189,7 @@ class DownloadApiStrategyV2(
         }
     }
 
-    private fun resolveEndpoint(
-        request: DownloadRequestV2,
-    ): Quad? {
+    private fun resolveEndpoint(request: DownloadRequestV2): Quad? {
         val seriesId = request.seriesId
         val volumeId = request.volumeId
         val chapterId = request.chapterId

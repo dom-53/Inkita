@@ -15,8 +15,8 @@ import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppPreferences
-import net.dom53.inkita.data.api.dto.MarkSeriesDto
 import net.dom53.inkita.data.api.dto.ChapterDto
+import net.dom53.inkita.data.api.dto.MarkSeriesDto
 import net.dom53.inkita.data.api.dto.ReaderProgressDto
 import net.dom53.inkita.data.api.dto.SeriesDetailDto
 import net.dom53.inkita.data.api.dto.SeriesDto

@@ -302,7 +302,9 @@ class ReaderRepositoryImpl(
                 input.copyTo(out)
             }
         }
-        if (net.dom53.inkita.core.logging.LoggingManager.isDebugEnabled()) {
+        if (net.dom53.inkita.core.logging.LoggingManager
+                .isDebugEnabled()
+        ) {
             net.dom53.inkita.core.logging.LoggingManager.d(
                 "PdfReader",
                 "Saved temp PDF: ${tempTarget.absolutePath}",
@@ -607,7 +609,8 @@ class ReaderRepositoryImpl(
         val entries =
             runCatching {
                 ZipFile(path).use { zip ->
-                    zip.entries()
+                    zip
+                        .entries()
                         .asSequence()
                         .filter { !it.isDirectory }
                         .map { it.name }

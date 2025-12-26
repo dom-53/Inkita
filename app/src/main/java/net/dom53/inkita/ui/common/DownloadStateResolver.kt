@@ -90,7 +90,8 @@ object DownloadStateResolver {
         when (format) {
             Format.Pdf,
             Format.Image,
-            Format.Archive -> true
+            Format.Archive,
+            -> true
             else -> false
         }
 
