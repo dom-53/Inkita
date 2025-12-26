@@ -206,6 +206,7 @@
     <string name="reader_image_default_mode_subtitle">Použije se pro kapitoly Image a Archive</string>
     <string name="reader_image_mode_ltr">Zleva doprava</string>
     <string name="reader_image_mode_rtl">Zprava doleva</string>
+    <string name="reader_image_mode_vertical">Vertikální</string>
     <string name="reader_image_mode_webtoon">Webtoon</string>
     <string name="reader_image_prefetch_pages">Počet přednačtených stránek</string>
     <string name="reader_image_prefetch_pages_subtitle">Kolik stránek připravit dopředu</string>

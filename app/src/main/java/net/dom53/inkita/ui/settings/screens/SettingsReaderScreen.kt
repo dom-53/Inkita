@@ -170,6 +170,7 @@ fun SettingsReaderScreen(
             listOf(
                 ImageReaderMode.LeftToRight to R.string.reader_image_mode_ltr,
                 ImageReaderMode.RightToLeft to R.string.reader_image_mode_rtl,
+                ImageReaderMode.Vertical to R.string.reader_image_mode_vertical,
                 ImageReaderMode.Webtoon to R.string.reader_image_mode_webtoon,
             )
         androidx.compose.material3.AlertDialog(
@@ -290,6 +291,7 @@ private fun ImageModeRow(
         when (mode) {
             ImageReaderMode.LeftToRight -> R.string.reader_image_mode_ltr
             ImageReaderMode.RightToLeft -> R.string.reader_image_mode_rtl
+            ImageReaderMode.Vertical -> R.string.reader_image_mode_vertical
             ImageReaderMode.Webtoon -> R.string.reader_image_mode_webtoon
         }
     Row(

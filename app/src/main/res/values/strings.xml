@@ -270,6 +270,7 @@
     <string name="reader_image_default_mode_subtitle">Used for Image and Archive chapters</string>
     <string name="reader_image_mode_ltr">Left to right</string>
     <string name="reader_image_mode_rtl">Right to left</string>
+    <string name="reader_image_mode_vertical">Vertical</string>
     <string name="reader_image_mode_webtoon">Webtoon</string>
     <string name="reader_image_prefetch_pages">Preloaded pages</string>
     <string name="reader_image_prefetch_pages_subtitle">How many pages to prepare ahead</string>

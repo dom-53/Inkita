@@ -22,7 +22,7 @@ enum class AppTheme { System, Light, Dark }
 
 enum class ReaderThemeMode { Light, Dark, DarkHighContrast, Sepia, SepiaHighContrast, Gray }
 
-enum class ImageReaderMode { LeftToRight, RightToLeft, Webtoon }
+enum class ImageReaderMode { LeftToRight, RightToLeft, Vertical, Webtoon }
 
 data class AppConfig(
     val serverUrl: String,
@@ -693,6 +693,7 @@ class AppPreferences(
     private fun Preferences.toImageReaderMode(): ImageReaderMode =
         when (this[KEY_IMAGE_READER_MODE]) {
             "rtl" -> ImageReaderMode.RightToLeft
+            "vertical" -> ImageReaderMode.Vertical
             "webtoon" -> ImageReaderMode.Webtoon
             else -> ImageReaderMode.LeftToRight
         }
@@ -701,6 +702,7 @@ class AppPreferences(
         when (mode) {
             ImageReaderMode.LeftToRight -> "ltr"
             ImageReaderMode.RightToLeft -> "rtl"
+            ImageReaderMode.Vertical -> "vertical"
             ImageReaderMode.Webtoon -> "webtoon"
         }
 }

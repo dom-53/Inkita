@@ -4,10 +4,13 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,6 +39,7 @@ object ImageReader : BaseReader {
     ) {
         val imageUrl = params.uiState.imageUrl
         val isRtl = params.imageReaderMode == ImageReaderMode.RightToLeft
+        val isVertical = params.imageReaderMode == ImageReaderMode.Vertical
         val swipeThresholdPx = with(LocalDensity.current) { 64.dp.toPx() }
         Box(
             modifier =
@@ -43,27 +47,45 @@ object ImageReader : BaseReader {
                     .fillMaxSize()
                     .pointerInput(params.uiState.pageIndex) {
                         var totalDrag = 0f
-                        detectHorizontalDragGestures(
-                            onDragStart = { totalDrag = 0f },
-                            onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
-                            onDragEnd = {
-                                if (abs(totalDrag) > swipeThresholdPx) {
-                                    val next =
-                                        if (isRtl) {
-                                            totalDrag > 0
+                        if (isVertical) {
+                            detectVerticalDragGestures(
+                                onDragStart = { totalDrag = 0f },
+                                onVerticalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                                onDragEnd = {
+                                    if (abs(totalDrag) > swipeThresholdPx) {
+                                        if (totalDrag < 0) {
+                                            callbacks.onSwipeNext()
                                         } else {
-                                            totalDrag < 0
+                                            callbacks.onSwipePrev()
                                         }
-                                    if (next) {
-                                        callbacks.onSwipeNext()
-                                    } else {
-                                        callbacks.onSwipePrev()
                                     }
-                                }
-                                totalDrag = 0f
-                            },
-                            onDragCancel = { totalDrag = 0f },
-                        )
+                                    totalDrag = 0f
+                                },
+                                onDragCancel = { totalDrag = 0f },
+                            )
+                        } else {
+                            detectHorizontalDragGestures(
+                                onDragStart = { totalDrag = 0f },
+                                onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                                onDragEnd = {
+                                    if (abs(totalDrag) > swipeThresholdPx) {
+                                        val next =
+                                            if (isRtl) {
+                                                totalDrag > 0
+                                            } else {
+                                                totalDrag < 0
+                                            }
+                                        if (next) {
+                                            callbacks.onSwipeNext()
+                                        } else {
+                                            callbacks.onSwipePrev()
+                                        }
+                                    }
+                                    totalDrag = 0f
+                                },
+                                onDragCancel = { totalDrag = 0f },
+                            )
+                        }
                     }.clickable { callbacks.onToggleOverlay() },
             contentAlignment = Alignment.Center,
         ) {
@@ -82,12 +104,15 @@ object ImageReader : BaseReader {
                     transitionSpec = {
                         val direction =
                             when {
-                                targetState.pageIndex > initialState.pageIndex -> if (isRtl) -1 else 1
-                                targetState.pageIndex < initialState.pageIndex -> if (isRtl) 1 else -1
+                                targetState.pageIndex > initialState.pageIndex -> if (isVertical) 1 else if (isRtl) -1 else 1
+                                targetState.pageIndex < initialState.pageIndex -> if (isVertical) -1 else if (isRtl) 1 else -1
                                 else -> 0
                             }
                         if (direction == 0) {
                             fadeIn() togetherWith fadeOut()
+                        } else if (isVertical) {
+                            (slideInVertically { fullHeight -> fullHeight * direction } + fadeIn()) togetherWith
+                                (slideOutVertically { fullHeight -> -fullHeight * direction } + fadeOut())
                         } else {
                             (slideInHorizontally { fullWidth -> fullWidth * direction } + fadeIn()) togetherWith
                                 (slideOutHorizontally { fullWidth -> -fullWidth * direction } + fadeOut())
