@@ -1,5 +1,11 @@
 package net.dom53.inkita.ui.reader.renderer
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
@@ -28,49 +34,76 @@ object ImageReader : BaseReader {
         callbacks: ReaderRenderCallbacks,
     ) {
         val imageUrl = params.uiState.imageUrl
-        when {
-            params.uiState.isLoading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        val swipeThresholdPx = with(LocalDensity.current) { 64.dp.toPx() }
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(params.uiState.pageIndex) {
+                        var totalDrag = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                            onDragEnd = {
+                                if (abs(totalDrag) > swipeThresholdPx) {
+                                    if (totalDrag < 0) {
+                                        callbacks.onSwipeNext()
+                                    } else {
+                                        callbacks.onSwipePrev()
+                                    }
+                                }
+                                totalDrag = 0f
+                            },
+                            onDragCancel = { totalDrag = 0f },
+                        )
+                    }.clickable { callbacks.onToggleOverlay() },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (imageUrl.isNullOrBlank()) {
+                if (params.uiState.isLoading) {
                     CircularProgressIndicator()
-                }
-            }
-            imageUrl.isNullOrBlank() -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                } else {
                     Text(
                         text = params.uiState.error ?: stringResource(R.string.general_error),
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
-            }
-            else -> {
-                val swipeThresholdPx = with(LocalDensity.current) { 64.dp.toPx() }
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = null,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .pointerInput(imageUrl) {
-                                var totalDrag = 0f
-                                detectHorizontalDragGestures(
-                                    onDragStart = { totalDrag = 0f },
-                                    onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
-                                    onDragEnd = {
-                                        if (abs(totalDrag) > swipeThresholdPx) {
-                                            if (totalDrag < 0) {
-                                                callbacks.onSwipeNext()
-                                            } else {
-                                                callbacks.onSwipePrev()
-                                            }
-                                        }
-                                        totalDrag = 0f
-                                    },
-                                    onDragCancel = { totalDrag = 0f },
-                                )
-                            }.clickable { callbacks.onToggleOverlay() },
-                    contentScale = ContentScale.Fit,
-                )
+            } else {
+                AnimatedContent(
+                    targetState = ImagePageState(pageIndex = params.uiState.pageIndex, imageUrl = imageUrl),
+                    transitionSpec = {
+                        val direction =
+                            when {
+                                targetState.pageIndex > initialState.pageIndex -> 1
+                                targetState.pageIndex < initialState.pageIndex -> -1
+                                else -> 0
+                            }
+                        if (direction == 0) {
+                            fadeIn() togetherWith fadeOut()
+                        } else {
+                            (slideInHorizontally { fullWidth -> fullWidth * direction } + fadeIn()) togetherWith
+                                (slideOutHorizontally { fullWidth -> -fullWidth * direction } + fadeOut())
+                        }
+                    },
+                    label = "ImageReaderTransition",
+                ) { state ->
+                    AsyncImage(
+                        model = state.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+
+                if (params.uiState.isLoading) {
+                    CircularProgressIndicator()
+                }
             }
         }
     }
 }
+
+private data class ImagePageState(
+    val pageIndex: Int,
+    val imageUrl: String,
+)
