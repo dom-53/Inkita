@@ -350,6 +350,7 @@ internal fun BaseReaderScreen(
                     themeMode = themeMode,
                     pendingScrollY = pendingScrollY,
                     pendingScrollId = pendingScrollId,
+                    imageReaderMode = readerPrefs.imageReaderMode,
                 ),
             callbacks =
                 ReaderRenderCallbacks(

@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import net.dom53.inkita.R
+import net.dom53.inkita.core.storage.ImageReaderMode
 import kotlin.math.abs
 
 object ImageReader : BaseReader {
@@ -34,6 +35,7 @@ object ImageReader : BaseReader {
         callbacks: ReaderRenderCallbacks,
     ) {
         val imageUrl = params.uiState.imageUrl
+        val isRtl = params.imageReaderMode == ImageReaderMode.RightToLeft
         val swipeThresholdPx = with(LocalDensity.current) { 64.dp.toPx() }
         Box(
             modifier =
@@ -46,7 +48,13 @@ object ImageReader : BaseReader {
                             onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
                             onDragEnd = {
                                 if (abs(totalDrag) > swipeThresholdPx) {
-                                    if (totalDrag < 0) {
+                                    val next =
+                                        if (isRtl) {
+                                            totalDrag > 0
+                                        } else {
+                                            totalDrag < 0
+                                        }
+                                    if (next) {
                                         callbacks.onSwipeNext()
                                     } else {
                                         callbacks.onSwipePrev()
@@ -74,8 +82,8 @@ object ImageReader : BaseReader {
                     transitionSpec = {
                         val direction =
                             when {
-                                targetState.pageIndex > initialState.pageIndex -> 1
-                                targetState.pageIndex < initialState.pageIndex -> -1
+                                targetState.pageIndex > initialState.pageIndex -> if (isRtl) -1 else 1
+                                targetState.pageIndex < initialState.pageIndex -> if (isRtl) 1 else -1
                                 else -> 0
                             }
                         if (direction == 0) {

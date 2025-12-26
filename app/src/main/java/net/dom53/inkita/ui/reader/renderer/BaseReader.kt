@@ -4,6 +4,7 @@ import android.webkit.WebView
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import net.dom53.inkita.core.storage.ImageReaderMode
 import net.dom53.inkita.core.storage.ReaderThemeMode
 import net.dom53.inkita.ui.reader.model.ReaderFontOption
 import net.dom53.inkita.ui.reader.viewmodel.ReaderUiState
@@ -30,6 +31,7 @@ data class ReaderRenderParams(
     val themeMode: ReaderThemeMode,
     val pendingScrollY: Int?,
     val pendingScrollId: String?,
+    val imageReaderMode: ImageReaderMode,
 )
 
 data class ReaderRenderCallbacks(
