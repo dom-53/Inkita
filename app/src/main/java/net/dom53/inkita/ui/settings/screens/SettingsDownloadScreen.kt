@@ -41,12 +41,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import net.dom53.inkita.core.download.DownloadManager
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
-import net.dom53.inkita.data.repository.DownloadRepositoryImpl
-import java.io.File
 
 @Composable
 fun SettingsDownloadScreen(
@@ -65,12 +63,6 @@ fun SettingsDownloadScreen(
     var deleteAfterMarkRead by remember { mutableStateOf(false) }
     var deleteAfterReadDepth by remember { mutableStateOf(1) }
 
-    val downloadRepo =
-        remember {
-            val db = InkitaDatabase.getInstance(context)
-            val manager = DownloadManager(context)
-            DownloadRepositoryImpl(db.downloadDao(), manager, context.applicationContext)
-        }
     val downloadV2Dao =
         remember {
             InkitaDatabase.getInstance(context).downloadV2Dao()
@@ -228,7 +220,6 @@ fun SettingsDownloadScreen(
                         showClearDialog = false
                         scope.launch {
                             withContext(Dispatchers.IO) {
-                                downloadRepo.clearAllDownloads()
                                 clearDownloadV2(context, downloadV2Dao)
                             }
                             Toast.makeText(context, context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast), Toast.LENGTH_SHORT).show()
@@ -251,12 +242,9 @@ private suspend fun clearDownloadV2(
     context: android.content.Context,
     downloadV2Dao: DownloadV2Dao,
 ) {
-    val externalRoot = context.getExternalFilesDir("Inkita/downloads")
-    val internalRoot = File(context.filesDir, "Inkita/downloads")
-    listOf(externalRoot, internalRoot).forEach { dir ->
-        if (dir != null && dir.exists()) {
-            runCatching { dir.deleteRecursively() }
-        }
+    val root = DownloadPaths.baseDir(context)
+    if (root.exists()) {
+        runCatching { root.deleteRecursively() }
     }
     downloadV2Dao.clearAllItems()
     downloadV2Dao.clearAllJobs()

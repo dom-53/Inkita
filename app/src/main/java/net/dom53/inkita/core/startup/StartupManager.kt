@@ -126,7 +126,6 @@ object StartupManager {
                 appContext,
                 preferences,
                 database.readerDao(),
-                database.downloadDao(),
                 database.downloadV2Dao(),
             )
 

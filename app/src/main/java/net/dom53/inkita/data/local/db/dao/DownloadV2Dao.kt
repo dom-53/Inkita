@@ -78,6 +78,26 @@ interface DownloadV2Dao {
     @Query("SELECT * FROM download_items_v2 WHERE chapterId = :chapterId ORDER BY updatedAt DESC")
     fun observeItemsForChapter(chapterId: Int): Flow<List<DownloadedItemV2Entity>>
 
+    @Query("SELECT * FROM download_items_v2 WHERE seriesId = :seriesId ORDER BY updatedAt DESC")
+    suspend fun getItemsForSeries(seriesId: Int): List<DownloadedItemV2Entity>
+
+    @Query("SELECT * FROM download_items_v2 WHERE volumeId = :volumeId ORDER BY updatedAt DESC")
+    suspend fun getItemsForVolume(volumeId: Int): List<DownloadedItemV2Entity>
+
+    @Query(
+        """
+        SELECT * FROM download_items_v2
+        WHERE chapterId = :chapterId
+          AND page IS NOT NULL
+          AND page < :page
+        ORDER BY updatedAt DESC
+        """,
+    )
+    suspend fun getItemsForChapterBeforePage(
+        chapterId: Int,
+        page: Int,
+    ): List<DownloadedItemV2Entity>
+
     @Query("DELETE FROM download_items_v2 WHERE id = :itemId")
     suspend fun deleteItemById(itemId: Long)
 

@@ -8,13 +8,11 @@ import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.sync.ProgressSyncWorker
-import net.dom53.inkita.data.local.db.dao.DownloadDao
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
 import net.dom53.inkita.data.local.db.entity.CachedPageEntity
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
-import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
 import net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity
 import net.dom53.inkita.data.mapper.toDomain
 import net.dom53.inkita.data.mapper.toDto
@@ -34,7 +32,6 @@ class ReaderRepositoryImpl(
     private val context: Context,
     private val appPreferences: AppPreferences,
     private val readerDao: ReaderDao,
-    private val downloadDao: DownloadDao? = null,
     private val downloadV2Dao: DownloadV2Dao? = null,
 ) : ReaderRepository {
     private val archiveEntryCache = mutableMapOf<String, List<String>>()
@@ -57,18 +54,8 @@ class ReaderRepositoryImpl(
                     null
                 }
             }
-        val downloaded = downloadDao?.getDownloadedPage(chapterId, page)
-        val downloadedHtml =
-            downloaded?.let { pageEntity ->
-                if (isPathPresent(pageEntity.htmlPath)) {
-                    readDownloadedHtml(pageEntity.htmlPath)
-                } else {
-                    runCatching { downloadDao?.deleteDownloadedPage(chapterId, page) }
-                    null
-                }
-            }
         val cached = readerDao.getPage(chapterId, page)?.html
-        val offlineHtml = downloadedHtmlV2 ?: downloadedHtml
+        val offlineHtml = downloadedHtmlV2
 
         if (!isOnlineAllowed() && offlineHtml == null) {
             throw PageNotDownloadedException("Page not downloaded for offline reading")
@@ -165,12 +152,7 @@ class ReaderRepositoryImpl(
             val entryNames = listArchiveImageEntries(archivePath)
             return page in entryNames.indices
         }
-        val downloaded = downloadDao?.getDownloadedPage(chapterId, page) ?: return false
-        val present = isPathPresent(downloaded.htmlPath)
-        if (!present) {
-            runCatching { downloadDao?.deleteDownloadedPage(chapterId, page) }
-        }
-        return present
+        return false
     }
 
     override suspend fun getProgress(chapterId: Int): ReaderProgress? {
@@ -752,53 +734,66 @@ class ReaderRepositoryImpl(
         seriesId: Int?,
         volumeIds: List<Int>?,
     ) {
-        val dao = downloadDao ?: return
+        val dao = downloadV2Dao ?: return
         val enabled = appPreferences.deleteAfterMarkReadFlow.first()
         if (!enabled) return
         val depth = appPreferences.deleteAfterReadDepthFlow.first().coerceIn(1, 5)
 
         if (volumeIds.isNullOrEmpty()) {
             if (seriesId != null) {
-                deleteDownloadedPages(dao.getDownloadedPagesBySeries(seriesId))
+                deleteDownloadedSeries(seriesId)
             }
             return
         }
 
         if (depth == 1) {
             volumeIds.forEach { id ->
-                deleteDownloadedPages(dao.getDownloadedPagesByVolume(id))
+                deleteDownloadedVolume(id)
             }
             return
         }
 
         // For volume-level completion, just delete the completed volumes when depth is 1.
         if (depth == 1) {
-            volumeIds.forEach { id -> deleteDownloadedPages(dao.getDownloadedPagesByVolume(id)) }
+            volumeIds.forEach { id -> deleteDownloadedVolume(id) }
         }
     }
 
     private suspend fun clearDeleteAfterHistory(seriesId: Int?) {
         if (seriesId != null) {
-            downloadDao?.let { dao -> deleteDownloadedPages(dao.getDownloadedPagesBySeries(seriesId)) }
+            deleteDownloadedSeries(seriesId)
         }
     }
 
-    private suspend fun deleteDownloadedPages(pages: List<DownloadedPageEntity>) {
-        if (pages.isEmpty()) return
-        pages.forEach { page ->
+    private suspend fun deleteDownloadedItems(items: List<DownloadedItemV2Entity>) {
+        if (items.isEmpty()) return
+        items.forEach { item ->
             runCatching {
-                if (!page.htmlPath.startsWith("content://")) {
-                    File(page.htmlPath).delete()
+                val path = item.localPath ?: return@runCatching
+                if (path.startsWith("content://")) {
+                    context.contentResolver.delete(Uri.parse(path), null, null)
                 } else {
-                    context.contentResolver.delete(Uri.parse(page.htmlPath), null, null)
-                }
-                page.assetsDir?.let { dir ->
-                    val file = File(dir)
-                    if (file.exists()) file.deleteRecursively()
+                    File(path).delete()
                 }
             }
-            runCatching { downloadDao?.deleteDownloadedPage(page.chapterId, page.page) }
         }
+        items.forEach { item ->
+            runCatching { downloadV2Dao?.deleteItemById(item.id) }
+        }
+    }
+
+    private suspend fun deleteDownloadedSeries(seriesId: Int) {
+        val dao = downloadV2Dao ?: return
+        deleteDownloadedItems(dao.getItemsForSeries(seriesId))
+        dao.deleteItemsForSeries(seriesId)
+        dao.deleteJobsForSeries(seriesId)
+    }
+
+    private suspend fun deleteDownloadedVolume(volumeId: Int) {
+        val dao = downloadV2Dao ?: return
+        deleteDownloadedItems(dao.getItemsForVolume(volumeId))
+        dao.deleteItemsForVolume(volumeId)
+        dao.deleteJobsForVolume(volumeId)
     }
 
     private suspend fun maybeDeleteAfterCompletion(
@@ -821,10 +816,8 @@ class ReaderRepositoryImpl(
         val page = progress.page ?: return
         val cutoff = page - depth + 1
         if (cutoff < 0) return
-        val pages =
-            downloadDao
-                ?.getDownloadedPagesBefore(progress.chapterId, cutoff)
-                .orEmpty()
-        deleteDownloadedPages(pages)
+        val dao = downloadV2Dao ?: return
+        val items = dao.getItemsForChapterBeforePage(progress.chapterId, cutoff)
+        deleteDownloadedItems(items)
     }
 }
