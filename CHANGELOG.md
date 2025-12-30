@@ -18,6 +18,7 @@ All notable changes to this project will be documented here.
 - Series Detail V2: Menu now shows a tree view of downloaded files/structure.
 - Reader: Offline Image/Archive reading now loads pages from downloaded CBZ files.
 - Reader: Added basic Image/Archive reader (image pages + swipe navigation).
+- Reader: Image reader now supports selectable reading modes (LTR/RTL/Vertical).
 - Reader: PDF opened for reading no longer persists on disk unless downloaded; temp files are cleaned on exit/startup (with verbose logs).
 - Series Detail V2: Chapters list now supports swipe read/unread and download.
 - Series Detail V2: Tapping a genre or tag opens Browse with the filter pre-applied.
