@@ -1,8 +1,12 @@
 package net.dom53.inkita.core.startup
 
+import android.Manifest
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Debug
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -11,6 +15,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.cache.CacheManagerImpl
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.notification.AppNotificationManager
@@ -125,14 +130,45 @@ object StartupManager {
                 appContext,
                 preferences,
                 database.readerDao(),
-                database.downloadDao(),
                 database.downloadV2Dao(),
             )
 
         // Kick off sync of offline reader progress; worker will only run when online.
         ProgressSyncWorker.enqueue(appContext)
         // Check for app updates and post a notification if available (best-effort).
-        appScope.launch { UpdateChecker.checkForUpdate(appContext) }
+        appScope.launch {
+            val hasPermission =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    ContextCompat.checkSelfPermission(
+                        appContext,
+                        Manifest.permission.POST_NOTIFICATIONS,
+                    ) == PackageManager.PERMISSION_GRANTED
+                } else {
+                    true
+                }
+            if (hasPermission) {
+                runCatching { UpdateChecker.checkForUpdate(appContext) }
+                    .onFailure { e ->
+                        if (LoggingManager.isDebugEnabled()) {
+                            LoggingManager.w("UpdateChecker", "Missing notification permission", e)
+                        }
+                    }
+            } else if (LoggingManager.isDebugEnabled()) {
+                LoggingManager.d("UpdateChecker", "Skipping update check: notifications permission not granted")
+            }
+        }
+        appScope.launch(Dispatchers.IO) {
+            val tempDir = DownloadPaths.pdfTempDir(appContext)
+            if (tempDir.exists()) {
+                tempDir.deleteRecursively()
+                if (LoggingManager.isDebugEnabled()) {
+                    LoggingManager.d(
+                        "PdfReader",
+                        "Cleared temp PDF cache on startup: ${tempDir.absolutePath}",
+                    )
+                }
+            }
+        }
 
         val components =
             Components(

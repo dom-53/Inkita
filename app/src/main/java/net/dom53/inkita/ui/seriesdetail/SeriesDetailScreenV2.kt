@@ -18,25 +18,34 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Downloading
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
@@ -69,11 +78,17 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
+import net.dom53.inkita.core.downloadv2.strategies.ChapterImageArchiveDownloadStrategyV2
+import net.dom53.inkita.core.downloadv2.strategies.DownloadApiStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
+import net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
@@ -83,13 +98,19 @@ import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.mapper.flattenToc
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.ui.browse.utils.PublicationState
+import net.dom53.inkita.ui.common.DownloadState
+import net.dom53.inkita.ui.common.DownloadStateResolver
 import net.dom53.inkita.ui.common.chapterCoverUrl
 import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
+import net.dom53.inkita.ui.reader.model.ReaderReturn
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
+import java.io.File
+import java.util.Locale
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun SeriesDetailScreenV2(
     seriesId: Int,
@@ -100,7 +121,10 @@ fun SeriesDetailScreenV2(
     onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
     onOpenVolume: (Int) -> Unit,
     onOpenSeries: (Int) -> Unit,
-    readerReturn: net.dom53.inkita.ui.reader.ReaderReturn? = null,
+    onOpenBrowseGenre: (id: Int, name: String) -> Unit,
+    onOpenBrowseTag: (id: Int, name: String) -> Unit,
+    onOpenCollection: ((id: Int, name: String) -> Unit)? = null,
+    readerReturn: ReaderReturn? = null,
     onConsumeReaderReturn: () -> Unit = {},
     refreshSignal: Boolean = false,
     onConsumeRefreshSignal: () -> Unit = {},
@@ -149,12 +173,16 @@ fun SeriesDetailScreenV2(
     var showMenu by remember { mutableStateOf(false) }
     var showDownloadVolumeDialog by remember { mutableStateOf(false) }
     var showVolumeActionsDialog by remember { mutableStateOf(false) }
-    var downloadVolumeState by remember { mutableStateOf(DownloadVolumeState.None) }
+    var showDownloadTreeDialog by remember { mutableStateOf(false) }
+    var downloadVolumeState by remember { mutableStateOf(DownloadState.None) }
     var selectedVolume by remember { mutableStateOf<net.dom53.inkita.data.api.dto.VolumeDto?>(null) }
     var selectedSpecialChapter by remember { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
     var selectedSpecialIndex by remember { mutableStateOf<Int?>(null) }
+    var downloadTreeNodes by remember { mutableStateOf<List<FileNode>>(emptyList()) }
+    var downloadTreeLoading by remember { mutableStateOf(false) }
+    val expandedPaths = remember { mutableStateMapOf<String, Boolean>() }
     val specialPageTitleCache = remember(seriesId) { mutableStateMapOf<Int, Map<Int, String>>() }
-    val volumeDownloadStates = remember { mutableStateMapOf<Int, DownloadVolumeState>() }
+    val volumeDownloadStates = remember { mutableStateMapOf<Int, DownloadState>() }
     val downloadDao =
         remember(context.applicationContext) {
             InkitaDatabase.getInstance(context.applicationContext).downloadV2Dao()
@@ -163,10 +191,43 @@ fun SeriesDetailScreenV2(
         downloadDao
             .observeItemsForSeries(seriesId)
             .collectAsState(initial = emptyList())
+    val hasDetail = uiState.detail != null
+    val isRefreshing = uiState.isLoading && hasDetail
+    val pullRefreshState =
+        rememberPullRefreshState(
+            refreshing = isRefreshing,
+            onRefresh = { viewModel.reload(forceRefresh = true) },
+        )
     val downloadManagerV2 =
         remember(context.applicationContext) {
-            val strategy =
+            val epubStrategy =
                 EpubDownloadStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                )
+            val pdfStrategy =
+                PdfDownloadStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                )
+            val imageStrategy =
+                ChapterImageArchiveDownloadStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                    key = ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE,
+                )
+            val archiveStrategy =
+                ChapterImageArchiveDownloadStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                    key = ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE,
+                )
+            val downloadStrategy =
+                DownloadApiStrategyV2(
                     appContext = context.applicationContext,
                     downloadDao = downloadDao,
                     appPreferences = appPreferences,
@@ -174,7 +235,14 @@ fun SeriesDetailScreenV2(
             DownloadManagerV2(
                 appContext = context.applicationContext,
                 downloadDao = downloadDao,
-                strategies = mapOf(strategy.key to strategy),
+                strategies =
+                    listOf(
+                        epubStrategy,
+                        pdfStrategy,
+                        imageStrategy,
+                        archiveStrategy,
+                        downloadStrategy,
+                    ).associateBy { it.key },
             )
         }
     LaunchedEffect(selectedSpecialChapter?.id, offlineMode, config.serverUrl, config.apiKey) {
@@ -193,6 +261,19 @@ fun SeriesDetailScreenV2(
         if (!tocResponse.isSuccessful) return@LaunchedEffect
         val tocItems = tocResponse.body().orEmpty().flatMap { flattenToc(it) }
         specialPageTitleCache[chapter.id] = buildPageTitleMap(context, pages, tocItems)
+    }
+    LaunchedEffect(showDownloadTreeDialog) {
+        if (!showDownloadTreeDialog) return@LaunchedEffect
+        downloadTreeLoading = true
+        val root =
+            withContext(Dispatchers.IO) {
+                val dir = DownloadPaths.seriesDir(context.applicationContext, seriesId)
+                if (dir.exists()) buildFileTree(dir) else null
+            }
+        downloadTreeNodes = root?.let { listOf(it) } ?: emptyList()
+        expandedPaths.clear()
+        root?.let { expandedPaths[it.path] = true }
+        downloadTreeLoading = false
     }
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -231,7 +312,11 @@ fun SeriesDetailScreenV2(
                                 }
                                 val detail = uiState.detail
                                 val format = Format.fromId(detail?.series?.format)
-                                if (format != Format.Epub) {
+                                val isPdf = format == Format.Pdf
+                                val isEpub = format == Format.Epub
+                                val isImage = format == Format.Image
+                                val isArchive = format == Format.Archive
+                                if (!isPdf && !isEpub && !isImage && !isArchive) {
                                     Toast
                                         .makeText(
                                             context,
@@ -268,7 +353,7 @@ fun SeriesDetailScreenV2(
                                                 add(chapter to chapter.volumeId)
                                             }
                                     }.distinctBy { it.first.id }
-                                        .filter { (it.first.pages ?: 0) > 0 }
+                                        .filter { isPdf || isImage || isArchive || (it.first.pages ?: 0) > 0 }
                                 if (chaptersWithVolume.isEmpty()) {
                                     Toast
                                         .makeText(
@@ -281,11 +366,11 @@ fun SeriesDetailScreenV2(
                                 scope.launch {
                                     val sid = detail?.series?.id ?: seriesId
                                     chaptersWithVolume.forEach { (chapter, volumeId) ->
-                                        val pages = chapter.pages ?: return@forEach
+                                        val pages = if (isPdf || isImage || isArchive) 1 else chapter.pages ?: return@forEach
                                         val request =
                                             DownloadRequestV2(
                                                 type = DownloadJobV2Entity.TYPE_CHAPTER,
-                                                format = EpubDownloadStrategyV2.FORMAT_EPUB,
+                                                format = formatKeyFor(detail?.series?.format),
                                                 seriesId = sid,
                                                 volumeId = volumeId,
                                                 chapterId = chapter.id,
@@ -317,6 +402,13 @@ fun SeriesDetailScreenV2(
                                             Toast.LENGTH_SHORT,
                                         ).show()
                                 }
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(net.dom53.inkita.R.string.series_detail_download_tree)) },
+                            onClick = {
+                                showMenu = false
+                                showDownloadTreeDialog = true
                             },
                         )
                         DropdownMenuItem(
@@ -373,19 +465,25 @@ fun SeriesDetailScreenV2(
                 }
             }
             when {
-                uiState.isLoading -> {
+                uiState.isLoading && !hasDetail -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = stringResource(id = net.dom53.inkita.R.string.general_loading),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            CircularProgressIndicator()
+                            Text(
+                                text = stringResource(id = net.dom53.inkita.R.string.general_loading),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
                     }
                 }
 
-                uiState.error != null -> {
+                uiState.error != null && !hasDetail -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
@@ -402,321 +500,341 @@ fun SeriesDetailScreenV2(
                     val series = detail?.series
                     val metadata = detail?.metadata
                     val coverUrl = series?.id?.let { seriesCoverUrl(config, it) }
-                    Column(
+                    Box(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 16.dp)
-                                .verticalScroll(rememberScrollState()),
+                                .pullRefresh(pullRefreshState),
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.Top,
-                        ) {
-                            CoverImage(
-                                coverUrl = coverUrl,
-                                context = context,
-                                modifier =
-                                    Modifier
-                                        .width(140.dp)
-                                        .aspectRatio(2f / 3f)
-                                        .clickable { coverExpanded = true },
-                            )
-                            HeaderInfo(
-                                seriesId = seriesId,
-                                series = series,
-                                metadata = metadata,
-                                detail = detail,
-                                context = context,
-                                clipboardManager = clipboardManager,
-                                onCopyToast = {
-                                    Toast
-                                        .makeText(
-                                            context,
-                                            context.getString(net.dom53.inkita.R.string.general_copied_to_clipboard),
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        ActionsRowV2(
-                            wantToRead = detail?.wantToRead == true,
-                            collectionsEnabled = !offlineMode,
-                            wantToReadEnabled = !offlineMode,
-                            onToggleWant = {
-                                viewModel.toggleWantToRead()
-                            },
-                            onOpenCollections = {
-                                viewModel.loadCollections()
-                                showCollectionDialog = true
-                            },
-                            onOpenWeb = {
-                                val url = webUrl(config, series?.libraryId, seriesId)
-                                if (url == null) {
-                                    Toast
-                                        .makeText(
-                                            context,
-                                            context.getString(net.dom53.inkita.R.string.series_detail_missing_library_id),
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                    return@ActionsRowV2
-                                }
-                                runCatching {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                }.onFailure {
-                                    Toast
-                                        .makeText(
-                                            context,
-                                            context.getString(net.dom53.inkita.R.string.general_unable_to_share),
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                }
-                            },
-                            onShare = {
-                                val url = webUrl(config, series?.libraryId, seriesId)
-                                val title =
-                                    series?.name?.ifBlank { null }
-                                        ?: context.getString(net.dom53.inkita.R.string.series_detail_series_fallback, seriesId)
-                                val shareIntent =
-                                    Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_SUBJECT, title)
-                                        putExtra(Intent.EXTRA_TEXT, url ?: title)
-                                    }
-                                runCatching {
-                                    context.startActivity(
-                                        Intent.createChooser(
-                                            shareIntent,
-                                            context.getString(net.dom53.inkita.R.string.general_share),
-                                        ),
-                                    )
-                                }.onFailure {
-                                    Toast
-                                        .makeText(
-                                            context,
-                                            context.getString(net.dom53.inkita.R.string.general_unable_to_share),
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                }
-                            },
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        SummarySectionV2(
-                            summary = cleanHtml(metadata?.summary),
-                            genres = metadata?.genres?.mapNotNull { it.title }.orEmpty(),
-                            tags = metadata?.tags?.mapNotNull { it.title }.orEmpty(),
-                            expanded = summaryExpanded,
-                            onToggle = { summaryExpanded = !summaryExpanded },
-                        )
-                        val continuePoint = detail?.continuePoint
-                        val readerProgress = detail?.readerProgress
-                        val continueLabel =
-                            if (continuePoint != null && detail?.hasProgress == true) {
-                                val page = (continuePoint.pagesRead ?: 0) + 1
-                                val volId = readerProgress?.volumeId ?: continuePoint.volumeId
-                                val volumeNumber =
-                                    detail
-                                        ?.detail
-                                        ?.volumes
-                                        ?.firstOrNull { it.id == volId }
-                                        ?.let { volumeNumberText(it) }
-                                if (volumeNumber != null) {
-                                    stringResource(
-                                        id = net.dom53.inkita.R.string.series_detail_continue_vol_ch,
-                                        volumeNumber,
-                                        page,
-                                    )
-                                } else {
-                                    stringResource(id = net.dom53.inkita.R.string.series_detail_continue_ch, page)
-                                }
-                            } else {
-                                stringResource(id = net.dom53.inkita.R.string.series_detail_start_reading)
-                            }
-                        Button(
-                            onClick = {
-                                val chapterId = readerProgress?.chapterId ?: continuePoint?.id
-                                val volumeId = readerProgress?.volumeId ?: continuePoint?.volumeId
-                                val sid = detail?.series?.id ?: seriesId
-                                val fmt = detail?.series?.format
-                                if (chapterId == null || volumeId == null) {
-                                    Toast
-                                        .makeText(
-                                            context,
-                                            context.getString(net.dom53.inkita.R.string.general_not_implemented),
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                    return@Button
-                                }
-                                val page =
-                                    readerProgress?.pageNum ?: continuePoint?.pagesRead ?: 0
-                                onOpenReader(chapterId, page, sid, volumeId, fmt)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(text = continueLabel)
-                        }
-                        val booksCount = detail?.detail?.volumes?.size
-                        val chaptersCount = detail?.detail?.chapters?.size
-                        val specialsCount = detail?.detail?.specials?.size
-                        val relatedCount =
-                            (detail?.related?.let { relatedSeriesCount(it) } ?: 0) +
-                                (detail?.collections?.size ?: 0)
-                        val tabs =
-                            listOf(
-                                TabItem(SeriesDetailTab.Books, booksCount ?: 0),
-                                TabItem(SeriesDetailTab.Chapters, chaptersCount ?: 0),
-                                TabItem(SeriesDetailTab.Specials, specialsCount ?: 0),
-                                TabItem(SeriesDetailTab.Related, relatedCount ?: 0),
-                                TabItem(SeriesDetailTab.Recommendations, 0),
-                                TabItem(SeriesDetailTab.Reviews, 0),
-                            ).filter { it.count > 0 }
-                        var selectedTab by remember { mutableStateOf(tabs.firstOrNull()?.id ?: SeriesDetailTab.Books) }
-                        LaunchedEffect(tabs) {
-                            if (tabs.none { it.id == selectedTab }) {
-                                tabs.firstOrNull()?.let { selectedTab = it.id }
-                            }
-                        }
-                        Row(
+                        Column(
                             modifier =
                                 Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                                    .fillMaxSize()
+                                    .padding(horizontal = 16.dp)
+                                    .verticalScroll(rememberScrollState()),
                         ) {
-                            tabs.forEach { tab ->
-                                SectionChip(
-                                    label = tab.id.label,
-                                    count = tab.count,
-                                    selected = selectedTab == tab.id,
-                                    onClick = { selectedTab = tab.id },
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                CoverImage(
+                                    coverUrl = coverUrl,
+                                    context = context,
+                                    modifier =
+                                        Modifier
+                                            .width(140.dp)
+                                            .aspectRatio(2f / 3f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { coverExpanded = true },
+                                )
+                                HeaderInfo(
+                                    seriesId = seriesId,
+                                    series = series,
+                                    metadata = metadata,
+                                    detail = detail,
+                                    context = context,
+                                    clipboardManager = clipboardManager,
+                                    onCopyToast = {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.general_copied_to_clipboard),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                    },
+                                    modifier = Modifier.weight(1f),
                                 )
                             }
-                        }
-                        if (selectedTab == SeriesDetailTab.Books) {
-                            val volumes = detail?.detail?.volumes.orEmpty()
-                            LaunchedEffect(volumes, downloadedItemsBySeries.value) {
-                                val items = downloadedItemsBySeries.value
-                                val grouped =
-                                    items
-                                        .filter { it.volumeId != null }
-                                        .groupBy { it.volumeId!! }
-                                volumes.forEach { volume ->
-                                    val list = grouped[volume.id].orEmpty()
-                                    val completed =
-                                        list.count { item ->
-                                            item.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                                isItemPathPresent(item.localPath)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            ActionsRowV2(
+                                wantToRead = detail?.wantToRead == true,
+                                collectionsEnabled = !offlineMode,
+                                wantToReadEnabled = !offlineMode,
+                                onToggleWant = {
+                                    viewModel.toggleWantToRead()
+                                },
+                                onOpenCollections = {
+                                    viewModel.loadCollections()
+                                    showCollectionDialog = true
+                                },
+                                onOpenWeb = {
+                                    val url = webUrl(config, series?.libraryId, seriesId)
+                                    if (url == null) {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.series_detail_missing_library_id),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        return@ActionsRowV2
+                                    }
+                                    runCatching {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                    }.onFailure {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.general_unable_to_share),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                    }
+                                },
+                                onShare = {
+                                    val url = webUrl(config, series?.libraryId, seriesId)
+                                    val title =
+                                        series?.name?.ifBlank { null }
+                                            ?: context.getString(net.dom53.inkita.R.string.series_detail_series_fallback, seriesId)
+                                    val shareIntent =
+                                        Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_SUBJECT, title)
+                                            putExtra(Intent.EXTRA_TEXT, url ?: title)
                                         }
-                                    val expected =
-                                        volume.pages
-                                            ?.takeIf { it > 0 }
-                                            ?: volume.chapters
-                                                ?.sumOf { it.pages ?: 0 }
-                                                ?.takeIf { it > 0 }
-                                            ?: 0
-                                    val state =
-                                        when {
-                                            expected > 0 && completed >= expected -> DownloadVolumeState.Complete
-                                            completed > 0 -> DownloadVolumeState.Partial
-                                            else -> DownloadVolumeState.None
-                                        }
-                                    volumeDownloadStates[volume.id] = state
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent.createChooser(
+                                                shareIntent,
+                                                context.getString(net.dom53.inkita.R.string.general_share),
+                                            ),
+                                        )
+                                    }.onFailure {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.general_unable_to_share),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                    }
+                                },
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            SummarySectionV2(
+                                summary = cleanHtml(metadata?.summary),
+                                genres =
+                                    metadata
+                                        ?.genres
+                                        ?.mapNotNull { genre ->
+                                            val title = genre.title ?: return@mapNotNull null
+                                            genre.id to title
+                                        }.orEmpty(),
+                                tags =
+                                    metadata
+                                        ?.tags
+                                        ?.mapNotNull { tag ->
+                                            val title = tag.title ?: return@mapNotNull null
+                                            tag.id to title
+                                        }.orEmpty(),
+                                expanded = summaryExpanded,
+                                onToggle = { summaryExpanded = !summaryExpanded },
+                                onGenreClick = { id, name -> onOpenBrowseGenre(id, name) },
+                                onTagClick = { id, name -> onOpenBrowseTag(id, name) },
+                            )
+                            val continuePoint = detail?.continuePoint
+                            val readerProgress = detail?.readerProgress
+                            val continueLabel =
+                                if (continuePoint != null && detail?.hasProgress == true) {
+                                    val page = (continuePoint.pagesRead ?: 0) + 1
+                                    val volId = readerProgress?.volumeId ?: continuePoint.volumeId
+                                    val volumeNumber =
+                                        detail
+                                            ?.detail
+                                            ?.volumes
+                                            ?.firstOrNull { it.id == volId }
+                                            ?.let { volumeNumberText(it) }
+                                    if (volumeNumber != null) {
+                                        stringResource(
+                                            id = net.dom53.inkita.R.string.series_detail_continue_vol_ch,
+                                            volumeNumber,
+                                            page,
+                                        )
+                                    } else {
+                                        stringResource(id = net.dom53.inkita.R.string.series_detail_continue_ch, page)
+                                    }
+                                } else {
+                                    stringResource(id = net.dom53.inkita.R.string.series_detail_start_reading)
+                                }
+                            Button(
+                                onClick = {
+                                    val chapterId = readerProgress?.chapterId ?: continuePoint?.id
+                                    val volumeId = readerProgress?.volumeId ?: continuePoint?.volumeId
+                                    val sid = detail?.series?.id ?: seriesId
+                                    val fmt = detail?.series?.format
+                                    if (chapterId == null || volumeId == null) {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        return@Button
+                                    }
+                                    val page =
+                                        readerProgress?.pageNum ?: continuePoint?.pagesRead ?: 0
+                                    onOpenReader(chapterId, page, sid, volumeId, fmt)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(text = continueLabel)
+                            }
+                            val booksCount = detail?.detail?.volumes?.size
+                            val chaptersCount = detail?.detail?.chapters?.size
+                            val specialsCount = detail?.detail?.specials?.size
+                            val relatedCount =
+                                (detail?.related?.let { relatedSeriesCount(it) } ?: 0) +
+                                    (detail?.collections?.size ?: 0)
+                            val tabs =
+                                listOf(
+                                    TabItem(SeriesDetailTab.Books, booksCount ?: 0),
+                                    TabItem(SeriesDetailTab.Chapters, chaptersCount ?: 0),
+                                    TabItem(SeriesDetailTab.Specials, specialsCount ?: 0),
+                                    TabItem(SeriesDetailTab.Related, relatedCount ?: 0),
+                                    TabItem(SeriesDetailTab.Recommendations, 0),
+                                    TabItem(SeriesDetailTab.Reviews, 0),
+                                ).filter { it.count > 0 }
+                            var selectedTab by remember { mutableStateOf(tabs.firstOrNull()?.id ?: SeriesDetailTab.Books) }
+                            LaunchedEffect(tabs) {
+                                if (tabs.none { it.id == selectedTab }) {
+                                    tabs.firstOrNull()?.let { selectedTab = it.id }
                                 }
                             }
-                            VolumeGridRow(
-                                volumes = volumes,
-                                config = config,
-                                seriesCoverUrl = series?.id?.let { seriesCoverUrl(config, it) },
-                                downloadStates = volumeDownloadStates,
-                                onOpenVolume = { volume ->
-                                    VolumeDetailCache.put(
-                                        VolumeDetailPayload(
-                                            seriesId = seriesId,
-                                            libraryId = detail?.series?.libraryId,
-                                            volume = volume,
-                                            formatId = detail?.series?.format,
-                                        ),
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                tabs.forEach { tab ->
+                                    SectionChip(
+                                        label = tab.id.label,
+                                        count = tab.count,
+                                        selected = selectedTab == tab.id,
+                                        onClick = { selectedTab = tab.id },
                                     )
-                                    onOpenVolume(volume.id)
-                                },
-                                onLongPressVolume = { volume ->
-                                    scope.launch {
-                                        val completed =
-                                            downloadedItemsBySeries.value
-                                                .filter { it.volumeId == volume.id }
-                                                .count { item ->
-                                                    item.status ==
+                                }
+                            }
+                            if (selectedTab == SeriesDetailTab.Books) {
+                                val volumes = detail?.detail?.volumes.orEmpty()
+                                LaunchedEffect(volumes, downloadedItemsBySeries.value) {
+                                    val format = Format.fromId(detail?.series?.format)
+                                    val items = downloadedItemsBySeries.value
+                                    val grouped =
+                                        items
+                                            .filter { it.volumeId != null }
+                                            .groupBy { it.volumeId!! }
+                                    volumes.forEach { volume ->
+                                        val list = grouped[volume.id].orEmpty()
+                                        val state =
+                                            DownloadStateResolver.resolveVolumeState(
+                                                format = format,
+                                                volume = volume,
+                                                items = list,
+                                            )
+                                        volumeDownloadStates[volume.id] = state
+                                    }
+                                }
+                                VolumeGridRow(
+                                    volumes = volumes,
+                                    config = config,
+                                    seriesCoverUrl = series?.id?.let { seriesCoverUrl(config, it) },
+                                    downloadStates = volumeDownloadStates,
+                                    onOpenVolume = { volume ->
+                                        VolumeDetailCache.put(
+                                            VolumeDetailPayload(
+                                                seriesId = seriesId,
+                                                libraryId = detail?.series?.libraryId,
+                                                volume = volume,
+                                                formatId = detail?.series?.format,
+                                            ),
+                                        )
+                                        onOpenVolume(volume.id)
+                                    },
+                                    onLongPressVolume = { volume ->
+                                        scope.launch {
+                                            val format = Format.fromId(detail?.series?.format)
+                                            val list =
+                                                downloadedItemsBySeries.value.filter { it.volumeId == volume.id }
+                                            downloadVolumeState =
+                                                DownloadStateResolver.resolveVolumeState(
+                                                    format = format,
+                                                    volume = volume,
+                                                    items = list,
+                                                )
+                                            selectedVolume = volume
+                                            showDownloadVolumeDialog = true
+                                            showVolumeActionsDialog = true
+                                        }
+                                    },
+                                )
+                            }
+                            if (selectedTab == SeriesDetailTab.Chapters) {
+                                val chapters = detail?.detail?.chapters.orEmpty()
+                                val chapterDownloadStates = remember { mutableStateMapOf<Int, DownloadState>() }
+                                LaunchedEffect(chapters, downloadedItemsBySeries.value) {
+                                    val format = Format.fromId(detail?.series?.format)
+                                    val items = downloadedItemsBySeries.value
+                                    val grouped = items.groupBy { it.chapterId }
+                                    chapters.forEach { chapter ->
+                                        val list = grouped[chapter.id].orEmpty()
+                                        val state =
+                                            DownloadStateResolver.resolveChapterState(
+                                                format = format,
+                                                chapter = chapter,
+                                                items = list,
+                                            )
+                                        chapterDownloadStates[chapter.id] = state
+                                    }
+                                }
+                                ChapterCompactList(
+                                    chapters = chapters,
+                                    downloadStates = chapterDownloadStates,
+                                    onChapterClick = onChapterClick@{ chapter, _ ->
+                                        val isSingleFile =
+                                            DownloadStateResolver.isSingleFileFormat(
+                                                Format.fromId(detail?.series?.format),
+                                            )
+                                        val pdfDownloaded =
+                                            if (isSingleFile) {
+                                                downloadedItemsBySeries.value.any { item ->
+                                                    item.chapterId == chapter.id &&
+                                                        item.type ==
+                                                        net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.TYPE_FILE &&
+                                                        item.status ==
                                                         net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
                                                         isItemPathPresent(item.localPath)
                                                 }
-                                        val expected =
-                                            volume.pages
-                                                ?.takeIf { it > 0 }
-                                                ?: volume.chapters
-                                                    ?.sumOf { it.pages ?: 0 }
-                                                    ?.takeIf { it > 0 }
-                                                ?: 0
-                                        downloadVolumeState =
-                                            when {
-                                                expected > 0 && completed >= expected -> DownloadVolumeState.Complete
-                                                completed > 0 -> DownloadVolumeState.Partial
-                                                else -> DownloadVolumeState.None
+                                            } else {
+                                                false
                                             }
-                                        selectedVolume = volume
-                                        showDownloadVolumeDialog = true
-                                        showVolumeActionsDialog = true
-                                    }
-                                },
-                            )
-                        }
-                        if (selectedTab == SeriesDetailTab.Specials) {
-                            val specials = detail?.detail?.specials.orEmpty()
-                            val specialDownloadStates = remember { mutableStateMapOf<Int, ChapterDownloadState>() }
-                            var showSpecialDialog by remember { mutableStateOf(false) }
-                            var selectedSpecial by remember { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
-                            var specialDownloadState by remember { mutableStateOf(ChapterDownloadState.None) }
-                            LaunchedEffect(specials, downloadedItemsBySeries.value) {
-                                val items = downloadedItemsBySeries.value
-                                val grouped = items.groupBy { it.chapterId }
-                                specials.forEach { chapter ->
-                                    val list = grouped[chapter.id].orEmpty()
-                                    val completed =
-                                        list.count { item ->
-                                            item.status ==
-                                                net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                                isItemPathPresent(item.localPath)
+                                        val pagesDownloaded =
+                                            downloadedItemsBySeries.value.any { item ->
+                                                item.chapterId == chapter.id &&
+                                                    item.status ==
+                                                    net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                    isItemPathPresent(item.localPath)
+                                            }
+                                        if ((offlineMode || !NetworkUtils.isOnline(context)) && !(isSingleFile && pdfDownloaded) && !pagesDownloaded) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.reader_page_not_downloaded),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            return@onChapterClick
                                         }
-                                    val expected = chapter.pages?.takeIf { it > 0 } ?: 0
-                                    val state =
-                                        when {
-                                            expected > 0 && completed >= expected -> ChapterDownloadState.Complete
-                                            completed > 0 -> ChapterDownloadState.Partial
-                                            else -> ChapterDownloadState.None
-                                        }
-                                    specialDownloadStates[chapter.id] = state
-                                }
-                            }
-                            if (selectedSpecialChapter != null) {
-                                val chapter = selectedSpecialChapter
-                                val downloadedPages =
-                                    downloadedItemsBySeries.value
-                                        .filter { it.chapterId == chapter?.id }
-                                        .filter { item ->
-                                            item.status ==
-                                                net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                                isItemPathPresent(item.localPath)
-                                        }.mapNotNull { it.page }
-                                        .toSet()
-                                ChapterPagesSection(
-                                    chapter = chapter,
-                                    chapterIndex = selectedSpecialIndex ?: 0,
-                                    downloadedPages = downloadedPages,
-                                    pageTitles = chapter?.id?.let { specialPageTitleCache[it] },
-                                    onTogglePageDownload = { target, page, isDownloaded ->
+                                        val page = chapter.pagesRead ?: 0
+                                        onOpenReader(
+                                            chapter.id,
+                                            page,
+                                            seriesId,
+                                            chapter.volumeId ?: 0,
+                                            detail?.series?.format,
+                                        )
+                                    },
+                                    onToggleDownload = onToggleDownload@{ chapter, isDownloaded ->
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                         if (offlineMode) {
                                             Toast
                                                 .makeText(
@@ -724,39 +842,63 @@ fun SeriesDetailScreenV2(
                                                     context.getString(net.dom53.inkita.R.string.general_offline_mode),
                                                     Toast.LENGTH_SHORT,
                                                 ).show()
-                                            return@ChapterPagesSection
+                                            return@onToggleDownload
                                         }
-                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        val format = Format.fromId(detail?.series?.format)
+                                        val isEpub = format == Format.Epub
+                                        val isSingleFile = DownloadStateResolver.isSingleFileFormat(format)
+                                        if (!isEpub && !isSingleFile) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            return@onToggleDownload
+                                        }
                                         if (isDownloaded) {
                                             scope.launch {
-                                                downloadDao.deleteItemsForChapterPage(target.id, page)
-                                            }
-                                        } else {
-                                            val format = Format.fromId(detail?.series?.format)
-                                            if (format != Format.Epub) {
+                                                downloadDao.deleteItemsForChapter(chapter.id)
+                                                downloadDao.deleteJobsForChapter(chapter.id)
                                                 Toast
                                                     .makeText(
                                                         context,
-                                                        context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                                        context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast),
                                                         Toast.LENGTH_SHORT,
                                                     ).show()
-                                                return@ChapterPagesSection
                                             }
-                                            scope.launch {
-                                                val request =
-                                                    DownloadRequestV2(
-                                                        type = DownloadJobV2Entity.TYPE_CHAPTER,
-                                                        format = EpubDownloadStrategyV2.FORMAT_EPUB,
-                                                        seriesId = seriesId,
-                                                        volumeId = target.volumeId,
-                                                        chapterId = target.id,
-                                                        pageIndex = page,
-                                                    )
-                                                downloadManagerV2.enqueue(request)
-                                            }
+                                            return@onToggleDownload
+                                        }
+                                        val pages = if (isSingleFile) 1 else chapter.pages ?: 0
+                                        if (!isSingleFile && pages <= 0) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.series_detail_pages_unavailable),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            return@onToggleDownload
+                                        }
+                                        scope.launch {
+                                            val request =
+                                                DownloadRequestV2(
+                                                    type = DownloadJobV2Entity.TYPE_CHAPTER,
+                                                    format = formatKeyFor(detail?.series?.format),
+                                                    seriesId = seriesId,
+                                                    volumeId = chapter.volumeId,
+                                                    chapterId = chapter.id,
+                                                    pageCount = pages,
+                                                )
+                                            downloadManagerV2.enqueue(request)
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.download_queued),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
                                         }
                                     },
-                                    onUpdateProgress = { target, pageNum ->
+                                    onUpdateProgress = onUpdateProgress@{ chapter, pageNum ->
                                         if (offlineMode) {
                                             Toast
                                                 .makeText(
@@ -764,7 +906,7 @@ fun SeriesDetailScreenV2(
                                                     context.getString(net.dom53.inkita.R.string.general_offline_mode),
                                                     Toast.LENGTH_SHORT,
                                                 ).show()
-                                            return@ChapterPagesSection
+                                            return@onUpdateProgress
                                         }
                                         if (!config.isConfigured) {
                                             Toast
@@ -773,44 +915,53 @@ fun SeriesDetailScreenV2(
                                                     context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
                                                     Toast.LENGTH_SHORT,
                                                 ).show()
-                                            return@ChapterPagesSection
+                                            return@onUpdateProgress
+                                        }
+                                        val pages = chapter.pages ?: 0
+                                        if (pages <= 0) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.series_detail_pages_unavailable),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            return@onUpdateProgress
                                         }
                                         val libraryId = detail?.series?.libraryId
-                                        if (libraryId == null) {
+                                        if (libraryId == null || chapter.volumeId == null) {
                                             Toast
                                                 .makeText(
                                                     context,
                                                     context.getString(net.dom53.inkita.R.string.general_error),
                                                     Toast.LENGTH_SHORT,
                                                 ).show()
-                                            return@ChapterPagesSection
+                                            return@onUpdateProgress
                                         }
-                                        val markRead = pageNum > (target.pagesRead ?: 0)
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                         scope.launch {
                                             val api =
                                                 net.dom53.inkita.core.network.KavitaApiFactory.createAuthenticated(
                                                     config.serverUrl,
                                                     config.apiKey,
                                                 )
+                                            val targetPage = if (pageNum <= 0) 0 else pages
                                             val resp =
                                                 api.setReaderProgress(
                                                     net.dom53.inkita.data.api.dto.ReaderProgressDto(
                                                         libraryId = libraryId,
                                                         seriesId = seriesId,
-                                                        volumeId = target.volumeId,
-                                                        chapterId = target.id,
-                                                        pageNum = pageNum,
+                                                        volumeId = chapter.volumeId,
+                                                        chapterId = chapter.id,
+                                                        pageNum = targetPage,
                                                         bookScrollId = null,
                                                     ),
                                                 )
                                             if (resp.isSuccessful) {
-                                                selectedSpecialChapter =
-                                                    target.copy(pagesRead = pageNum)
                                                 Toast
                                                     .makeText(
                                                         context,
                                                         context.getString(
-                                                            if (markRead) {
+                                                            if (targetPage > 0) {
                                                                 net.dom53.inkita.R.string.general_mark_read
                                                             } else {
                                                                 net.dom53.inkita.R.string.general_mark_unread
@@ -829,138 +980,61 @@ fun SeriesDetailScreenV2(
                                             }
                                         }
                                     },
-                                    onOpenPage = { target, page ->
-                                        if ((offlineMode || !NetworkUtils.isOnline(context)) && !downloadedPages.contains(page)) {
-                                            Toast
-                                                .makeText(
-                                                    context,
-                                                    context.getString(net.dom53.inkita.R.string.reader_page_not_downloaded),
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                            return@ChapterPagesSection
-                                        }
-                                        onOpenReader(
-                                            target.id,
-                                            page,
-                                            seriesId,
-                                            target.volumeId ?: 0,
-                                            detail?.series?.format,
-                                        )
-                                    },
-                                    onBack = {
-                                        selectedSpecialChapter = null
-                                        selectedSpecialIndex = null
-                                    },
-                                )
-                            } else {
-                                SpecialsGridRow(
-                                    specials = specials,
-                                    config = config,
-                                    seriesCoverUrl = series?.id?.let { seriesCoverUrl(config, it) },
-                                    downloadStates = specialDownloadStates,
-                                    onSelectSpecial = { chapter, index ->
-                                        selectedSpecialChapter = chapter
-                                        selectedSpecialIndex = index
-                                    },
-                                    onLongPressSpecial = { chapter ->
-                                        scope.launch {
-                                            val completed =
-                                                downloadedItemsBySeries.value
-                                                    .filter { it.chapterId == chapter.id }
-                                                    .count { item ->
-                                                        item.status ==
-                                                            net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                                            isItemPathPresent(item.localPath)
-                                                    }
-                                            val expected = chapter.pages?.takeIf { it > 0 } ?: 0
-                                            specialDownloadState =
-                                                when {
-                                                    expected > 0 && completed >= expected -> ChapterDownloadState.Complete
-                                                    completed > 0 -> ChapterDownloadState.Partial
-                                                    else -> ChapterDownloadState.None
-                                                }
-                                            selectedSpecial = chapter
-                                            showSpecialDialog = true
-                                        }
-                                    },
                                 )
                             }
-                            if (showSpecialDialog) {
-                                val chapter = selectedSpecial
-                                AlertDialog(
-                                    onDismissRequest = {
-                                        showSpecialDialog = false
-                                        selectedSpecial = null
-                                    },
-                                    title = {
-                                        val titleRes =
-                                            when (specialDownloadState) {
-                                                ChapterDownloadState.Complete ->
-                                                    net.dom53.inkita.R.string.series_detail_remove_chapter_title
-                                                ChapterDownloadState.Partial ->
-                                                    net.dom53.inkita.R.string.series_detail_resume_chapter_title
-                                                ChapterDownloadState.None ->
-                                                    net.dom53.inkita.R.string.series_detail_download_chapter_title
+                            if (selectedTab == SeriesDetailTab.Specials) {
+                                val specials = detail?.detail?.specials.orEmpty()
+                                val specialDownloadStates = remember { mutableStateMapOf<Int, DownloadState>() }
+                                var showSpecialDialog by remember { mutableStateOf(false) }
+                                var selectedSpecial by remember { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
+                                var specialDownloadState by remember { mutableStateOf(DownloadState.None) }
+                                LaunchedEffect(specials, downloadedItemsBySeries.value) {
+                                    val format = Format.fromId(detail?.series?.format)
+                                    val items = downloadedItemsBySeries.value
+                                    val grouped = items.groupBy { it.chapterId }
+                                    specials.forEach { chapter ->
+                                        val list = grouped[chapter.id].orEmpty()
+                                        val state =
+                                            DownloadStateResolver.resolveChapterState(
+                                                format = format,
+                                                chapter = chapter,
+                                                items = list,
+                                            )
+                                        specialDownloadStates[chapter.id] = state
+                                    }
+                                }
+                                if (selectedSpecialChapter != null) {
+                                    val chapter = selectedSpecialChapter
+                                    val downloadedPages =
+                                        downloadedItemsBySeries.value
+                                            .filter { it.chapterId == chapter?.id }
+                                            .filter { item ->
+                                                item.status ==
+                                                    net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                    isItemPathPresent(item.localPath)
+                                            }.mapNotNull { it.page }
+                                            .toSet()
+                                    ChapterPagesSection(
+                                        chapter = chapter,
+                                        chapterIndex = selectedSpecialIndex ?: 0,
+                                        downloadedPages = downloadedPages,
+                                        pageTitles = chapter?.id?.let { specialPageTitleCache[it] },
+                                        onTogglePageDownload = { target, page, isDownloaded ->
+                                            if (offlineMode) {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                return@ChapterPagesSection
                                             }
-                                        Text(stringResource(titleRes))
-                                    },
-                                    text = {
-                                        val label =
-                                            chapter
-                                                ?.titleName
-                                                ?.takeIf { it.isNotBlank() }
-                                                ?: chapter
-                                                    ?.title
-                                                    ?.takeIf { it.isNotBlank() }
-                                                ?: chapter
-                                                    ?.range
-                                                    ?.takeIf { it.isNotBlank() }
-                                                ?: stringResource(
-                                                    net.dom53.inkita.R.string.series_detail_chapter_fallback,
-                                                    (specials.indexOf(chapter).coerceAtLeast(0) + 1),
-                                                )
-                                        val bodyRes =
-                                            when (specialDownloadState) {
-                                                ChapterDownloadState.Complete ->
-                                                    net.dom53.inkita.R.string.series_detail_remove_chapter_body
-                                                ChapterDownloadState.Partial ->
-                                                    net.dom53.inkita.R.string.series_detail_resume_chapter_body
-                                                ChapterDownloadState.None ->
-                                                    net.dom53.inkita.R.string.series_detail_download_chapter_body
-                                            }
-                                        Text(stringResource(bodyRes, label))
-                                    },
-                                    confirmButton = {
-                                        val confirmRes =
-                                            when (specialDownloadState) {
-                                                ChapterDownloadState.Complete ->
-                                                    net.dom53.inkita.R.string.series_detail_remove_chapter_confirm
-                                                ChapterDownloadState.Partial ->
-                                                    net.dom53.inkita.R.string.series_detail_resume_chapter_confirm
-                                                ChapterDownloadState.None ->
-                                                    net.dom53.inkita.R.string.series_detail_download_chapter_confirm
-                                            }
-                                        Button(
-                                            onClick = {
-                                                showSpecialDialog = false
-                                                val target = chapter ?: return@Button
-                                                if (specialDownloadState == ChapterDownloadState.Complete) {
-                                                    scope.launch {
-                                                        downloadDao.deleteItemsForChapter(target.id)
-                                                        downloadDao.deleteJobsForChapter(target.id)
-                                                    }
-                                                    selectedSpecial = null
-                                                    return@Button
+                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            if (isDownloaded) {
+                                                scope.launch {
+                                                    downloadDao.deleteItemsForChapterPage(target.id, page)
                                                 }
-                                                if (offlineMode) {
-                                                    Toast
-                                                        .makeText(
-                                                            context,
-                                                            context.getString(net.dom53.inkita.R.string.general_offline_mode),
-                                                            Toast.LENGTH_SHORT,
-                                                        ).show()
-                                                    return@Button
-                                                }
+                                            } else {
                                                 val format = Format.fromId(detail?.series?.format)
                                                 if (format != Format.Epub) {
                                                     Toast
@@ -969,427 +1043,757 @@ fun SeriesDetailScreenV2(
                                                             context.getString(net.dom53.inkita.R.string.general_not_implemented),
                                                             Toast.LENGTH_SHORT,
                                                         ).show()
-                                                    return@Button
-                                                }
-                                                val pages = target.pages ?: 0
-                                                if (pages <= 0) {
-                                                    Toast
-                                                        .makeText(
-                                                            context,
-                                                            context.getString(net.dom53.inkita.R.string.series_detail_pages_unavailable),
-                                                            Toast.LENGTH_SHORT,
-                                                        ).show()
-                                                    return@Button
+                                                    return@ChapterPagesSection
                                                 }
                                                 scope.launch {
                                                     val request =
                                                         DownloadRequestV2(
                                                             type = DownloadJobV2Entity.TYPE_CHAPTER,
-                                                            format = EpubDownloadStrategyV2.FORMAT_EPUB,
+                                                            format = formatKeyFor(detail?.series?.format),
                                                             seriesId = seriesId,
                                                             volumeId = target.volumeId,
                                                             chapterId = target.id,
-                                                            pageCount = pages,
+                                                            pageIndex = page,
                                                         )
                                                     downloadManagerV2.enqueue(request)
+                                                }
+                                            }
+                                        },
+                                        onUpdateProgress = { target, pageNum ->
+                                            if (offlineMode) {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                return@ChapterPagesSection
+                                            }
+                                            if (!config.isConfigured) {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                return@ChapterPagesSection
+                                            }
+                                            val libraryId = detail?.series?.libraryId
+                                            if (libraryId == null) {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(net.dom53.inkita.R.string.general_error),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                return@ChapterPagesSection
+                                            }
+                                            val markRead = pageNum > (target.pagesRead ?: 0)
+                                            scope.launch {
+                                                val api =
+                                                    net.dom53.inkita.core.network.KavitaApiFactory.createAuthenticated(
+                                                        config.serverUrl,
+                                                        config.apiKey,
+                                                    )
+                                                val resp =
+                                                    api.setReaderProgress(
+                                                        net.dom53.inkita.data.api.dto.ReaderProgressDto(
+                                                            libraryId = libraryId,
+                                                            seriesId = seriesId,
+                                                            volumeId = target.volumeId,
+                                                            chapterId = target.id,
+                                                            pageNum = pageNum,
+                                                            bookScrollId = null,
+                                                        ),
+                                                    )
+                                                if (resp.isSuccessful) {
+                                                    selectedSpecialChapter =
+                                                        target.copy(pagesRead = pageNum)
                                                     Toast
                                                         .makeText(
                                                             context,
-                                                            context.getString(net.dom53.inkita.R.string.download_queued),
+                                                            context.getString(
+                                                                if (markRead) {
+                                                                    net.dom53.inkita.R.string.general_mark_read
+                                                                } else {
+                                                                    net.dom53.inkita.R.string.general_mark_unread
+                                                                },
+                                                            ),
+                                                            Toast.LENGTH_SHORT,
+                                                        ).show()
+                                                    viewModel.reload()
+                                                } else {
+                                                    Toast
+                                                        .makeText(
+                                                            context,
+                                                            context.getString(net.dom53.inkita.R.string.general_error),
                                                             Toast.LENGTH_SHORT,
                                                         ).show()
                                                 }
-                                                selectedSpecial = null
-                                            },
-                                        ) {
-                                            Text(stringResource(confirmRes))
-                                        }
-                                    },
-                                    dismissButton = {
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            if (specialDownloadState == ChapterDownloadState.Partial) {
-                                                Button(
-                                                    onClick = {
-                                                        showSpecialDialog = false
-                                                        val target = chapter ?: return@Button
+                                            }
+                                        },
+                                        onOpenPage = { target, page ->
+                                            val isSingleFile =
+                                                DownloadStateResolver.isSingleFileFormat(
+                                                    Format.fromId(detail?.series?.format),
+                                                )
+                                            val pdfDownloaded =
+                                                if (isSingleFile) {
+                                                    downloadedItemsBySeries.value.any { item ->
+                                                        item.chapterId == target.id &&
+                                                            item.type ==
+                                                            net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.TYPE_FILE &&
+                                                            item.status ==
+                                                            net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                            isItemPathPresent(item.localPath)
+                                                    }
+                                                } else {
+                                                    false
+                                                }
+                                            if ((offlineMode || !NetworkUtils.isOnline(context)) && !(isSingleFile && pdfDownloaded) && !downloadedPages.contains(page)) {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(net.dom53.inkita.R.string.reader_page_not_downloaded),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                return@ChapterPagesSection
+                                            }
+                                            onOpenReader(
+                                                target.id,
+                                                page,
+                                                seriesId,
+                                                target.volumeId ?: 0,
+                                                detail?.series?.format,
+                                            )
+                                        },
+                                        onBack = {
+                                            selectedSpecialChapter = null
+                                            selectedSpecialIndex = null
+                                        },
+                                    )
+                                } else {
+                                    SpecialsGridRow(
+                                        specials = specials,
+                                        config = config,
+                                        seriesCoverUrl = series?.id?.let { seriesCoverUrl(config, it) },
+                                        downloadStates = specialDownloadStates,
+                                        onSelectSpecial = { chapter, index ->
+                                            selectedSpecialChapter = chapter
+                                            selectedSpecialIndex = index
+                                        },
+                                        onLongPressSpecial = { chapter ->
+                                            scope.launch {
+                                                val format = Format.fromId(detail?.series?.format)
+                                                val list =
+                                                    downloadedItemsBySeries.value.filter { it.chapterId == chapter.id }
+                                                specialDownloadState =
+                                                    DownloadStateResolver.resolveChapterState(
+                                                        format = format,
+                                                        chapter = chapter,
+                                                        items = list,
+                                                    )
+                                                selectedSpecial = chapter
+                                                showSpecialDialog = true
+                                            }
+                                        },
+                                    )
+                                }
+                                if (showSpecialDialog) {
+                                    val chapter = selectedSpecial
+                                    AlertDialog(
+                                        onDismissRequest = {
+                                            showSpecialDialog = false
+                                            selectedSpecial = null
+                                        },
+                                        title = {
+                                            val titleRes =
+                                                when (specialDownloadState) {
+                                                    DownloadState.Complete ->
+                                                        net.dom53.inkita.R.string.series_detail_remove_chapter_title
+                                                    DownloadState.Partial ->
+                                                        net.dom53.inkita.R.string.series_detail_resume_chapter_title
+                                                    DownloadState.None ->
+                                                        net.dom53.inkita.R.string.series_detail_download_chapter_title
+                                                }
+                                            Text(stringResource(titleRes))
+                                        },
+                                        text = {
+                                            val label =
+                                                chapter
+                                                    ?.titleName
+                                                    ?.takeIf { it.isNotBlank() }
+                                                    ?: chapter
+                                                        ?.title
+                                                        ?.takeIf { it.isNotBlank() }
+                                                    ?: chapter
+                                                        ?.range
+                                                        ?.takeIf { it.isNotBlank() }
+                                                    ?: stringResource(
+                                                        net.dom53.inkita.R.string.series_detail_chapter_fallback,
+                                                        (specials.indexOf(chapter).coerceAtLeast(0) + 1),
+                                                    )
+                                            val bodyRes =
+                                                when (specialDownloadState) {
+                                                    DownloadState.Complete ->
+                                                        net.dom53.inkita.R.string.series_detail_remove_chapter_body
+                                                    DownloadState.Partial ->
+                                                        net.dom53.inkita.R.string.series_detail_resume_chapter_body
+                                                    DownloadState.None ->
+                                                        net.dom53.inkita.R.string.series_detail_download_chapter_body
+                                                }
+                                            Text(stringResource(bodyRes, label))
+                                        },
+                                        confirmButton = {
+                                            val confirmRes =
+                                                when (specialDownloadState) {
+                                                    DownloadState.Complete ->
+                                                        net.dom53.inkita.R.string.series_detail_remove_chapter_confirm
+                                                    DownloadState.Partial ->
+                                                        net.dom53.inkita.R.string.series_detail_resume_chapter_confirm
+                                                    DownloadState.None ->
+                                                        net.dom53.inkita.R.string.series_detail_download_chapter_confirm
+                                                }
+                                            Button(
+                                                onClick = {
+                                                    showSpecialDialog = false
+                                                    val target = chapter ?: return@Button
+                                                    if (specialDownloadState == DownloadState.Complete) {
                                                         scope.launch {
                                                             downloadDao.deleteItemsForChapter(target.id)
                                                             downloadDao.deleteJobsForChapter(target.id)
                                                         }
                                                         selectedSpecial = null
-                                                    },
-                                                ) {
-                                                    Text(stringResource(net.dom53.inkita.R.string.series_detail_remove_chapter_confirm))
-                                                }
-                                            }
-                                            Button(
-                                                onClick = {
-                                                    showSpecialDialog = false
+                                                        return@Button
+                                                    }
+                                                    if (offlineMode) {
+                                                        Toast
+                                                            .makeText(
+                                                                context,
+                                                                context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                                                Toast.LENGTH_SHORT,
+                                                            ).show()
+                                                        return@Button
+                                                    }
+                                                    val format = Format.fromId(detail?.series?.format)
+                                                    val isPdf = format == Format.Pdf
+                                                    val isEpub = format == Format.Epub
+                                                    val isImage = format == Format.Image
+                                                    val isArchive = format == Format.Archive
+                                                    if (!isPdf && !isEpub && !isImage && !isArchive) {
+                                                        Toast
+                                                            .makeText(
+                                                                context,
+                                                                context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                                                Toast.LENGTH_SHORT,
+                                                            ).show()
+                                                        return@Button
+                                                    }
+                                                    val pages = if (isPdf || isImage || isArchive) 1 else target.pages ?: 0
+                                                    if (!isPdf && !isImage && !isArchive && pages <= 0) {
+                                                        Toast
+                                                            .makeText(
+                                                                context,
+                                                                context.getString(net.dom53.inkita.R.string.series_detail_pages_unavailable),
+                                                                Toast.LENGTH_SHORT,
+                                                            ).show()
+                                                        return@Button
+                                                    }
+                                                    scope.launch {
+                                                        val request =
+                                                            DownloadRequestV2(
+                                                                type = DownloadJobV2Entity.TYPE_CHAPTER,
+                                                                format = formatKeyFor(detail?.series?.format),
+                                                                seriesId = seriesId,
+                                                                volumeId = target.volumeId,
+                                                                chapterId = target.id,
+                                                                pageCount = pages,
+                                                            )
+                                                        downloadManagerV2.enqueue(request)
+                                                        Toast
+                                                            .makeText(
+                                                                context,
+                                                                context.getString(net.dom53.inkita.R.string.download_queued),
+                                                                Toast.LENGTH_SHORT,
+                                                            ).show()
+                                                    }
                                                     selectedSpecial = null
                                                 },
                                             ) {
-                                                Text(stringResource(net.dom53.inkita.R.string.general_cancel))
+                                                Text(stringResource(confirmRes))
                                             }
-                                        }
-                                    },
+                                        },
+                                        dismissButton = {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                if (specialDownloadState == DownloadState.Partial) {
+                                                    Button(
+                                                        onClick = {
+                                                            showSpecialDialog = false
+                                                            val target = chapter ?: return@Button
+                                                            scope.launch {
+                                                                downloadDao.deleteItemsForChapter(target.id)
+                                                                downloadDao.deleteJobsForChapter(target.id)
+                                                            }
+                                                            selectedSpecial = null
+                                                        },
+                                                    ) {
+                                                        Text(stringResource(net.dom53.inkita.R.string.series_detail_remove_chapter_confirm))
+                                                    }
+                                                }
+                                                Button(
+                                                    onClick = {
+                                                        showSpecialDialog = false
+                                                        selectedSpecial = null
+                                                    },
+                                                ) {
+                                                    Text(stringResource(net.dom53.inkita.R.string.general_cancel))
+                                                }
+                                            }
+                                        },
+                                    )
+                                }
+                            }
+                            if (selectedTab == SeriesDetailTab.Related) {
+                                RelatedCollectionsSection(
+                                    related = detail?.related,
+                                    collections = detail?.collections.orEmpty(),
+                                    config = config,
+                                    onOpenSeries = onOpenSeries,
+                                    onOpenCollection = onOpenCollection,
                                 )
                             }
+                            Spacer(modifier = Modifier.height(24.dp))
                         }
-                        if (selectedTab == SeriesDetailTab.Related) {
-                            RelatedCollectionsSection(
-                                related = detail?.related,
-                                collections = detail?.collections.orEmpty(),
-                                config = config,
-                                onOpenSeries = onOpenSeries,
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(24.dp))
+                        PullRefreshIndicator(
+                            refreshing = isRefreshing,
+                            state = pullRefreshState,
+                            modifier = Modifier.align(Alignment.TopCenter),
+                            backgroundColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.primary,
+                        )
                     }
                 }
             }
-        }
 
-        if (showCollectionDialog) {
-            CollectionDialogV2(
-                collections = uiState.collections,
-                isLoading = uiState.isLoadingCollections,
-                error = uiState.collectionError,
-                membership = uiState.collectionsWithSeries,
-                onDismiss = { showCollectionDialog = false },
-                onLoadCollections = { viewModel.loadCollections() },
-                onToggle = { collection, add ->
-                    if (!config.isConfigured) {
-                        Toast
-                            .makeText(
-                                context,
-                                context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        return@CollectionDialogV2
-                    }
-                    viewModel.toggleCollection(collection, add)
-                },
-                onCreateCollection = { title ->
-                    if (title.isBlank() || !config.isConfigured) return@CollectionDialogV2
-                    viewModel.createCollection(title)
-                },
-            )
-        }
+            if (showCollectionDialog) {
+                CollectionDialogV2(
+                    collections = uiState.collections,
+                    isLoading = uiState.isLoadingCollections,
+                    error = uiState.collectionError,
+                    membership = uiState.collectionsWithSeries,
+                    onDismiss = { showCollectionDialog = false },
+                    onLoadCollections = { viewModel.loadCollections() },
+                    onToggle = { collection, add ->
+                        if (!config.isConfigured) {
+                            Toast
+                                .makeText(
+                                    context,
+                                    context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            return@CollectionDialogV2
+                        }
+                        viewModel.toggleCollection(collection, add)
+                    },
+                    onCreateCollection = { title ->
+                        if (title.isBlank() || !config.isConfigured) return@CollectionDialogV2
+                        viewModel.createCollection(title)
+                    },
+                )
+            }
 
-        if (coverExpanded) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .clickable { coverExpanded = false },
-                contentAlignment = Alignment.Center,
-            ) {
-                CoverImage(
-                    coverUrl =
-                        uiState.detail
-                            ?.series
-                            ?.id
-                            ?.let { seriesCoverUrl(config, it) },
-                    context = context,
+            if (coverExpanded) {
+                Box(
                     modifier =
                         Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
-                            .aspectRatio(2f / 3f)
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.6f))
                             .clickable { coverExpanded = false },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CoverImage(
+                        coverUrl =
+                            uiState.detail
+                                ?.series
+                                ?.id
+                                ?.let { seriesCoverUrl(config, it) },
+                        context = context,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .aspectRatio(2f / 3f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { coverExpanded = false },
+                    )
+                }
+            }
+            if (showDownloadVolumeDialog) {
+                val volume = selectedVolume
+                AlertDialog(
+                    onDismissRequest = {
+                        showDownloadVolumeDialog = false
+                        selectedVolume = null
+                    },
+                    title = {
+                        val titleRes =
+                            when (downloadVolumeState) {
+                                DownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_title
+                                DownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_title
+                                DownloadState.None -> net.dom53.inkita.R.string.series_detail_download_volume_title
+                            }
+                        Text(stringResource(titleRes))
+                    },
+                    text = {
+                        val volLabel =
+                            volume
+                                ?.name
+                                ?.takeIf { it.isNotBlank() }
+                                ?: volume
+                                    ?.let { volumeNumberText(it) }
+                                    ?.let { number ->
+                                        context.getString(net.dom53.inkita.R.string.series_detail_vol_short, number)
+                                    }
+                                ?: context.getString(net.dom53.inkita.R.string.series_detail_vol_short_plain)
+                        val bodyRes =
+                            when (downloadVolumeState) {
+                                DownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_body
+                                DownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_body
+                                DownloadState.None -> net.dom53.inkita.R.string.series_detail_download_volume_body
+                            }
+                        Text(text = stringResource(bodyRes, volLabel))
+                    },
+                    confirmButton = {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            val confirmRes =
+                                when (downloadVolumeState) {
+                                    DownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_confirm
+                                    DownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_confirm
+                                    DownloadState.None -> net.dom53.inkita.R.string.series_detail_download_volume_confirm
+                                }
+                            Button(
+                                onClick = {
+                                    showDownloadVolumeDialog = false
+                                    showVolumeActionsDialog = false
+                                    selectedVolume = null
+                                    val volume = volume ?: return@Button
+                                    if (downloadVolumeState == DownloadState.Complete) {
+                                        scope.launch {
+                                            downloadDao.deleteItemsForVolume(volume.id)
+                                            downloadDao.deleteJobsForVolume(volume.id)
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                        }
+                                        return@Button
+                                    }
+                                    if (offlineMode) {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        return@Button
+                                    }
+                                    val detail = uiState.detail
+                                    val format = Format.fromId(detail?.series?.format)
+                                    val isPdf = format == Format.Pdf
+                                    val isEpub = format == Format.Epub
+                                    val isImage = format == Format.Image
+                                    val isArchive = format == Format.Archive
+                                    if (!isPdf && !isEpub && !isImage && !isArchive) {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.general_not_implemented),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        return@Button
+                                    }
+                                    val chapters =
+                                        if (isPdf || isImage || isArchive) {
+                                            volume.chapters.orEmpty()
+                                        } else {
+                                            volume.chapters
+                                                ?.filter { (it.pages ?: 0) > 0 }
+                                        }.orEmpty()
+                                    if (chapters.isEmpty()) {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.series_detail_pages_unavailable),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        return@Button
+                                    }
+                                    scope.launch {
+                                        val seriesId = detail?.series?.id ?: seriesId
+                                        chapters.forEach { chapter ->
+                                            val pages = if (isPdf || isImage || isArchive) 1 else chapter.pages ?: return@forEach
+                                            val request =
+                                                DownloadRequestV2(
+                                                    type = DownloadJobV2Entity.TYPE_CHAPTER,
+                                                    format = formatKeyFor(detail?.series?.format),
+                                                    seriesId = seriesId,
+                                                    volumeId = volume.id,
+                                                    chapterId = chapter.id,
+                                                    pageCount = pages,
+                                                )
+                                            downloadManagerV2.enqueue(request)
+                                        }
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(net.dom53.inkita.R.string.download_queued),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(stringResource(confirmRes))
+                            }
+                            if (showVolumeActionsDialog) {
+                                OutlinedButton(
+                                    onClick = {
+                                        showDownloadVolumeDialog = false
+                                        showVolumeActionsDialog = false
+                                        val volume = volume ?: return@OutlinedButton
+                                        if (offlineMode) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            return@OutlinedButton
+                                        }
+                                        if (!config.isConfigured) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            return@OutlinedButton
+                                        }
+                                        scope.launch {
+                                            val api =
+                                                net.dom53.inkita.core.network.KavitaApiFactory.createAuthenticated(
+                                                    config.serverUrl,
+                                                    config.apiKey,
+                                                )
+                                            val resp =
+                                                api.markVolumeRead(
+                                                    MarkVolumeReadDto(
+                                                        seriesId = seriesId,
+                                                        volumeId = volume.id,
+                                                    ),
+                                                )
+                                            if (resp.isSuccessful) {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(net.dom53.inkita.R.string.series_detail_mark_volume_read),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                viewModel.reload()
+                                            } else {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(net.dom53.inkita.R.string.general_error),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                            }
+                                        }
+                                        selectedVolume = null
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(stringResource(net.dom53.inkita.R.string.series_detail_mark_volume_read))
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        showDownloadVolumeDialog = false
+                                        showVolumeActionsDialog = false
+                                        val volume = volume ?: return@OutlinedButton
+                                        if (offlineMode) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.general_offline_mode),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            return@OutlinedButton
+                                        }
+                                        if (!config.isConfigured) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            return@OutlinedButton
+                                        }
+                                        scope.launch {
+                                            val api =
+                                                net.dom53.inkita.core.network.KavitaApiFactory.createAuthenticated(
+                                                    config.serverUrl,
+                                                    config.apiKey,
+                                                )
+                                            val resp =
+                                                api.markVolumeUnread(
+                                                    MarkVolumeReadDto(
+                                                        seriesId = seriesId,
+                                                        volumeId = volume.id,
+                                                    ),
+                                                )
+                                            if (resp.isSuccessful) {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(net.dom53.inkita.R.string.series_detail_mark_volume_unread),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                viewModel.reload()
+                                            } else {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(net.dom53.inkita.R.string.general_error),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                            }
+                                        }
+                                        selectedVolume = null
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(stringResource(net.dom53.inkita.R.string.series_detail_mark_volume_unread))
+                                }
+                            }
+                            if (downloadVolumeState == DownloadState.Partial) {
+                                OutlinedButton(
+                                    onClick = {
+                                        showDownloadVolumeDialog = false
+                                        showVolumeActionsDialog = false
+                                        val volume = volume ?: return@OutlinedButton
+                                        scope.launch {
+                                            downloadDao.deleteItemsForVolume(volume.id)
+                                            downloadDao.deleteJobsForVolume(volume.id)
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                        }
+                                        selectedVolume = null
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(stringResource(net.dom53.inkita.R.string.series_detail_remove_volume_confirm))
+                                }
+                            }
+                            TextButton(
+                                onClick = {
+                                    showDownloadVolumeDialog = false
+                                    showVolumeActionsDialog = false
+                                    selectedVolume = null
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(stringResource(net.dom53.inkita.R.string.general_cancel))
+                            }
+                        }
+                    },
+                )
+            }
+            if (showDownloadTreeDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDownloadTreeDialog = false },
+                    title = { Text(stringResource(net.dom53.inkita.R.string.series_detail_download_tree_title)) },
+                    text = {
+                        if (downloadTreeLoading) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        } else if (downloadTreeNodes.isEmpty()) {
+                            Text(stringResource(net.dom53.inkita.R.string.series_detail_download_tree_empty))
+                        } else {
+                            val expandedSnapshot = expandedPaths.toMap()
+                            val flatNodes =
+                                remember(downloadTreeNodes, expandedSnapshot) {
+                                    flattenTree(downloadTreeNodes, expandedSnapshot)
+                                }
+                            androidx.compose.foundation.lazy.LazyColumn(
+                                modifier = Modifier.heightIn(max = 420.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                items(flatNodes) { (node, depth) ->
+                                    val indent = (depth * 12).dp
+                                    val isExpanded = expandedPaths[node.path] == true
+                                    Row(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = indent, top = 2.dp, bottom = 2.dp)
+                                                .clickable(enabled = node.isDir) {
+                                                    expandedPaths[node.path] = !isExpanded
+                                                },
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    ) {
+                                        if (node.isDir) {
+                                            Icon(
+                                                imageVector =
+                                                    if (isExpanded) {
+                                                        Icons.Filled.ExpandLess
+                                                    } else {
+                                                        Icons.Filled.ExpandMore
+                                                    },
+                                                contentDescription = null,
+                                            )
+                                        } else {
+                                            Spacer(modifier = Modifier.width(24.dp))
+                                        }
+                                        Text(
+                                            text = node.name,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Text(
+                                            text = formatBytes(node.size),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showDownloadTreeDialog = false }) {
+                            Text(stringResource(net.dom53.inkita.R.string.general_close))
+                        }
+                    },
                 )
             }
         }
-        if (showDownloadVolumeDialog) {
-            val volume = selectedVolume
-            AlertDialog(
-                onDismissRequest = {
-                    showDownloadVolumeDialog = false
-                    selectedVolume = null
-                },
-                title = {
-                    val titleRes =
-                        when (downloadVolumeState) {
-                            DownloadVolumeState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_title
-                            DownloadVolumeState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_title
-                            DownloadVolumeState.None -> net.dom53.inkita.R.string.series_detail_download_volume_title
-                        }
-                    Text(stringResource(titleRes))
-                },
-                text = {
-                    val volLabel =
-                        volume
-                            ?.name
-                            ?.takeIf { it.isNotBlank() }
-                            ?: volume
-                                ?.let { volumeNumberText(it) }
-                                ?.let { number ->
-                                    context.getString(net.dom53.inkita.R.string.series_detail_vol_short, number)
-                                }
-                            ?: context.getString(net.dom53.inkita.R.string.series_detail_vol_short_plain)
-                    val bodyRes =
-                        when (downloadVolumeState) {
-                            DownloadVolumeState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_body
-                            DownloadVolumeState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_body
-                            DownloadVolumeState.None -> net.dom53.inkita.R.string.series_detail_download_volume_body
-                        }
-                    Text(text = stringResource(bodyRes, volLabel))
-                },
-                confirmButton = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        val confirmRes =
-                            when (downloadVolumeState) {
-                                DownloadVolumeState.Complete -> net.dom53.inkita.R.string.series_detail_remove_volume_confirm
-                                DownloadVolumeState.Partial -> net.dom53.inkita.R.string.series_detail_resume_volume_confirm
-                                DownloadVolumeState.None -> net.dom53.inkita.R.string.series_detail_download_volume_confirm
-                            }
-                        Button(
-                            onClick = {
-                                showDownloadVolumeDialog = false
-                                showVolumeActionsDialog = false
-                                selectedVolume = null
-                                val volume = volume ?: return@Button
-                                if (downloadVolumeState == DownloadVolumeState.Complete) {
-                                    scope.launch {
-                                        downloadDao.deleteItemsForVolume(volume.id)
-                                        downloadDao.deleteJobsForVolume(volume.id)
-                                        Toast
-                                            .makeText(
-                                                context,
-                                                context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast),
-                                                Toast.LENGTH_SHORT,
-                                            ).show()
-                                    }
-                                    return@Button
-                                }
-                                if (offlineMode) {
-                                    Toast
-                                        .makeText(
-                                            context,
-                                            context.getString(net.dom53.inkita.R.string.general_offline_mode),
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                    return@Button
-                                }
-                                val detail = uiState.detail
-                                val format = Format.fromId(detail?.series?.format)
-                                if (format != Format.Epub) {
-                                    Toast
-                                        .makeText(
-                                            context,
-                                            context.getString(net.dom53.inkita.R.string.general_not_implemented),
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                    return@Button
-                                }
-                                val chapters =
-                                    volume.chapters
-                                        ?.filter { (it.pages ?: 0) > 0 }
-                                        .orEmpty()
-                                if (chapters.isEmpty()) {
-                                    Toast
-                                        .makeText(
-                                            context,
-                                            context.getString(net.dom53.inkita.R.string.series_detail_pages_unavailable),
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                    return@Button
-                                }
-                                scope.launch {
-                                    val seriesId = detail?.series?.id ?: seriesId
-                                    chapters.forEach { chapter ->
-                                        val pages = chapter.pages ?: return@forEach
-                                        val request =
-                                            DownloadRequestV2(
-                                                type = DownloadJobV2Entity.TYPE_CHAPTER,
-                                                format = EpubDownloadStrategyV2.FORMAT_EPUB,
-                                                seriesId = seriesId,
-                                                volumeId = volume.id,
-                                                chapterId = chapter.id,
-                                                pageCount = pages,
-                                            )
-                                        downloadManagerV2.enqueue(request)
-                                    }
-                                    Toast
-                                        .makeText(
-                                            context,
-                                            context.getString(net.dom53.inkita.R.string.download_queued),
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(stringResource(confirmRes))
-                        }
-                        if (showVolumeActionsDialog) {
-                            OutlinedButton(
-                                onClick = {
-                                    showDownloadVolumeDialog = false
-                                    showVolumeActionsDialog = false
-                                    val volume = volume ?: return@OutlinedButton
-                                    if (offlineMode) {
-                                        Toast
-                                            .makeText(
-                                                context,
-                                                context.getString(net.dom53.inkita.R.string.general_offline_mode),
-                                                Toast.LENGTH_SHORT,
-                                            ).show()
-                                        return@OutlinedButton
-                                    }
-                                    if (!config.isConfigured) {
-                                        Toast
-                                            .makeText(
-                                                context,
-                                                context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
-                                                Toast.LENGTH_SHORT,
-                                            ).show()
-                                        return@OutlinedButton
-                                    }
-                                    scope.launch {
-                                        val api =
-                                            net.dom53.inkita.core.network.KavitaApiFactory.createAuthenticated(
-                                                config.serverUrl,
-                                                config.apiKey,
-                                            )
-                                        val resp =
-                                            api.markVolumeRead(
-                                                MarkVolumeReadDto(
-                                                    seriesId = seriesId,
-                                                    volumeId = volume.id,
-                                                ),
-                                            )
-                                        if (resp.isSuccessful) {
-                                            Toast
-                                                .makeText(
-                                                    context,
-                                                    context.getString(net.dom53.inkita.R.string.series_detail_mark_volume_read),
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                            viewModel.reload()
-                                        } else {
-                                            Toast
-                                                .makeText(
-                                                    context,
-                                                    context.getString(net.dom53.inkita.R.string.general_error),
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                        }
-                                    }
-                                    selectedVolume = null
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(stringResource(net.dom53.inkita.R.string.series_detail_mark_volume_read))
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    showDownloadVolumeDialog = false
-                                    showVolumeActionsDialog = false
-                                    val volume = volume ?: return@OutlinedButton
-                                    if (offlineMode) {
-                                        Toast
-                                            .makeText(
-                                                context,
-                                                context.getString(net.dom53.inkita.R.string.general_offline_mode),
-                                                Toast.LENGTH_SHORT,
-                                            ).show()
-                                        return@OutlinedButton
-                                    }
-                                    if (!config.isConfigured) {
-                                        Toast
-                                            .makeText(
-                                                context,
-                                                context.getString(net.dom53.inkita.R.string.general_no_server_logged_in),
-                                                Toast.LENGTH_SHORT,
-                                            ).show()
-                                        return@OutlinedButton
-                                    }
-                                    scope.launch {
-                                        val api =
-                                            net.dom53.inkita.core.network.KavitaApiFactory.createAuthenticated(
-                                                config.serverUrl,
-                                                config.apiKey,
-                                            )
-                                        val resp =
-                                            api.markVolumeUnread(
-                                                MarkVolumeReadDto(
-                                                    seriesId = seriesId,
-                                                    volumeId = volume.id,
-                                                ),
-                                            )
-                                        if (resp.isSuccessful) {
-                                            Toast
-                                                .makeText(
-                                                    context,
-                                                    context.getString(net.dom53.inkita.R.string.series_detail_mark_volume_unread),
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                            viewModel.reload()
-                                        } else {
-                                            Toast
-                                                .makeText(
-                                                    context,
-                                                    context.getString(net.dom53.inkita.R.string.general_error),
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                        }
-                                    }
-                                    selectedVolume = null
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(stringResource(net.dom53.inkita.R.string.series_detail_mark_volume_unread))
-                            }
-                        }
-                        if (downloadVolumeState == DownloadVolumeState.Partial) {
-                            OutlinedButton(
-                                onClick = {
-                                    showDownloadVolumeDialog = false
-                                    showVolumeActionsDialog = false
-                                    val volume = volume ?: return@OutlinedButton
-                                    scope.launch {
-                                        downloadDao.deleteItemsForVolume(volume.id)
-                                        downloadDao.deleteJobsForVolume(volume.id)
-                                        Toast
-                                            .makeText(
-                                                context,
-                                                context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast),
-                                                Toast.LENGTH_SHORT,
-                                            ).show()
-                                    }
-                                    selectedVolume = null
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(stringResource(net.dom53.inkita.R.string.series_detail_remove_volume_confirm))
-                            }
-                        }
-                        TextButton(
-                            onClick = {
-                                showDownloadVolumeDialog = false
-                                showVolumeActionsDialog = false
-                                selectedVolume = null
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(stringResource(net.dom53.inkita.R.string.general_cancel))
-                        }
-                    }
-                },
-            )
-        }
     }
-}
-
-private enum class DownloadVolumeState {
-    None,
-    Partial,
-    Complete,
 }
 
 private fun isItemPathPresent(path: String?): Boolean {
@@ -1408,6 +1812,7 @@ private fun RelatedCollectionsSection(
     collections: List<net.dom53.inkita.data.api.dto.AppUserCollectionDto>,
     config: AppConfig,
     onOpenSeries: (Int) -> Unit,
+    onOpenCollection: ((Int, String) -> Unit)? = null,
 ) {
     val relatedGroups = relatedSeriesGroups(related)
     if (relatedGroups.isNotEmpty()) {
@@ -1477,7 +1882,10 @@ private fun RelatedCollectionsSection(
             collections.forEach { collection ->
                 val coverUrl = collectionCoverUrl(config, collection.id)
                 Column(
-                    modifier = Modifier.width(140.dp),
+                    modifier =
+                        Modifier
+                            .width(140.dp)
+                            .clickable { onOpenCollection?.invoke(collection.id, collection.title ?: "") },
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     CoverImage(
@@ -1513,6 +1921,70 @@ private fun webUrl(
     if (!config.isConfigured || libraryId == null) return null
     val base = if (config.serverUrl.endsWith("/")) config.serverUrl.dropLast(1) else config.serverUrl
     return "$base/library/$libraryId/series/$seriesId"
+}
+
+private fun formatKeyFor(formatId: Int?): String =
+    when (Format.fromId(formatId)) {
+        Format.Pdf -> PdfDownloadStrategyV2.FORMAT_PDF
+        Format.Epub -> EpubDownloadStrategyV2.FORMAT_EPUB
+        Format.Image -> ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE
+        Format.Archive -> ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE
+        else -> DownloadApiStrategyV2.FORMAT_DOWNLOAD
+    }
+
+private data class FileNode(
+    val name: String,
+    val path: String,
+    val isDir: Boolean,
+    val size: Long,
+    val children: List<FileNode> = emptyList(),
+)
+
+private fun buildFileTree(root: File): FileNode {
+    val children =
+        if (root.isDirectory) {
+            root
+                .listFiles()
+                ?.sortedWith(compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase(Locale.getDefault()) })
+                ?.map { buildFileTree(it) }
+                .orEmpty()
+        } else {
+            emptyList()
+        }
+    return FileNode(
+        name = root.name,
+        path = root.absolutePath,
+        isDir = root.isDirectory,
+        size = if (root.isFile) root.length() else children.sumOf { it.size },
+        children = children,
+    )
+}
+
+private fun flattenTree(
+    nodes: List<FileNode>,
+    expanded: Map<String, Boolean>,
+    depth: Int = 0,
+    out: MutableList<Pair<FileNode, Int>> = mutableListOf(),
+): List<Pair<FileNode, Int>> {
+    nodes.forEach { node ->
+        out.add(node to depth)
+        if (node.isDir && expanded[node.path] == true) {
+            flattenTree(node.children, expanded, depth + 1, out)
+        }
+    }
+    return out
+}
+
+private fun formatBytes(value: Long): String {
+    if (value <= 0) return "0 B"
+    val units = arrayOf("B", "KB", "MB", "GB")
+    var v = value.toDouble()
+    var idx = 0
+    while (v >= 1024 && idx < units.lastIndex) {
+        v /= 1024
+        idx++
+    }
+    return String.format(Locale.getDefault(), "%.1f %s", v, units[idx])
 }
 
 @Composable
@@ -1580,7 +2052,7 @@ private fun VolumeGridRow(
     volumes: List<net.dom53.inkita.data.api.dto.VolumeDto>,
     config: AppConfig,
     seriesCoverUrl: String?,
-    downloadStates: Map<Int, DownloadVolumeState>,
+    downloadStates: Map<Int, DownloadState>,
     onOpenVolume: (net.dom53.inkita.data.api.dto.VolumeDto) -> Unit,
     onLongPressVolume: (net.dom53.inkita.data.api.dto.VolumeDto) -> Unit,
 ) {
@@ -1617,7 +2089,7 @@ private fun VolumeGridRow(
                                 .aspectRatio(2f / 3f),
                     )
                     val downloadState = downloadStates[volume.id]
-                    if (downloadState == DownloadVolumeState.Complete || downloadState == DownloadVolumeState.Partial) {
+                    if (downloadState == DownloadState.Complete || downloadState == DownloadState.Partial) {
                         Box(
                             modifier =
                                 Modifier
@@ -1630,7 +2102,7 @@ private fun VolumeGridRow(
                         ) {
                             Icon(
                                 imageVector =
-                                    if (downloadState == DownloadVolumeState.Complete) {
+                                    if (downloadState == DownloadState.Complete) {
                                         Icons.Filled.DownloadDone
                                     } else {
                                         Icons.Filled.Downloading
@@ -1710,7 +2182,7 @@ private fun SpecialsGridRow(
     specials: List<net.dom53.inkita.data.api.dto.ChapterDto>,
     config: AppConfig,
     seriesCoverUrl: String?,
-    downloadStates: Map<Int, ChapterDownloadState>,
+    downloadStates: Map<Int, DownloadState>,
     onSelectSpecial: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit,
     onLongPressSpecial: (net.dom53.inkita.data.api.dto.ChapterDto) -> Unit,
 ) {
@@ -1749,7 +2221,7 @@ private fun SpecialsGridRow(
                                 .aspectRatio(2f / 3f),
                     )
                     val downloadState = downloadStates[chapter.id]
-                    if (downloadState == ChapterDownloadState.Complete || downloadState == ChapterDownloadState.Partial) {
+                    if (downloadState == DownloadState.Complete || downloadState == DownloadState.Partial) {
                         Box(
                             modifier =
                                 Modifier
@@ -1762,7 +2234,7 @@ private fun SpecialsGridRow(
                         ) {
                             Icon(
                                 imageVector =
-                                    if (downloadState == ChapterDownloadState.Complete) {
+                                    if (downloadState == DownloadState.Complete) {
                                         Icons.Filled.DownloadDone
                                     } else {
                                         Icons.Filled.Downloading

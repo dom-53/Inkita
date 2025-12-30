@@ -41,9 +41,6 @@ import net.dom53.inkita.domain.model.Person
 import net.dom53.inkita.domain.model.ReadState
 import net.dom53.inkita.domain.model.ReadingList
 import net.dom53.inkita.domain.model.Series
-import net.dom53.inkita.domain.model.SeriesDetail
-import net.dom53.inkita.domain.model.filter.SeriesQuery
-import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
 import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -51,7 +48,7 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * Default cache implementation for legacy (no-op) and V2 cache flows.
+ * Default cache implementation for V2 cache flows.
  *
  * Uses Room DAOs for structured lists and details, and stores thumbnails on disk.
  */
@@ -153,43 +150,6 @@ class CacheManagerImpl(
             }
         }
     }
-
-    /** Legacy cache entry point kept as no-op for compatibility. */
-    override suspend fun cacheTabResults(
-        key: LibraryTabCacheKey,
-        series: List<Series>,
-    ) {
-        // Legacy cache removed; no-op.
-    }
-
-    /** Legacy cache entry point kept as no-op for compatibility. */
-    override suspend fun cacheBrowsePage(
-        queryKey: String,
-        page: Int,
-        series: List<Series>,
-    ) {
-        // Legacy cache removed; no-op.
-    }
-
-    /** Legacy cache entry point kept as no-op for compatibility. */
-    override suspend fun cacheSeriesDetail(detail: SeriesDetail) {
-        // Legacy cache removed; no-op.
-    }
-
-    /** Legacy cache read kept as empty for compatibility. */
-    override suspend fun getCachedSeries(query: SeriesQuery): List<Series> = emptyList()
-
-    /** Legacy cache read kept as empty for compatibility. */
-    override suspend fun getCachedSeriesForTab(key: LibraryTabCacheKey): List<Series> = emptyList()
-
-    /** Legacy cache read kept as empty for compatibility. */
-    override suspend fun getCachedBrowsePage(
-        queryKey: String,
-        page: Int,
-    ): List<Series> = emptyList()
-
-    /** Legacy cache read kept as null for compatibility. */
-    override suspend fun getCachedSeriesDetail(seriesId: Int): SeriesDetail? = null
 
     /** Store a Library V2 series list along with reference ordering. */
     override suspend fun cacheLibraryV2SeriesList(
@@ -661,7 +621,9 @@ class CacheManagerImpl(
         policy: CachePolicy,
         listType: String,
     ): Boolean {
-        if (!policy.globalEnabled || !policy.libraryEnabled) return false
+        if (!policy.globalEnabled) return false
+        if (listType == LibraryV2CacheKeys.BROWSE) return policy.browseEnabled
+        if (!policy.libraryEnabled) return false
         return when (listType) {
             LibraryV2CacheKeys.HOME_ON_DECK,
             LibraryV2CacheKeys.HOME_RECENTLY_UPDATED,

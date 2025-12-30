@@ -34,7 +34,6 @@ data class InkitaServices(
                     context,
                     appPreferences,
                     database.readerDao(),
-                    database.downloadDao(),
                     database.downloadV2Dao(),
                 )
             return InkitaServices(readerRepository = readerRepository)

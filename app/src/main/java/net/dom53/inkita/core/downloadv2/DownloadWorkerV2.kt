@@ -8,7 +8,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import net.dom53.inkita.core.downloadv2.strategies.ChapterImageArchiveDownloadStrategyV2
+import net.dom53.inkita.core.downloadv2.strategies.DownloadApiStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
+import net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
@@ -79,6 +82,32 @@ class DownloadWorkerV2(
                         appContext = applicationContext,
                         downloadDao = dao,
                         appPreferences = appPreferences,
+                    )
+                DownloadApiStrategyV2.FORMAT_DOWNLOAD ->
+                    DownloadApiStrategyV2(
+                        appContext = applicationContext,
+                        downloadDao = dao,
+                        appPreferences = appPreferences,
+                    )
+                PdfDownloadStrategyV2.FORMAT_PDF ->
+                    PdfDownloadStrategyV2(
+                        appContext = applicationContext,
+                        downloadDao = dao,
+                        appPreferences = appPreferences,
+                    )
+                ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE ->
+                    ChapterImageArchiveDownloadStrategyV2(
+                        appContext = applicationContext,
+                        downloadDao = dao,
+                        appPreferences = appPreferences,
+                        key = ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE,
+                    )
+                ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE ->
+                    ChapterImageArchiveDownloadStrategyV2(
+                        appContext = applicationContext,
+                        downloadDao = dao,
+                        appPreferences = appPreferences,
+                        key = ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE,
                     )
                 else -> null
             }

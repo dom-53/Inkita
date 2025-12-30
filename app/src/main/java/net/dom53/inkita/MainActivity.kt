@@ -2,6 +2,7 @@ package net.dom53.inkita
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -76,7 +77,8 @@ import net.dom53.inkita.ui.download.DownloadQueueViewModelFactory
 import net.dom53.inkita.ui.history.HistoryScreen
 import net.dom53.inkita.ui.library.LibraryV2Screen
 import net.dom53.inkita.ui.navigation.MainScreen
-import net.dom53.inkita.ui.reader.ReaderScreen
+import net.dom53.inkita.ui.reader.model.ReaderReturn
+import net.dom53.inkita.ui.reader.screen.ReaderScreen
 import net.dom53.inkita.ui.seriesdetail.SeriesDetailScreenV2
 import net.dom53.inkita.ui.settings.SettingsScreen
 import net.dom53.inkita.ui.theme.InkitaTheme
@@ -133,46 +135,45 @@ private const val IMPORTANT_INFO_HEADER =
 
 private val IMPORTANT_INFO_ADDED =
     listOf(
-        "Library V2 navigation with Home/Want to Read/Collections/Reading Lists/Browse People + pagination",
-        "Series Detail V2 with richer metadata, actions, and tabs",
-        "Volume Detail V2 with chapters list and deep link from series",
-        "Continue reading now routes to the correct reader with accurate labels",
-        "Progress overlays on volumes/chapters (unread triangle + in-progress bar)",
-        "Downloads V2: per-volume/chapter actions, queue screen, and state icons",
-        "Downloads V2: swipe to download/remove with haptics",
-        "Downloads queue redesign (cards, chips, progress bars, empty states)",
-        "Offline reading improvements + “Offline data” indicator",
-        "Specials now open into per-page lists with download/reader actions",
-        "Kavita Images API key field in Settings",
-        "Mark series/volume/chapter read/unread actions",
-        "EPUB TOC page titles for Volume Detail and Specials",
-        "Important update modal shown once per version",
+        "Downloads V2: default Download API strategy for series/volume/chapter archives",
+        "Downloads V2: fallback DownloadApiStrategyV2 for unsupported formats",
+        "Downloads V2: normalized on-disk layout for series/volumes/chapters/specials",
+        "Downloads V2: image/archive chapter downloads stored as CBZ",
+        "Downloads V2: PDF downloads now show in the queue",
+        "Downloads V2: centralized download state for series/volume/chapter badges",
+        "Downloads V2: queue items show series/volume/chapter labels",
+        "Library/Browse: download badges on series covers",
+        "Settings: toggle to show/hide download badges",
+        "Settings: download stats dialog",
+        "Series Detail V2: tree view of downloaded files",
+        "Reader: offline Image/Archive reading from downloaded CBZ",
+        "Reader: basic Image/Archive reader (image pages + swipe)",
+        "Reader: image reader modes (LTR/RTL/Vertical)",
+        "Reader: PDF temp files cleaned on exit/startup unless downloaded",
+        "Series Detail V2: chapters list swipe read/unread + download",
+        "Series Detail V2: tap genre/tag to open Browse with filter",
+        "Series Detail V2: collection click opens Library V2 collection",
     )
 
 private val IMPORTANT_INFO_CHANGED =
     listOf(
-        "Completed Kavita DTOs needed for Detail V2 aggregation",
-        "Detail V2 now fetches full series payloads + related data",
-        "Reader remaining time updates on page/chapter changes (rounded to 1 decimal)",
-        "Downloads V2 respects max concurrent + retry limits",
-        "Download-all now includes volumes, chapters, specials, storyline chapters",
-        "Prefetch switches are disabled until the new pipeline lands",
-        "Verbose logging added for cache decisions, detail flows, and downloads",
-        "Download settings now use dedicated metered/low-battery preferences",
-        "Cache stale window supports minutes/hours (default 15 min)",
-        "Global HTTP timeouts increased to 30 seconds",
+        "Downloads V2: PDF items open with correct MIME type",
+        "Downloads V2: queue/completed rows wrap titles cleanly",
+        "Reader: EpubReaderViewModel/PdfReaderViewModel split into separate files",
+        "Reader: navigation jumps across chapters at edges",
+        "Reader: next chapter prompts to mark current as read when leaving early",
+        "Reader: image/archive routing preserves format id",
+        "UI: rounded corners aligned across Library/Series/Volume covers",
+        "Series Detail: legacy screen/viewmodel removed",
+        "Downloads: legacy V1 download manager/DB removed",
+        "Library: legacy screen/viewmodel and cache APIs removed",
     )
 
 private val IMPORTANT_INFO_FIXED =
     listOf(
-        "Progress/continue point refresh after returning from reader",
-        "Volume name no longer overwritten by numeric-only API values",
-        "Remaining time refreshes on page changes",
-        "Downloads V2 deduplicates pages and keeps the queue moving",
-        "Offline overlays show page/title from downloaded files",
-        "Progress sync respects Kavita timestamps",
-        "Clearing downloads removes items from the Downloaded tab",
-        "Browse thumbnail shimmer stays active per-item until load completes",
+        "Series Detail V2 cache defaults to enabled to prevent offline cache misses",
+        "History list no longer crashes due to duplicate LazyColumn keys",
+        "Bottom bar stays visible when opening Library/Browse via filters",
     )
 
 private const val FORCE_SHOW_IMPORTANT_INFO = false
@@ -215,6 +216,7 @@ private fun InfoSection(
     }
 }
 
+@Suppress("UnusedPrivateProperty")
 @Composable
 fun InkitaApp(
     initialLanguage: String,
@@ -279,6 +281,7 @@ fun InkitaApp(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val mainRoutes = MainScreen.items.map { it.route }
+    val isMainRoute = MainScreen.items.any { item -> currentRoute?.startsWith(item.route) == true }
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
@@ -320,6 +323,7 @@ fun InkitaApp(
             )
         }
         if (showImportantInfoDialog.value) {
+            val pkg = context.packageManager.getPackageInfo(context.packageName, 0)
             AlertDialog(
                 onDismissRequest = {},
                 title = { Text(text = context.getString(R.string.update_info_title)) },
@@ -340,7 +344,7 @@ fun InkitaApp(
                             )
                             Spacer(modifier = Modifier.size(12.dp))
                             Text(
-                                text = "📌 Unreleased",
+                                text = "📌 ${pkg.versionName}",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             )
                             Spacer(modifier = Modifier.size(8.dp))
@@ -402,11 +406,12 @@ fun InkitaApp(
             }
             Scaffold(
                 bottomBar = {
-                    if (currentRoute in mainRoutes) {
+                    if (isMainRoute) {
                         NavigationBar {
                             MainScreen.items.forEach { screen ->
+                                val selected = currentRoute?.startsWith(screen.route) == true
                                 NavigationBarItem(
-                                    selected = currentRoute == screen.route,
+                                    selected = selected,
                                     onClick = {
                                         navController.navigate(screen.route) {
                                             popUpTo(navController.graph.startDestinationId) {
@@ -438,7 +443,22 @@ fun InkitaApp(
                     startDestination = MainScreen.LibraryV2.route,
                     modifier = Modifier.padding(innerPadding),
                 ) {
-                    composable(MainScreen.LibraryV2.route) {
+                    composable(
+                        route = "${MainScreen.LibraryV2.route}?collectionId={collectionId}&collectionName={collectionName}",
+                        arguments =
+                            listOf(
+                                navArgument("collectionId") {
+                                    type = NavType.IntType
+                                    defaultValue = -1
+                                },
+                                navArgument("collectionName") {
+                                    type = NavType.StringType
+                                    defaultValue = ""
+                                },
+                            ),
+                    ) {
+                        val collectionIdArg = it.arguments?.getInt("collectionId")?.takeIf { id -> id >= 0 }
+                        val collectionNameArg = it.arguments?.getString("collectionName")?.takeIf { name -> name.isNotBlank() }
                         LibraryV2Screen(
                             libraryRepository = libraryRepository,
                             seriesRepository = seriesRepository,
@@ -450,6 +470,8 @@ fun InkitaApp(
                             onOpenSeries = { seriesId ->
                                 navController.navigate("series/$seriesId")
                             },
+                            initialCollectionId = collectionIdArg,
+                            initialCollectionName = collectionNameArg,
                         )
                     }
                     composable(MainScreen.Updates.route) { UpdatesScreen() }
@@ -458,7 +480,32 @@ fun InkitaApp(
                             appPreferences = appPreferences,
                         )
                     }
-                    composable(MainScreen.Browse.route) {
+                    composable(
+                        route = "${MainScreen.Browse.route}?genreId={genreId}&tagId={tagId}&genreName={genreName}&tagName={tagName}",
+                        arguments =
+                            listOf(
+                                navArgument("genreId") {
+                                    type = NavType.IntType
+                                    defaultValue = -1
+                                },
+                                navArgument("tagId") {
+                                    type = NavType.IntType
+                                    defaultValue = -1
+                                },
+                                navArgument("genreName") {
+                                    type = NavType.StringType
+                                    defaultValue = ""
+                                },
+                                navArgument("tagName") {
+                                    type = NavType.StringType
+                                    defaultValue = ""
+                                },
+                            ),
+                    ) { entry ->
+                        val genreIdArg = entry.arguments?.getInt("genreId")?.takeIf { it >= 0 }
+                        val tagIdArg = entry.arguments?.getInt("tagId")?.takeIf { it >= 0 }
+                        val genreNameArg = entry.arguments?.getString("genreName")?.takeIf { it.isNotBlank() }
+                        val tagNameArg = entry.arguments?.getString("tagName")?.takeIf { it.isNotBlank() }
                         BrowseScreen(
                             seriesRepository = seriesRepository,
                             appPreferences = appPreferences,
@@ -466,11 +513,15 @@ fun InkitaApp(
                             onOpenSeries = { seriesId ->
                                 navController.navigate("series/$seriesId")
                             },
+                            initialGenreId = genreIdArg,
+                            initialGenreName = genreNameArg,
+                            initialTagId = tagIdArg,
+                            initialTagName = tagNameArg,
                         )
                     }
                     composable(MainScreen.Downloads.route) {
                         val ctx = LocalContext.current
-                        val vm = remember { DownloadQueueViewModelFactory.create(ctx) }
+                        val vm = remember { DownloadQueueViewModelFactory.create(ctx, cacheManager) }
                         DownloadQueueScreen(viewModel = vm)
                     }
                     composable(MainScreen.Settings.route) {
@@ -488,7 +539,7 @@ fun InkitaApp(
                         val seriesId = entry.arguments?.getInt("seriesId") ?: return@composable
                         val readerReturn =
                             entry.savedStateHandle
-                                .getStateFlow<net.dom53.inkita.ui.reader.ReaderReturn?>(
+                                .getStateFlow<ReaderReturn?>(
                                     "reader_return",
                                     null,
                                 ).collectAsState(initial = null)
@@ -505,13 +556,25 @@ fun InkitaApp(
                             readerRepository = readerRepository,
                             cacheManager = cacheManager,
                             onOpenReader = { chapterId, page, sid, vid, fmt ->
-                                navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: 0}")
+                                navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: -1}")
                             },
                             onOpenVolume = { volumeId ->
                                 navController.navigate("volume/$volumeId")
                             },
                             onOpenSeries = { id ->
                                 navController.navigate("series/$id")
+                            },
+                            onOpenBrowseGenre = { id, name ->
+                                val encoded = Uri.encode(name)
+                                navController.navigate("${MainScreen.Browse.route}?genreId=$id&genreName=$encoded")
+                            },
+                            onOpenBrowseTag = { id, name ->
+                                val encoded = Uri.encode(name)
+                                navController.navigate("${MainScreen.Browse.route}?tagId=$id&tagName=$encoded")
+                            },
+                            onOpenCollection = { id, name ->
+                                val encoded = Uri.encode(name)
+                                navController.navigate("${MainScreen.LibraryV2.route}?collectionId=$id&collectionName=$encoded")
                             },
                             readerReturn = readerReturn.value,
                             onConsumeReaderReturn = { entry.savedStateHandle["reader_return"] = null },
@@ -527,7 +590,7 @@ fun InkitaApp(
                         val volumeId = entry.arguments?.getInt("volumeId") ?: return@composable
                         val readerReturn =
                             entry.savedStateHandle
-                                .getStateFlow<net.dom53.inkita.ui.reader.ReaderReturn?>(
+                                .getStateFlow<ReaderReturn?>(
                                     "reader_return",
                                     null,
                                 ).collectAsState(initial = null)
@@ -573,7 +636,7 @@ fun InkitaApp(
                                 },
                                 navArgument("fmt") {
                                     type = NavType.IntType
-                                    defaultValue = 0
+                                    defaultValue = -1
                                 },
                             ),
                     ) { entry ->
@@ -581,7 +644,7 @@ fun InkitaApp(
                         val page = entry.arguments?.getInt("page")
                         val sid = entry.arguments?.getInt("sid")?.takeIf { it != 0 }
                         val vid = entry.arguments?.getInt("vid")?.takeIf { it != 0 }
-                        val fmt = entry.arguments?.getInt("fmt")?.takeIf { it != 0 }
+                        val fmt = entry.arguments?.getInt("fmt")?.takeIf { it != -1 }
                         ReaderScreen(
                             chapterId = chId,
                             initialPage = page,
@@ -595,7 +658,7 @@ fun InkitaApp(
                             onBack = { _, pIdx, _, vIdBack ->
                                 navController.previousBackStackEntry?.savedStateHandle?.set(
                                     "reader_return",
-                                    net.dom53.inkita.ui.reader.ReaderReturn(
+                                    ReaderReturn(
                                         volumeId = vIdBack ?: 0,
                                         page = pIdx,
                                     ),
@@ -605,8 +668,9 @@ fun InkitaApp(
                             onNavigateToChapter = { targetChapter, targetPage, targetSid, targetVid ->
                                 val nextSid = targetSid ?: sid ?: 0
                                 val nextVid = targetVid ?: vid ?: 0
-                                navController.navigate("reader/$targetChapter?page=${targetPage ?: 0}&sid=$nextSid&vid=$nextVid&fmt=${fmt ?: 0}") {
-                                    popUpTo("reader/$chId?page=${page ?: 0}&sid=${sid ?: 0}&vid=${vid ?: 0}&fmt=${fmt ?: 0}") { inclusive = true }
+                                val fmtValue = fmt ?: -1
+                                navController.navigate("reader/$targetChapter?page=${targetPage ?: 0}&sid=$nextSid&vid=$nextVid&fmt=$fmtValue") {
+                                    popUpTo("reader/$chId?page=${page ?: 0}&sid=${sid ?: 0}&vid=${vid ?: 0}&fmt=$fmtValue") { inclusive = true }
                                 }
                             },
                         )

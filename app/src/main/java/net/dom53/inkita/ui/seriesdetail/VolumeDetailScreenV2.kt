@@ -2,7 +2,6 @@ package net.dom53.inkita.ui.seriesdetail
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -14,17 +13,13 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DownloadDone
-import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -50,14 +45,16 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
+import net.dom53.inkita.core.downloadv2.strategies.ChapterImageArchiveDownloadStrategyV2
+import net.dom53.inkita.core.downloadv2.strategies.DownloadApiStrategyV2
 import net.dom53.inkita.core.downloadv2.strategies.EpubDownloadStrategyV2
+import net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkUtils
@@ -69,8 +66,11 @@ import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.mapper.flattenToc
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.repository.ReaderRepository
+import net.dom53.inkita.ui.common.DownloadState
+import net.dom53.inkita.ui.common.DownloadStateResolver
 import net.dom53.inkita.ui.common.seriesCoverUrl
 import net.dom53.inkita.ui.common.volumeCoverUrl
+import net.dom53.inkita.ui.reader.model.ReaderReturn
 import net.dom53.inkita.ui.seriesdetail.utils.cleanHtml
 
 @Suppress("CyclomaticComplexMethod")
@@ -79,14 +79,14 @@ fun VolumeDetailScreenV2(
     volumeId: Int,
     appPreferences: AppPreferences,
     readerRepository: ReaderRepository,
-    readerReturn: net.dom53.inkita.ui.reader.ReaderReturn? = null,
+    readerReturn: ReaderReturn? = null,
     onConsumeReaderReturn: () -> Unit = {},
     onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     val downloadDao = remember(context.applicationContext) { InkitaDatabase.getInstance(context.applicationContext).downloadV2Dao() }
-    val chapterDownloadStates = remember { mutableStateMapOf<Int, ChapterDownloadState>() }
+    val chapterDownloadStates = remember { mutableStateMapOf<Int, DownloadState>() }
     val payload = remember(volumeId) { VolumeDetailCache.get(volumeId) }
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
@@ -94,20 +94,51 @@ fun VolumeDetailScreenV2(
     var coverExpanded by remember { mutableStateOf(false) }
     var summaryExpanded by remember { mutableStateOf(false) }
     val offlineMode by appPreferences.offlineModeFlow.collectAsState(initial = false)
+    val format = Format.fromId(payload?.formatId)
+    val isEpub = format == Format.Epub
+    val isImage = format == Format.Image
+    val isArchive = format == Format.Archive
+    val isSingleFile = format == Format.Pdf || isImage || isArchive
     val haptics = LocalHapticFeedback.current
     var selectedChapter by remember(volumeId) { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
     var selectedChapterIndex by remember(volumeId) { mutableStateOf<Int?>(null) }
     var selectedChapterForDownload by remember(volumeId) { mutableStateOf<net.dom53.inkita.data.api.dto.ChapterDto?>(null) }
     var selectedChapterDownloadIndex by remember(volumeId) { mutableStateOf<Int?>(null) }
     var showDownloadChapterDialog by remember { mutableStateOf(false) }
-    var downloadChapterState by remember { mutableStateOf(ChapterDownloadState.None) }
+    var downloadChapterState by remember { mutableStateOf(DownloadState.None) }
     val pageTitleCache = remember(volumeId) { mutableStateMapOf<Int, Map<Int, String>>() }
     val scope = rememberCoroutineScope()
     val selectedChapterId = selectedChapter?.id
     val downloadManagerV2 =
         remember(context.applicationContext) {
-            val strategy =
+            val epubStrategy =
                 EpubDownloadStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                )
+            val pdfStrategy =
+                PdfDownloadStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                )
+            val imageStrategy =
+                ChapterImageArchiveDownloadStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                    key = ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE,
+                )
+            val archiveStrategy =
+                ChapterImageArchiveDownloadStrategyV2(
+                    appContext = context.applicationContext,
+                    downloadDao = downloadDao,
+                    appPreferences = appPreferences,
+                    key = ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE,
+                )
+            val downloadStrategy =
+                DownloadApiStrategyV2(
                     appContext = context.applicationContext,
                     downloadDao = downloadDao,
                     appPreferences = appPreferences,
@@ -115,7 +146,14 @@ fun VolumeDetailScreenV2(
             DownloadManagerV2(
                 appContext = context.applicationContext,
                 downloadDao = downloadDao,
-                strategies = mapOf(strategy.key to strategy),
+                strategies =
+                    listOf(
+                        epubStrategy,
+                        pdfStrategy,
+                        imageStrategy,
+                        archiveStrategy,
+                        downloadStrategy,
+                    ).associateBy { it.key },
             )
         }
 
@@ -185,7 +223,7 @@ fun VolumeDetailScreenV2(
     LaunchedEffect(selectedChapterId, offlineMode, config.serverUrl, config.apiKey) {
         val chapter = selectedChapter ?: return@LaunchedEffect
         if (offlineMode) return@LaunchedEffect
-        if (Format.fromId(payload.formatId) != Format.Epub) return@LaunchedEffect
+        if (!isEpub) return@LaunchedEffect
         if (pageTitleCache.containsKey(chapter.id)) return@LaunchedEffect
         if (!config.isConfigured) return@LaunchedEffect
         val pages = chapter.pages ?: 0
@@ -253,6 +291,7 @@ fun VolumeDetailScreenV2(
                             Modifier
                                 .width(140.dp)
                                 .aspectRatio(2f / 3f)
+                                .clip(RoundedCornerShape(8.dp))
                                 .clickable { coverExpanded = true },
                     )
                     Column(
@@ -388,6 +427,13 @@ fun VolumeDetailScreenV2(
                         TabItem(SeriesDetailTab.Books, chapterList.size),
                     ).filter { it.count > 0 }
                 if (selectedChapter != null) {
+                    val pdfDownloaded =
+                        isSingleFile &&
+                            downloadedItemsForChapter.value.any { item ->
+                                item.type == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.TYPE_FILE &&
+                                    item.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                    isItemPathPresent(item.localPath)
+                            }
                     val downloadedPages =
                         downloadedItemsForChapter.value
                             .filter { it.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED }
@@ -415,8 +461,7 @@ fun VolumeDetailScreenV2(
                                     downloadDao.deleteItemsForChapterPage(chapter.id, page)
                                 }
                             } else {
-                                val format = Format.fromId(payload.formatId)
-                                if (format != Format.Epub) {
+                                if (!isEpub) {
                                     Toast
                                         .makeText(
                                             context,
@@ -429,7 +474,7 @@ fun VolumeDetailScreenV2(
                                     val request =
                                         DownloadRequestV2(
                                             type = DownloadJobV2Entity.TYPE_CHAPTER,
-                                            format = EpubDownloadStrategyV2.FORMAT_EPUB,
+                                            format = formatKeyForVolume(payload.formatId),
                                             seriesId = payload.seriesId,
                                             volumeId = volume.id,
                                             chapterId = chapter.id,
@@ -521,7 +566,7 @@ fun VolumeDetailScreenV2(
                             }
                         },
                         onOpenPage = { chapter, page ->
-                            if ((offlineMode || !NetworkUtils.isOnline(context)) && !downloadedPages.contains(page)) {
+                            if ((offlineMode || !NetworkUtils.isOnline(context)) && !pdfDownloaded && !downloadedPages.contains(page)) {
                                 Toast
                                     .makeText(
                                         context,
@@ -550,18 +595,12 @@ fun VolumeDetailScreenV2(
                         val grouped = items.groupBy { it.chapterId }
                         chapterList.forEach { chapter ->
                             val list = grouped[chapter.id].orEmpty()
-                            val completed =
-                                list.count { item ->
-                                    item.status == net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                        isItemPathPresent(item.localPath)
-                                }
-                            val expected = chapter.pages?.takeIf { it > 0 } ?: 0
                             val state =
-                                when {
-                                    expected > 0 && completed >= expected -> ChapterDownloadState.Complete
-                                    completed > 0 -> ChapterDownloadState.Partial
-                                    else -> ChapterDownloadState.None
-                                }
+                                DownloadStateResolver.resolveChapterState(
+                                    format = format,
+                                    chapter = chapter,
+                                    items = list,
+                                )
                             chapterDownloadStates[chapter.id] = state
                         }
                     }
@@ -593,15 +632,25 @@ fun VolumeDetailScreenV2(
                             },
                             onChapterLongPress = { chapter, index ->
                                 scope.launch {
+                                    val items = downloadDao.getItemsForChapter(chapter.id)
                                     val completed =
-                                        downloadDao
-                                            .getItemsForChapter(chapter.id)
-                                            .count { item ->
-                                                item.status ==
-                                                    net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
-                                                    isItemPathPresent(item.localPath)
-                                            }
-                                    val expected = chapter.pages?.takeIf { it > 0 } ?: 0
+                                        items.count { item ->
+                                            item.status ==
+                                                net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED &&
+                                                isItemPathPresent(item.localPath)
+                                        }
+                                    val expected =
+                                        if (DownloadStateResolver.isSingleFileFormat(format)) {
+                                            1
+                                        } else {
+                                            chapter.pages?.takeIf { it > 0 } ?: 0
+                                        }
+                                    downloadChapterState =
+                                        DownloadStateResolver.resolveChapterState(
+                                            format = format,
+                                            chapter = chapter,
+                                            items = items,
+                                        )
                                     if (expected == 0 && completed == 0) {
                                         Toast
                                             .makeText(
@@ -611,12 +660,6 @@ fun VolumeDetailScreenV2(
                                             ).show()
                                         return@launch
                                     }
-                                    downloadChapterState =
-                                        when {
-                                            expected > 0 && completed >= expected -> ChapterDownloadState.Complete
-                                            completed > 0 -> ChapterDownloadState.Partial
-                                            else -> ChapterDownloadState.None
-                                        }
                                     selectedChapterForDownload = chapter
                                     selectedChapterDownloadIndex = index
                                     showDownloadChapterDialog = true
@@ -645,6 +688,7 @@ fun VolumeDetailScreenV2(
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp)
                             .aspectRatio(2f / 3f)
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable { coverExpanded = false },
                 )
             }
@@ -661,9 +705,9 @@ fun VolumeDetailScreenV2(
                 title = {
                     val titleRes =
                         when (downloadChapterState) {
-                            ChapterDownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_chapter_title
-                            ChapterDownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_chapter_title
-                            ChapterDownloadState.None -> net.dom53.inkita.R.string.series_detail_download_chapter_title
+                            DownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_chapter_title
+                            DownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_chapter_title
+                            DownloadState.None -> net.dom53.inkita.R.string.series_detail_download_chapter_title
                         }
                     Text(stringResource(titleRes))
                 },
@@ -684,9 +728,9 @@ fun VolumeDetailScreenV2(
                             )
                     val bodyRes =
                         when (downloadChapterState) {
-                            ChapterDownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_chapter_body
-                            ChapterDownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_chapter_body
-                            ChapterDownloadState.None -> net.dom53.inkita.R.string.series_detail_download_chapter_body
+                            DownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_chapter_body
+                            DownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_chapter_body
+                            DownloadState.None -> net.dom53.inkita.R.string.series_detail_download_chapter_body
                         }
                     Text(text = stringResource(bodyRes, label))
                 },
@@ -697,9 +741,9 @@ fun VolumeDetailScreenV2(
                     ) {
                         val confirmRes =
                             when (downloadChapterState) {
-                                ChapterDownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_chapter_confirm
-                                ChapterDownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_chapter_confirm
-                                ChapterDownloadState.None -> net.dom53.inkita.R.string.series_detail_download_chapter_confirm
+                                DownloadState.Complete -> net.dom53.inkita.R.string.series_detail_remove_chapter_confirm
+                                DownloadState.Partial -> net.dom53.inkita.R.string.series_detail_resume_chapter_confirm
+                                DownloadState.None -> net.dom53.inkita.R.string.series_detail_download_chapter_confirm
                             }
                         Button(
                             onClick = {
@@ -707,7 +751,7 @@ fun VolumeDetailScreenV2(
                                 selectedChapterForDownload = null
                                 selectedChapterDownloadIndex = null
                                 val chapter = chapter ?: return@Button
-                                if (downloadChapterState == ChapterDownloadState.Complete) {
+                                if (downloadChapterState == DownloadState.Complete) {
                                     scope.launch {
                                         downloadDao.deleteItemsForChapter(chapter.id)
                                         downloadDao.deleteJobsForChapter(chapter.id)
@@ -729,18 +773,8 @@ fun VolumeDetailScreenV2(
                                         ).show()
                                     return@Button
                                 }
-                                val format = Format.fromId(payload.formatId)
-                                if (format != Format.Epub) {
-                                    Toast
-                                        .makeText(
-                                            context,
-                                            context.getString(net.dom53.inkita.R.string.general_not_implemented),
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                    return@Button
-                                }
-                                val pages = chapter.pages ?: 0
-                                if (pages <= 0) {
+                                val pages = if (isSingleFile) 1 else chapter.pages ?: 0
+                                if (!isSingleFile && pages <= 0) {
                                     Toast
                                         .makeText(
                                             context,
@@ -753,7 +787,7 @@ fun VolumeDetailScreenV2(
                                     val request =
                                         DownloadRequestV2(
                                             type = DownloadJobV2Entity.TYPE_CHAPTER,
-                                            format = EpubDownloadStrategyV2.FORMAT_EPUB,
+                                            format = formatKeyForVolume(payload.formatId),
                                             seriesId = payload.seriesId,
                                             volumeId = volume.id,
                                             chapterId = chapter.id,
@@ -944,7 +978,7 @@ fun VolumeDetailScreenV2(
                                 Text(stringResource(net.dom53.inkita.R.string.general_mark_unread))
                             }
                         }
-                        if (downloadChapterState == ChapterDownloadState.Partial) {
+                        if (downloadChapterState == DownloadState.Partial) {
                             OutlinedButton(
                                 onClick = {
                                     showDownloadChapterDialog = false
@@ -1022,3 +1056,15 @@ private suspend fun applyLocalProgress(
         chapters = updatedChapters,
     )
 }
+
+private fun formatKeyForVolume(formatId: Int?): String =
+    when (
+        net.dom53.inkita.domain.model.Format
+            .fromId(formatId)
+    ) {
+        net.dom53.inkita.domain.model.Format.Pdf -> PdfDownloadStrategyV2.FORMAT_PDF
+        net.dom53.inkita.domain.model.Format.Epub -> EpubDownloadStrategyV2.FORMAT_EPUB
+        net.dom53.inkita.domain.model.Format.Image -> ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE
+        net.dom53.inkita.domain.model.Format.Archive -> ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE
+        else -> DownloadApiStrategyV2.FORMAT_DOWNLOAD
+    }

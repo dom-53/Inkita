@@ -26,6 +26,12 @@ interface DownloadV2Dao {
     @Query("SELECT * FROM download_jobs_v2 WHERE status = :status ORDER BY updatedAt DESC")
     suspend fun getJobsByStatus(status: String): List<DownloadJobV2Entity>
 
+    @Query("SELECT COUNT(*) FROM download_jobs_v2")
+    suspend fun countJobs(): Int
+
+    @Query("SELECT COUNT(*) FROM download_jobs_v2 WHERE status = :status")
+    suspend fun countJobsByStatus(status: String): Int
+
     @Query("DELETE FROM download_jobs_v2 WHERE status = :status")
     suspend fun deleteJobsByStatus(status: String)
 
@@ -69,6 +75,9 @@ interface DownloadV2Dao {
     @Query("SELECT * FROM download_items_v2 WHERE status = :status ORDER BY updatedAt DESC")
     fun observeItemsByStatus(status: String): Flow<List<DownloadedItemV2Entity>>
 
+    @Query("SELECT * FROM download_items_v2 WHERE status = :status")
+    suspend fun getItemsByStatus(status: String): List<DownloadedItemV2Entity>
+
     @Query("SELECT * FROM download_items_v2 WHERE seriesId = :seriesId ORDER BY updatedAt DESC")
     fun observeItemsForSeries(seriesId: Int): Flow<List<DownloadedItemV2Entity>>
 
@@ -78,8 +87,73 @@ interface DownloadV2Dao {
     @Query("SELECT * FROM download_items_v2 WHERE chapterId = :chapterId ORDER BY updatedAt DESC")
     fun observeItemsForChapter(chapterId: Int): Flow<List<DownloadedItemV2Entity>>
 
+    @Query("SELECT * FROM download_items_v2 WHERE seriesId = :seriesId ORDER BY updatedAt DESC")
+    suspend fun getItemsForSeries(seriesId: Int): List<DownloadedItemV2Entity>
+
+    @Query("SELECT * FROM download_items_v2 WHERE volumeId = :volumeId ORDER BY updatedAt DESC")
+    suspend fun getItemsForVolume(volumeId: Int): List<DownloadedItemV2Entity>
+
+    @Query(
+        """
+        SELECT * FROM download_items_v2
+        WHERE chapterId = :chapterId
+          AND page IS NOT NULL
+          AND page < :page
+        ORDER BY updatedAt DESC
+        """,
+    )
+    suspend fun getItemsForChapterBeforePage(
+        chapterId: Int,
+        page: Int,
+    ): List<DownloadedItemV2Entity>
+
     @Query("DELETE FROM download_items_v2 WHERE id = :itemId")
     suspend fun deleteItemById(itemId: Long)
+
+    @Query(
+        """
+        SELECT * FROM download_items_v2
+        WHERE chapterId = :chapterId
+          AND type = :type
+          AND status = :status
+        LIMIT 1
+        """,
+    )
+    suspend fun getDownloadedFileForChapter(
+        chapterId: Int,
+        type: String = net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.TYPE_FILE,
+        status: String = net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED,
+    ): net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity?
+
+    @Query(
+        """
+        SELECT * FROM download_items_v2
+        WHERE volumeId = :volumeId
+          AND type = :type
+          AND status = :status
+        LIMIT 1
+        """,
+    )
+    suspend fun getDownloadedFileForVolume(
+        volumeId: Int,
+        type: String = net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.TYPE_FILE,
+        status: String = net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED,
+    ): net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity?
+
+    @Query(
+        """
+        SELECT * FROM download_items_v2
+        WHERE seriesId = :seriesId
+          AND type = :type
+          AND status = :status
+        LIMIT 1
+        """,
+    )
+    suspend fun getDownloadedFileForSeries(
+        seriesId: Int,
+        type: String = net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.TYPE_FILE,
+        status: String = net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity.STATUS_COMPLETED,
+    ): net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity?
 
     @Query("DELETE FROM download_items_v2 WHERE jobId IN (SELECT id FROM download_jobs_v2 WHERE seriesId = :seriesId)")
     suspend fun deleteItemsForSeries(seriesId: Int)

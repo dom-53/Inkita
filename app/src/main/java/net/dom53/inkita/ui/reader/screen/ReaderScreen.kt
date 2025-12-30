@@ -1,4 +1,4 @@
-﻿package net.dom53.inkita.ui.reader
+﻿package net.dom53.inkita.ui.reader.screen
 
 import android.app.Activity
 import android.content.Context
@@ -16,6 +16,7 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
@@ -64,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -91,7 +94,18 @@ import net.dom53.inkita.core.storage.ReaderPrefs
 import net.dom53.inkita.core.storage.ReaderThemeMode
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.repository.ReaderRepository
+import net.dom53.inkita.ui.reader.model.ReaderFontOption
+import net.dom53.inkita.ui.reader.model.readerFontOptions
+import net.dom53.inkita.ui.reader.model.readerThemeOptions
+import net.dom53.inkita.ui.reader.renderer.BaseReader
+import net.dom53.inkita.ui.reader.renderer.ReaderRenderCallbacks
+import net.dom53.inkita.ui.reader.renderer.ReaderRenderParams
+import net.dom53.inkita.ui.reader.viewmodel.BaseReaderViewModel
+import net.dom53.inkita.ui.reader.viewmodel.PdfReaderViewModel
+import net.dom53.inkita.ui.reader.viewmodel.ReaderUiState
 import java.io.File
+import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.max
 
 @Composable
@@ -111,6 +125,19 @@ fun ReaderScreen(
     val format = Format.fromId(formatId)
     if (format == Format.Pdf) {
         PdfReaderScreen(
+            chapterId = chapterId,
+            initialPage = initialPage,
+            readerRepository = readerRepository,
+            appPreferences = appPreferences,
+            seriesId = seriesId,
+            volumeId = volumeId,
+            serverUrl = serverUrl,
+            apiKey = apiKey,
+            onBack = onBack,
+            onNavigateToChapter = onNavigateToChapter,
+        )
+    } else if (format == Format.Image || format == Format.Archive) {
+        ImageReaderScreen(
             chapterId = chapterId,
             initialPage = initialPage,
             readerRepository = readerRepository,
@@ -183,6 +210,8 @@ internal fun BaseReaderScreen(
     var fontFamilyId by remember { mutableStateOf(ReaderPrefs.DEFAULT_FONT_FAMILY) }
     var textAlign by remember { mutableStateOf(TextAlign.Justify) }
     var themeMode by remember { mutableStateOf(ReaderThemeMode.Light) }
+    var showNextChapterDialog by remember { mutableStateOf(false) }
+    var pendingNextChapter by remember { mutableStateOf<net.dom53.inkita.domain.model.ReaderChapterNav?>(null) }
     val scope = rememberCoroutineScope()
     val activity = LocalView.current.context as? Activity
     var showOverlay by remember { mutableStateOf(true) }
@@ -219,7 +248,37 @@ internal fun BaseReaderScreen(
         }
     }
 
-    val goPrevPage: () -> Unit = {
+    val goPrevPage: () -> Unit = goPrevPage@{
+        if (uiState.pageIndex <= 0) {
+            scope.launch {
+                val nav = readerViewModel.getPreviousChapter()
+                val chId = nav?.chapterId
+                if (chId != null && chId >= 0) {
+                    val info = readerViewModel.getBookInfoFor(chId)
+                    val targetPage =
+                        info
+                            ?.pages
+                            ?.takeIf { it > 0 }
+                            ?.let { it - 1 }
+                            ?: nav.pagesRead
+                            ?: 0
+                    onNavigateToChapter(
+                        chId,
+                        targetPage,
+                        nav.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
+                        nav.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
+                    )
+                } else {
+                    Toast
+                        .makeText(
+                            context,
+                            context.resources.getString(R.string.reader_no_previous_chapter),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                }
+            }
+            return@goPrevPage
+        }
         val prev = (uiState.pageIndex - 1).coerceAtLeast(0)
         if (uiState.isPdf) {
             (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(prev, uiState.pageCount)
@@ -233,7 +292,24 @@ internal fun BaseReaderScreen(
             }
         }
     }
-    val goNextPage: () -> Unit = {
+    val goNextPage: () -> Unit = goNextPage@{
+        if (uiState.pageCount > 0 && uiState.pageIndex >= uiState.pageCount - 1) {
+            scope.launch {
+                val nav = readerViewModel.getNextChapter()
+                val chId = nav?.chapterId
+                if (chId != null && chId >= 0) {
+                    onNavigateToChapter(
+                        chId,
+                        0,
+                        nav.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
+                        nav.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
+                    )
+                } else {
+                    Toast.makeText(context, context.resources.getString(R.string.reader_no_next_chapter), Toast.LENGTH_SHORT).show()
+                }
+            }
+            return@goNextPage
+        }
         val next =
             if (uiState.pageCount > 0) {
                 (uiState.pageIndex + 1).coerceAtMost((uiState.pageCount - 1).coerceAtLeast(0))
@@ -274,6 +350,7 @@ internal fun BaseReaderScreen(
                     themeMode = themeMode,
                     pendingScrollY = pendingScrollY,
                     pendingScrollId = pendingScrollId,
+                    imageReaderMode = readerPrefs.imageReaderMode,
                 ),
             callbacks =
                 ReaderRenderCallbacks(
@@ -327,7 +404,13 @@ internal fun BaseReaderScreen(
             val bottomBarCallbacks =
                 ReaderBottomBarCallbacks(
                     onScrollTop = {
-                        if (uiState.isPdf) {
+                        if (renderer == net.dom53.inkita.ui.reader.renderer.ImageReader) {
+                            if (uiState.pageCount > 0) {
+                                readerViewModel.loadPage(0)
+                            } else {
+                                readerViewModel.loadPage(0)
+                            }
+                        } else if (uiState.isPdf) {
                             if (uiState.pageCount > 0) {
                                 (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(0, uiState.pageCount)
                             }
@@ -338,7 +421,11 @@ internal fun BaseReaderScreen(
                         }
                     },
                     onScrollBottom = {
-                        if (uiState.isPdf) {
+                        if (renderer == net.dom53.inkita.ui.reader.renderer.ImageReader) {
+                            if (uiState.pageCount > 0) {
+                                readerViewModel.loadPage((uiState.pageCount - 1).coerceAtLeast(0))
+                            }
+                        } else if (uiState.isPdf) {
                             if (uiState.pageCount > 0) {
                                 (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(uiState.pageCount - 1, uiState.pageCount)
                             }
@@ -380,12 +467,17 @@ internal fun BaseReaderScreen(
                             val nav = readerViewModel.getNextChapter()
                             val chId = nav?.chapterId
                             if (chId != null && chId >= 0) {
-                                onNavigateToChapter(
-                                    chId,
-                                    nav.pagesRead ?: 0,
-                                    nav.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
-                                    nav.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
-                                )
+                                if (uiState.pageCount > 0 && uiState.pageIndex < uiState.pageCount - 1) {
+                                    pendingNextChapter = nav
+                                    showNextChapterDialog = true
+                                } else {
+                                    onNavigateToChapter(
+                                        chId,
+                                        nav.pagesRead ?: 0,
+                                        nav.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
+                                        nav.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
+                                    )
+                                }
                             } else {
                                 Toast.makeText(context, context.resources.getString(R.string.reader_no_next_chapter), Toast.LENGTH_SHORT).show()
                             }
@@ -515,12 +607,61 @@ internal fun BaseReaderScreen(
 
             overlayExtras()
         }
+
+        if (showNextChapterDialog) {
+            val nav = pendingNextChapter
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = {
+                    showNextChapterDialog = false
+                    pendingNextChapter = null
+                },
+                title = { Text(stringResource(R.string.reader_mark_chapter_read_title)) },
+                text = { Text(stringResource(R.string.reader_mark_chapter_read_body)) },
+                confirmButton = {
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            val next = nav
+                            showNextChapterDialog = false
+                            pendingNextChapter = null
+                            if (next == null) return@Button
+                            readerViewModel.markChapterRead()
+                            onNavigateToChapter(
+                                next.chapterId ?: return@Button,
+                                0,
+                                next.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
+                                next.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
+                            )
+                        },
+                    ) {
+                        Text(stringResource(R.string.reader_mark_chapter_read_confirm))
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            val next = nav
+                            showNextChapterDialog = false
+                            pendingNextChapter = null
+                            if (next == null) return@TextButton
+                            onNavigateToChapter(
+                                next.chapterId ?: return@TextButton,
+                                next.pagesRead ?: 0,
+                                next.seriesId ?: uiState.bookInfo?.seriesId ?: seriesId,
+                                next.volumeId ?: uiState.bookInfo?.volumeId ?: volumeId,
+                            )
+                        },
+                    ) {
+                        Text(stringResource(R.string.reader_mark_chapter_read_skip))
+                    }
+                },
+            )
+        }
     }
 }
 
 private fun ReaderUiState.timeLeftText(context: Context): String? {
     val tl = timeLeft ?: return null
-    val rounded = String.format(java.util.Locale.getDefault(), "%.1f", tl.avgHours)
+    val rounded = String.format(Locale.getDefault(), "%.1f", tl.avgHours)
     return "${context.resources.getString(R.string.reader_time_left)}: $rounded h"
 }
 
@@ -782,7 +923,7 @@ public enum class ReaderSettingsTab(
 }
 
 @Composable
-@OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 private fun FontSettings(
     fontSize: Float,
     onFontSizeChange: (Float) -> Unit,
@@ -1087,9 +1228,9 @@ internal fun ReaderWebView(
                             if (e1 == null) return false
                             val diffX = e2.x - e1.x
                             val diffY = e2.y - e1.y
-                            if (kotlin.math.abs(diffX) > kotlin.math.abs(diffY) &&
-                                kotlin.math.abs(diffX) > swipeThreshold &&
-                                kotlin.math.abs(velocityX) > swipeVelocityThreshold
+                            if (abs(diffX) > abs(diffY) &&
+                                abs(diffX) > swipeThreshold &&
+                                abs(velocityX) > swipeVelocityThreshold
                             ) {
                                 if (diffX < 0) onSwipeNext() else onSwipePrev()
                                 return true
@@ -1239,7 +1380,7 @@ internal fun PdfPageViewer(
 
     var pageIndex by remember { mutableStateOf(currentPage.coerceAtLeast(0)) }
     var pageCount by remember { mutableStateOf(0) }
-    var imageBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
     val rendererHolder = remember { mutableStateOf<Pair<PdfRenderer, ParcelFileDescriptor>?>(null) }
 
@@ -1309,7 +1450,7 @@ internal fun PdfPageViewer(
                             onDragStart = { totalDrag = 0f },
                             onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
                             onDragEnd = {
-                                if (kotlin.math.abs(totalDrag) > swipeThresholdPx) {
+                                if (abs(totalDrag) > swipeThresholdPx) {
                                     if (totalDrag < 0 && pageIndex < pageCount - 1) {
                                         pageIndex += 1
                                     } else if (totalDrag > 0 && pageIndex > 0) {
@@ -1326,7 +1467,7 @@ internal fun PdfPageViewer(
             when {
                 imageBitmap != null -> {
                     val ratio = imageBitmap!!.width.toFloat() / imageBitmap!!.height.toFloat()
-                    androidx.compose.foundation.Image(
+                    Image(
                         bitmap = imageBitmap!!,
                         contentDescription = null,
                         modifier =

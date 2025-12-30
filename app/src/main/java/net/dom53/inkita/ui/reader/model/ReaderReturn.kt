@@ -1,4 +1,4 @@
-package net.dom53.inkita.ui.reader
+package net.dom53.inkita.ui.reader.model
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize

@@ -15,52 +15,14 @@ import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppPreferences
-import net.dom53.inkita.data.api.dto.AnnotationDto
-import net.dom53.inkita.data.api.dto.AppUserCollectionDto
-import net.dom53.inkita.data.api.dto.BookmarkDto
 import net.dom53.inkita.data.api.dto.ChapterDto
-import net.dom53.inkita.data.api.dto.HourEstimateRangeDto
 import net.dom53.inkita.data.api.dto.MarkSeriesDto
-import net.dom53.inkita.data.api.dto.RatingDto
 import net.dom53.inkita.data.api.dto.ReaderProgressDto
-import net.dom53.inkita.data.api.dto.ReadingListDto
-import net.dom53.inkita.data.api.dto.RelatedSeriesDto
 import net.dom53.inkita.data.api.dto.SeriesDetailDto
-import net.dom53.inkita.data.api.dto.SeriesDetailPlusDto
 import net.dom53.inkita.data.api.dto.SeriesDto
-import net.dom53.inkita.data.api.dto.SeriesMetadataDto
 import net.dom53.inkita.data.mapper.toDomain
 import net.dom53.inkita.data.mapper.toDto
 import retrofit2.Response
-
-data class SeriesDetailUiStateV2(
-    val isLoading: Boolean = true,
-    val error: String? = null,
-    val detail: InkitaDetailV2? = null,
-    val showLoadedToast: Boolean = false,
-    val collections: List<net.dom53.inkita.domain.model.Collection> = emptyList(),
-    val isLoadingCollections: Boolean = false,
-    val collectionError: String? = null,
-    val collectionsWithSeries: Set<Int> = emptySet(),
-)
-
-data class InkitaDetailV2(
-    val series: SeriesDto?,
-    val metadata: SeriesMetadataDto?,
-    val wantToRead: Boolean?,
-    val readingLists: List<ReadingListDto>?,
-    val collections: List<AppUserCollectionDto>?,
-    val bookmarks: List<BookmarkDto>?,
-    val annotations: List<AnnotationDto>?,
-    val timeLeft: HourEstimateRangeDto?,
-    val hasProgress: Boolean?,
-    val continuePoint: ChapterDto?,
-    val seriesDetailPlus: SeriesDetailPlusDto?,
-    val related: RelatedSeriesDto?,
-    val detail: SeriesDetailDto?,
-    val rating: RatingDto?,
-    val readerProgress: ReaderProgressDto?,
-)
 
 class SeriesDetailViewModelV2(
     val seriesId: Int,
@@ -81,8 +43,8 @@ class SeriesDetailViewModelV2(
         _state.update { it.copy(showLoadedToast = false) }
     }
 
-    fun reload() {
-        load()
+    fun reload(forceRefresh: Boolean = false) {
+        load(forceRefresh)
     }
 
     fun loadCollections() {
@@ -304,13 +266,14 @@ class SeriesDetailViewModelV2(
         }
     }
 
-    private fun load() {
+    private fun load(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             val offlineMode = appPreferences.offlineModeFlow.first()
             val isOnline = !offlineMode && NetworkUtils.isOnline(appPreferences.appContext)
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
             val staleMinutes = appPreferences.cacheStaleMinutesFlow.first()
+            val shouldRefresh = forceRefresh || alwaysRefresh
             val policy = cacheManager.policy()
             val canCache = policy.globalEnabled && policy.libraryEnabled && policy.libraryDetailsEnabled
             if (LoggingManager.isDebugEnabled()) {
@@ -347,7 +310,7 @@ class SeriesDetailViewModelV2(
                         error = null,
                     )
                 }
-                if (!isOnline || (!alwaysRefresh && !isStale)) {
+                if (!isOnline || (!shouldRefresh && !isStale)) {
                     showDebugToast(net.dom53.inkita.R.string.debug_cache_use)
                     if (LoggingManager.isDebugEnabled()) {
                         LoggingManager.d("SeriesDetailV2", "Using cached detail only (series=$seriesId)")
@@ -356,7 +319,7 @@ class SeriesDetailViewModelV2(
                     return@launch
                 }
                 val message =
-                    if (alwaysRefresh) {
+                    if (shouldRefresh) {
                         net.dom53.inkita.R.string.debug_cache_force_online
                     } else {
                         net.dom53.inkita.R.string.debug_cache_stale_reload

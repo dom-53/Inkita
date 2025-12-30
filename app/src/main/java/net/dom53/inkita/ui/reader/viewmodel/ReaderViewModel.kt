@@ -1,7 +1,6 @@
-package net.dom53.inkita.ui.reader
+package net.dom53.inkita.ui.reader.viewmodel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -9,19 +8,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.model.ReaderBookInfo
+import net.dom53.inkita.domain.model.ReaderChapterNav
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.ReaderTimeLeft
 import net.dom53.inkita.domain.reader.BaseReader
-import net.dom53.inkita.domain.reader.EpubReader
-import net.dom53.inkita.domain.reader.PdfReader
 import net.dom53.inkita.domain.reader.ReaderLoadResult
-import net.dom53.inkita.domain.repository.ReaderRepository
 
 data class ReaderUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val content: String? = null,
     val fromOffline: Boolean = false,
+    val imageUrl: String? = null,
     val pageIndex: Int = 0,
     val pageCount: Int = 0,
     val timeLeft: ReaderTimeLeft? = null,
@@ -136,7 +134,7 @@ abstract class BaseReaderViewModel(
             runCatching { reader.loadInitial(chapterId, initialPage) }
                 .onSuccess { result ->
                     applyLoadResult(result, initialPage)
-                    if (reader.format == Format.Epub) {
+                    if (reader.format != Format.Pdf) {
                         updateProgress(initialPage)
                     }
                 }.onFailure { e ->
@@ -145,7 +143,7 @@ abstract class BaseReaderViewModel(
         }
     }
 
-    suspend fun getNextChapter(): net.dom53.inkita.domain.model.ReaderChapterNav? {
+    suspend fun getNextChapter(): ReaderChapterNav? {
         val info = _state.value.bookInfo
         val sid = info?.seriesId ?: seriesId ?: return null
         val vid = info?.volumeId ?: volumeId ?: return null
@@ -158,7 +156,7 @@ abstract class BaseReaderViewModel(
             val pages = nextInfo.pages ?: 0
             _state.update { it.copy(bookInfo = nextInfo, pageCount = pages, pageIndex = 0, content = null) }
         }
-        return net.dom53.inkita.domain.model.ReaderChapterNav(
+        return ReaderChapterNav(
             seriesId = nextInfo?.seriesId ?: nextNav.seriesId ?: sid,
             volumeId = nextInfo?.volumeId ?: nextNav.volumeId ?: vid,
             chapterId = nextId,
@@ -166,7 +164,7 @@ abstract class BaseReaderViewModel(
         )
     }
 
-    suspend fun getPreviousChapter(): net.dom53.inkita.domain.model.ReaderChapterNav? {
+    suspend fun getPreviousChapter(): ReaderChapterNav? {
         val info = _state.value.bookInfo
         val sid = info?.seriesId ?: seriesId ?: return null
         val vid = info?.volumeId ?: volumeId ?: return null
@@ -178,7 +176,7 @@ abstract class BaseReaderViewModel(
             val pages = prevInfo.pages ?: 0
             _state.update { it.copy(bookInfo = prevInfo, pageCount = pages, pageIndex = 0, content = null) }
         }
-        return net.dom53.inkita.domain.model.ReaderChapterNav(
+        return ReaderChapterNav(
             seriesId = prevInfo?.seriesId ?: prevNav.seriesId ?: sid,
             volumeId = prevInfo?.volumeId ?: prevNav.volumeId ?: vid,
             chapterId = prevId,
@@ -189,6 +187,14 @@ abstract class BaseReaderViewModel(
     fun markProgressAtCurrentPage(bookScrollId: String? = null) {
         updateProgress(_state.value.pageIndex, bookScrollId)
     }
+
+    fun markChapterRead() {
+        val total = _state.value.pageCount
+        val lastIndex = if (total > 0) total - 1 else _state.value.pageIndex
+        updateProgress(lastIndex, totalPagesOverride = total.takeIf { it > 0 })
+    }
+
+    suspend fun getBookInfoFor(chapterId: Int): ReaderBookInfo? = runCatching { reader.getBookInfo(chapterId) }.getOrNull()
 
     open suspend fun isPageDownloaded(pageIndex: Int): Boolean = runCatching { reader.isPageDownloaded(chapterId, pageIndex) }.getOrDefault(false)
 
@@ -204,102 +210,8 @@ abstract class BaseReaderViewModel(
                 isLoading = false,
                 error = null,
                 pdfPath = result.pdfPath ?: it.pdfPath,
+                imageUrl = result.imageUrl ?: it.imageUrl,
             )
         }
-    }
-}
-
-class EpubReaderViewModel(
-    chapterId: Int,
-    initialPage: Int,
-    readerRepository: ReaderRepository,
-    seriesId: Int?,
-    volumeId: Int?,
-    anonymous: Boolean = false,
-) : BaseReaderViewModel(
-        chapterId = chapterId,
-        initialPage = initialPage,
-        reader = EpubReader(readerRepository),
-        seriesId = seriesId,
-        volumeId = volumeId,
-        anonymous = anonymous,
-    ) {
-    companion object {
-        fun provideFactory(
-            chapterId: Int,
-            initialPage: Int,
-            readerRepository: ReaderRepository,
-            seriesId: Int?,
-            volumeId: Int?,
-            anonymous: Boolean = false,
-        ): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    @Suppress("UNCHECKED_CAST")
-                    return EpubReaderViewModel(
-                        chapterId,
-                        initialPage,
-                        readerRepository,
-                        seriesId,
-                        volumeId,
-                        anonymous,
-                    ) as T
-                }
-            }
-    }
-}
-
-class PdfReaderViewModel(
-    chapterId: Int,
-    initialPage: Int,
-    readerRepository: ReaderRepository,
-    seriesId: Int?,
-    volumeId: Int?,
-    anonymous: Boolean = false,
-) : BaseReaderViewModel(
-        chapterId = chapterId,
-        initialPage = initialPage,
-        reader = PdfReader(readerRepository),
-        seriesId = seriesId,
-        volumeId = volumeId,
-        anonymous = anonymous,
-    ) {
-    override fun loadPage(index: Int) {
-        _state.update { it.copy(pageIndex = index) }
-        updateProgress(index, totalPagesOverride = _state.value.pageCount)
-    }
-
-    fun setPdfPageIndex(
-        index: Int,
-        pageCount: Int,
-    ) {
-        _state.update { it.copy(pageCount = pageCount, pageIndex = index) }
-        updateProgress(index, totalPagesOverride = pageCount)
-    }
-
-    override suspend fun isPageDownloaded(pageIndex: Int): Boolean = true
-
-    companion object {
-        fun provideFactory(
-            chapterId: Int,
-            initialPage: Int,
-            readerRepository: ReaderRepository,
-            seriesId: Int?,
-            volumeId: Int?,
-            anonymous: Boolean = false,
-        ): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    @Suppress("UNCHECKED_CAST")
-                    return PdfReaderViewModel(
-                        chapterId,
-                        initialPage,
-                        readerRepository,
-                        seriesId,
-                        volumeId,
-                        anonymous,
-                    ) as T
-                }
-            }
     }
 }

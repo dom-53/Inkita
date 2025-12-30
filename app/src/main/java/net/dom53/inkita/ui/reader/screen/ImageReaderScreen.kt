@@ -1,13 +1,14 @@
-package net.dom53.inkita.ui.reader
+package net.dom53.inkita.ui.reader.screen
 
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.domain.repository.ReaderRepository
+import net.dom53.inkita.ui.reader.renderer.ImageReader
+import net.dom53.inkita.ui.reader.viewmodel.ImageReaderViewModel
 
 @Composable
-fun EpubReaderScreen(
+fun ImageReaderScreen(
     chapterId: Int,
     initialPage: Int?,
     readerRepository: ReaderRepository,
@@ -18,19 +19,16 @@ fun EpubReaderScreen(
     apiKey: String? = null,
     onBack: (chapterId: Int, page: Int, seriesId: Int?, volumeId: Int?) -> Unit = { _, _, _, _ -> },
     onNavigateToChapter: (Int, Int?, Int?, Int?) -> Unit = { _, _, _, _ -> },
-    topBarContent: (@Composable (String, String, () -> Unit) -> Unit)? = null,
     bottomBarContent: (@Composable (ReaderBottomBarState, ReaderBottomBarCallbacks) -> Unit)? = null,
     settingsContent: (@Composable (ReaderSettingsState, ReaderSettingsCallbacks) -> Unit)? = null,
-    overlayExtras: @Composable BoxScope.() -> Unit = {},
 ) {
     BaseReaderScreen(
         chapterId = chapterId,
         initialPage = initialPage,
         readerViewModel =
             viewModel(
-                key = "reader-$chapterId",
                 factory =
-                    EpubReaderViewModel.provideFactory(
+                    ImageReaderViewModel.provideFactory(
                         chapterId = chapterId,
                         initialPage = initialPage ?: 0,
                         readerRepository = readerRepository,
@@ -43,12 +41,10 @@ fun EpubReaderScreen(
         volumeId = volumeId,
         serverUrl = serverUrl,
         apiKey = apiKey,
-        renderer = EpubReader,
+        renderer = ImageReader,
         onBack = onBack,
         onNavigateToChapter = onNavigateToChapter,
-        topBarContent = topBarContent,
         bottomBarContent = bottomBarContent,
         settingsContent = settingsContent,
-        overlayExtras = overlayExtras,
     )
 }
