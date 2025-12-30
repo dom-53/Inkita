@@ -1368,6 +1368,8 @@ fun SeriesDetailScreenV2(
                         refreshing = isRefreshing,
                         state = pullRefreshState,
                         modifier = Modifier.align(Alignment.TopCenter),
+                        backgroundColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
