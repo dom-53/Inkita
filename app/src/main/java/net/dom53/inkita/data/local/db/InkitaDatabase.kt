@@ -8,7 +8,6 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import net.dom53.inkita.data.local.db.dao.DownloadDao
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
@@ -29,9 +28,7 @@ import net.dom53.inkita.data.local.db.entity.CachedSeriesVolumeRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedVolumeChapterRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedVolumeV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
-import net.dom53.inkita.data.local.db.entity.DownloadTaskEntity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
-import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
 
 @Database(
     entities = [
@@ -50,13 +47,11 @@ import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
         CachedChapterV2Entity::class,
         CachedVolumeChapterRefEntity::class,
         CachedPageEntity::class,
-        DownloadTaskEntity::class,
-        DownloadedPageEntity::class,
         DownloadJobV2Entity::class,
         DownloadedItemV2Entity::class,
         net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = false,
 )
 abstract class InkitaDatabase : RoomDatabase() {
@@ -65,8 +60,6 @@ abstract class InkitaDatabase : RoomDatabase() {
     abstract fun seriesDetailV2Dao(): SeriesDetailV2Dao
 
     abstract fun readerDao(): ReaderDao
-
-    abstract fun downloadDao(): DownloadDao
 
     abstract fun downloadV2Dao(): DownloadV2Dao
 
@@ -545,6 +538,13 @@ abstract class InkitaDatabase : RoomDatabase() {
                     database.execSQL("ALTER TABLE download_jobs_v2 ADD COLUMN retryCount INTEGER NOT NULL DEFAULT 0")
                 }
             }
+        private val MIGRATION_19_20 =
+            object : Migration(19, 20) {
+                override fun migrate(database: SupportSQLiteDatabase) {
+                    database.execSQL("DROP TABLE IF EXISTS download_tasks")
+                    database.execSQL("DROP TABLE IF EXISTS downloaded_pages")
+                }
+            }
 
         fun getInstance(context: Context): InkitaDatabase =
             INSTANCE ?: synchronized(this) {
@@ -572,6 +572,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         MIGRATION_16_17,
                         MIGRATION_17_18,
                         MIGRATION_18_19,
+                        MIGRATION_19_20,
                     ).build()
                     .also { INSTANCE = it }
             }

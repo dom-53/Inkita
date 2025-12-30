@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import net.dom53.inkita.R
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
@@ -62,6 +63,7 @@ private fun formatBytes(value: Long): String {
 fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
     val tasks by viewModel.tasks.collectAsState()
     val downloaded by viewModel.downloaded.collectAsState()
+    val lookup by viewModel.lookup.collectAsState()
     val context = LocalContext.current
     var selectedTab by remember { mutableStateOf(0) }
 
@@ -127,6 +129,7 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
                         ) { _, page ->
                             DownloadedRow(
                                 page = page,
+                                lookup = lookup,
                                 onOpen = {
                                     val path = page.localPath ?: return@DownloadedRow
                                     val uri =
@@ -135,9 +138,19 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
                                         } else {
                                             Uri.fromFile(File(path))
                                         }
+                                    val mime =
+                                        if (page.type == DownloadedItemV2Entity.TYPE_FILE) {
+                                            if (path.endsWith(".pdf")) {
+                                                "application/pdf"
+                                            } else {
+                                                "application/octet-stream"
+                                            }
+                                        } else {
+                                            "text/html"
+                                        }
                                     val intent =
                                         Intent(Intent.ACTION_VIEW)
-                                            .setDataAndType(uri, "text/html")
+                                            .setDataAndType(uri, mime)
                                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     runCatching { context.startActivity(intent) }
                                 },
@@ -174,6 +187,7 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
                         items(visibleTasks, key = { it.id }) { task ->
                             TaskRow(
                                 task = task,
+                                lookup = lookup,
                                 onCancel = { viewModel.cancelTask(task.id) },
                                 onPause = { viewModel.pauseTask(task.id) },
                                 onResume = { viewModel.resumeTask(task.id) },
@@ -191,6 +205,7 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
 @Composable
 private fun TaskRow(
     task: DownloadJobV2Entity,
+    lookup: DownloadLookup,
     onCancel: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
@@ -204,6 +219,9 @@ private fun TaskRow(
             DownloadJobV2Entity.TYPE_SERIES -> stringResource(R.string.general_series)
             else -> task.type
         }
+    val seriesLabel = formatLabel(task.seriesId, lookup.seriesNames[task.seriesId])
+    val volumeLabel = formatLabel(task.volumeId, lookup.volumeNames[task.volumeId])
+    val chapterLabelText = formatLabel(task.chapterId, lookup.chapterTitles[task.chapterId])
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -212,17 +230,40 @@ private fun TaskRow(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            val seriesLabel = task.seriesId?.toString() ?: "-"
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     stringResource(R.string.download_item_title, seriesLabel, labelType),
                     style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 DownloadStatusChip(status = task.status)
+            }
+            if (task.seriesId != null) {
+                Text(
+                    text = stringResource(R.string.download_info_series, seriesLabel),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (task.volumeId != null) {
+                Text(
+                    text = stringResource(R.string.download_info_volume, volumeLabel),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (task.chapterId != null) {
+                Text(
+                    text = stringResource(R.string.download_info_chapter, chapterLabelText),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             val chapterLabel = task.chapterId?.toString() ?: "-"
             val total = task.totalItems ?: 0
@@ -318,6 +359,7 @@ private fun TaskRow(
 @Composable
 private fun DownloadedRow(
     page: DownloadedItemV2Entity,
+    lookup: DownloadLookup,
     onOpen: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -329,6 +371,9 @@ private fun DownloadedRow(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            val seriesLabel = formatLabel(page.seriesId, lookup.seriesNames[page.seriesId])
+            val volumeLabel = formatLabel(page.volumeId, lookup.volumeNames[page.volumeId])
+            val chapterLabel = formatLabel(page.chapterId, lookup.chapterTitles[page.chapterId])
             Text(
                 stringResource(
                     R.string.download_item_v2_title,
@@ -338,6 +383,27 @@ private fun DownloadedRow(
                 ),
                 style = MaterialTheme.typography.titleMedium,
             )
+            if (page.seriesId != null) {
+                Text(
+                    text = stringResource(R.string.download_info_series, seriesLabel),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (page.volumeId != null) {
+                Text(
+                    text = stringResource(R.string.download_info_volume, volumeLabel),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (page.chapterId != null) {
+                Text(
+                    text = stringResource(R.string.download_info_chapter, chapterLabel),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             DownloadStatusChip(status = page.status)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
@@ -396,6 +462,18 @@ private fun DownloadStatusChip(status: String) {
                 disabledLabelColor = fg,
             ),
     )
+}
+
+private fun formatLabel(
+    id: Int?,
+    name: String?,
+): String {
+    if (id == null) return "-"
+    return if (name.isNullOrBlank()) {
+        "#$id"
+    } else {
+        "$name (#$id)"
+    }
 }
 
 @Composable

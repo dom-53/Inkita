@@ -56,6 +56,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -77,6 +78,8 @@ import net.dom53.inkita.domain.repository.LibraryRepository
 import net.dom53.inkita.domain.repository.PersonRepository
 import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
+import net.dom53.inkita.ui.common.DownloadState
+import net.dom53.inkita.ui.common.DownloadStateBadge
 import net.dom53.inkita.ui.common.collectionCoverUrl
 import net.dom53.inkita.ui.common.personCoverUrl
 import net.dom53.inkita.ui.common.readingListCoverUrl
@@ -94,6 +97,8 @@ fun LibraryV2Screen(
     cacheManager: CacheManager,
     appPreferences: AppPreferences,
     onOpenSeries: (Int) -> Unit,
+    initialCollectionId: Int? = null,
+    initialCollectionName: String? = null,
 ) {
     val viewModel: LibraryV2ViewModel =
         viewModel(
@@ -109,10 +114,21 @@ fun LibraryV2Screen(
                 ),
         )
     val uiState by viewModel.state.collectAsState()
+    var presetApplied by remember { mutableStateOf(false) }
+
+    LaunchedEffect(initialCollectionId) {
+        if (presetApplied) return@LaunchedEffect
+        if (initialCollectionId != null) {
+            viewModel.openCollectionFromExternal(initialCollectionId, initialCollectionName)
+            presetApplied = true
+        }
+    }
     val context = LocalContext.current
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
+    val showDownloadBadges by appPreferences.showDownloadBadgesFlow.collectAsState(initial = true)
+    val downloadStates = uiState.downloadStates
     val showDrawerDebug = false
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -322,18 +338,24 @@ fun LibraryV2Screen(
                                     title = "On Deck",
                                     items = uiState.onDeck,
                                     config = config,
+                                    downloadStates = downloadStates,
+                                    showDownloadBadges = showDownloadBadges,
                                     onOpenSeries = onOpenSeries,
                                 )
                                 HomeSection(
                                     title = "Recently Updated Series",
                                     items = uiState.recentlyUpdated,
                                     config = config,
+                                    downloadStates = downloadStates,
+                                    showDownloadBadges = showDownloadBadges,
                                     onOpenSeries = onOpenSeries,
                                 )
                                 HomeSection(
                                     title = "Newly Added Series",
                                     items = uiState.recentlyAdded,
                                     config = config,
+                                    downloadStates = downloadStates,
+                                    showDownloadBadges = showDownloadBadges,
                                     onOpenSeries = onOpenSeries,
                                 )
                             }
@@ -347,6 +369,8 @@ fun LibraryV2Screen(
                         isLoading = uiState.isWantToReadLoading,
                         error = uiState.wantToReadError,
                         config = config,
+                        downloadStates = downloadStates,
+                        showDownloadBadges = showDownloadBadges,
                         onOpenSeries = onOpenSeries,
                     )
                 }
@@ -359,6 +383,8 @@ fun LibraryV2Screen(
                             isLoading = uiState.isCollectionSeriesLoading,
                             error = uiState.collectionSeriesError,
                             config = config,
+                            downloadStates = downloadStates,
+                            showDownloadBadges = showDownloadBadges,
                             onBack = { viewModel.selectCollection(null) },
                             onOpenSeries = onOpenSeries,
                         )
@@ -399,6 +425,8 @@ fun LibraryV2Screen(
                         error = uiState.librarySeriesError,
                         accessDenied = uiState.libraryAccessDenied,
                         config = config,
+                        downloadStates = downloadStates,
+                        showDownloadBadges = showDownloadBadges,
                         onLoadMore = { viewModel.loadMoreLibrarySeries() },
                         onOpenSeries = onOpenSeries,
                     )
@@ -450,6 +478,8 @@ private fun HomeSection(
     title: String,
     items: List<HomeSeriesItem>,
     config: AppConfig,
+    downloadStates: Map<Int, DownloadState>,
+    showDownloadBadges: Boolean,
     onOpenSeries: (Int) -> Unit,
 ) {
     Text(
@@ -467,6 +497,8 @@ private fun HomeSection(
                 SeriesCard(
                     item = item,
                     config = config,
+                    downloadState = downloadStates[item.id] ?: DownloadState.None,
+                    showDownloadBadges = showDownloadBadges,
                     onOpenSeries = onOpenSeries,
                 )
             }
@@ -479,6 +511,8 @@ private fun HomeSection(
 private fun SeriesCard(
     item: HomeSeriesItem,
     config: AppConfig,
+    downloadState: DownloadState,
+    showDownloadBadges: Boolean,
     onOpenSeries: (Int) -> Unit,
 ) {
     val imageUrl = item.localThumbPath ?: seriesCoverUrl(config, item.id)
@@ -489,19 +523,35 @@ private fun SeriesCard(
                 .padding(bottom = 4.dp)
                 .clickable { onOpenSeries(item.id) },
     ) {
-        AsyncImage(
-            model =
-                ImageRequest
-                    .Builder(LocalContext.current)
-                    .data(imageUrl)
-                    .crossfade(true)
-                    .build(),
-            contentDescription = null,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(170.dp),
-        )
+        Box {
+            AsyncImage(
+                model =
+                    ImageRequest
+                        .Builder(LocalContext.current)
+                        .data(imageUrl)
+                        .crossfade(true)
+                        .build(),
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(170.dp)
+                        .clip(
+                            androidx.compose.foundation.shape
+                                .RoundedCornerShape(8.dp),
+                        ),
+                contentScale = ContentScale.Crop,
+            )
+            if (showDownloadBadges) {
+                DownloadStateBadge(
+                    state = downloadState,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 6.dp, bottom = 10.dp),
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = item.title,
@@ -518,6 +568,8 @@ private fun WantToReadGrid(
     isLoading: Boolean,
     error: String?,
     config: AppConfig,
+    downloadStates: Map<Int, DownloadState>,
+    showDownloadBadges: Boolean,
     onOpenSeries: (Int) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -564,6 +616,8 @@ private fun WantToReadGrid(
                         WantToReadCard(
                             series = series,
                             config = config,
+                            downloadState = downloadStates[series.id] ?: DownloadState.None,
+                            showDownloadBadges = showDownloadBadges,
                             onOpenSeries = onOpenSeries,
                         )
                     }
@@ -577,6 +631,8 @@ private fun WantToReadGrid(
 private fun WantToReadCard(
     series: net.dom53.inkita.domain.model.Series,
     config: AppConfig,
+    downloadState: DownloadState,
+    showDownloadBadges: Boolean,
     onOpenSeries: (Int) -> Unit,
 ) {
     val imageUrl = seriesCoverUrl(config, series.id)
@@ -586,19 +642,35 @@ private fun WantToReadCard(
                 .fillMaxWidth()
                 .clickable { onOpenSeries(series.id) },
     ) {
-        AsyncImage(
-            model =
-                ImageRequest
-                    .Builder(LocalContext.current)
-                    .data(imageUrl)
-                    .crossfade(true)
-                    .build(),
-            contentDescription = null,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(160.dp),
-        )
+        Box {
+            AsyncImage(
+                model =
+                    ImageRequest
+                        .Builder(LocalContext.current)
+                        .data(imageUrl)
+                        .crossfade(true)
+                        .build(),
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .clip(
+                            androidx.compose.foundation.shape
+                                .RoundedCornerShape(8.dp),
+                        ),
+                contentScale = ContentScale.Crop,
+            )
+            if (showDownloadBadges) {
+                DownloadStateBadge(
+                    state = downloadState,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 6.dp, bottom = 10.dp),
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = series.name.ifBlank { "Series ${series.id}" },
@@ -694,7 +766,11 @@ private fun CollectionCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(160.dp),
+                    .height(160.dp)
+                    .clip(
+                        androidx.compose.foundation.shape
+                            .RoundedCornerShape(8.dp),
+                    ),
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -713,6 +789,8 @@ private fun CollectionSeriesGrid(
     isLoading: Boolean,
     error: String?,
     config: AppConfig,
+    downloadStates: Map<Int, DownloadState>,
+    showDownloadBadges: Boolean,
     onBack: () -> Unit,
     onOpenSeries: (Int) -> Unit,
 ) {
@@ -738,6 +816,8 @@ private fun CollectionSeriesGrid(
             isLoading = isLoading,
             error = error,
             config = config,
+            downloadStates = downloadStates,
+            showDownloadBadges = showDownloadBadges,
             onOpenSeries = onOpenSeries,
         )
     }
@@ -830,7 +910,11 @@ private fun ReadingListCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(160.dp),
+                    .height(160.dp)
+                    .clip(
+                        androidx.compose.foundation.shape
+                            .RoundedCornerShape(8.dp),
+                    ),
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -992,6 +1076,8 @@ private fun LibrarySeriesGrid(
     error: String?,
     accessDenied: Boolean,
     config: AppConfig,
+    downloadStates: Map<Int, DownloadState>,
+    showDownloadBadges: Boolean,
     onLoadMore: () -> Unit,
     onOpenSeries: (Int) -> Unit,
 ) {
@@ -1066,6 +1152,8 @@ private fun LibrarySeriesGrid(
                             WantToReadCard(
                                 series = series,
                                 config = config,
+                                downloadState = downloadStates[series.id] ?: DownloadState.None,
+                                showDownloadBadges = showDownloadBadges,
                                 onOpenSeries = onOpenSeries,
                             )
                         }

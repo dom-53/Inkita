@@ -165,6 +165,7 @@ fun HistoryScreen(appPreferences: AppPreferences) {
                     } else {
                         sortedKeys.forEach { dateKey ->
                             val itemsForDay = groupedByDate[dateKey].orEmpty()
+                            val dayKey = dateKey?.toEpochDay()?.toString() ?: "unknown"
                             item(key = "header-$dateKey") {
                                 Text(
                                     text = dayLabel(dateKey, context),
@@ -172,7 +173,13 @@ fun HistoryScreen(appPreferences: AppPreferences) {
                                     modifier = Modifier.padding(vertical = 4.dp),
                                 )
                             }
-                            items(itemsForDay, key = { it.seriesId ?: it.seriesName.hashCode() }) { item ->
+                            items(
+                                itemsForDay,
+                                key = { item ->
+                                    val seriesKey = item.seriesId?.toString() ?: item.seriesName.hashCode().toString()
+                                    "row-$dayKey-$seriesKey"
+                                },
+                            ) { item ->
                                 HistoryRow(
                                     item = item,
                                     config = config,

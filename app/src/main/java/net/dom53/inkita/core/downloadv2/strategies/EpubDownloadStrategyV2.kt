@@ -5,6 +5,7 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
 import net.dom53.inkita.core.downloadv2.DownloadStrategyV2
 import net.dom53.inkita.core.logging.LoggingManager
@@ -159,11 +160,9 @@ class EpubDownloadStrategyV2(
         val seriesId = job.seriesId ?: return
         val chapterId = job.chapterId ?: return
         val volumeId = job.volumeId
-        val baseDir =
-            appContext.getExternalFilesDir("Inkita/downloads/series_$seriesId")
-                ?: File(appContext.filesDir, "Inkita/downloads/series_$seriesId").apply { mkdirs() }
-        if (!baseDir.exists()) baseDir.mkdirs()
-        val assetsDir = File(baseDir, "assets").apply { if (!exists()) mkdirs() }
+        val chapterDir = DownloadPaths.chapterDir(appContext, seriesId, volumeId, chapterId)
+        if (!chapterDir.exists()) chapterDir.mkdirs()
+        val assetsDir = DownloadPaths.epubAssetsDir(chapterDir).apply { if (!exists()) mkdirs() }
 
         updateJob(job, DownloadJobV2Entity.STATUS_RUNNING, error = null)
         if (LoggingManager.isDebugEnabled()) {
@@ -186,8 +185,8 @@ class EpubDownloadStrategyV2(
                 if (!htmlResp.isSuccessful) throw HttpException(htmlResp)
                 val htmlRaw = htmlResp.body() ?: ""
                 val (rewrittenHtml, assetsBytes) = rewriteAndDownloadImages(htmlRaw, assetsDir, config.serverUrl, config.apiKey)
-                val htmlName = "page_${chapterId}_$page.html"
-                val htmlFile = File(baseDir, htmlName)
+                val htmlName = DownloadPaths.epubPageFileName(seriesId, volumeId, chapterId, page)
+                val htmlFile = File(chapterDir, htmlName)
                 withContext(Dispatchers.IO) {
                     htmlFile.sink().buffer().use { sink -> sink.writeString(rewrittenHtml, Charsets.UTF_8) }
                 }

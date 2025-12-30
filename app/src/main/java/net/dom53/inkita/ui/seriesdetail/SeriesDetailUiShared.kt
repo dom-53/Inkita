@@ -55,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
@@ -69,6 +70,7 @@ import coil.request.ImageRequest
 import net.dom53.inkita.R
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.data.mapper.TocItem
+import net.dom53.inkita.ui.common.DownloadState
 import net.dom53.inkita.ui.common.chapterCoverUrl
 import java.time.Instant
 import java.time.LocalDateTime
@@ -137,7 +139,7 @@ internal fun SectionChip(
 internal fun ChapterListV2(
     chapters: List<net.dom53.inkita.data.api.dto.ChapterDto>,
     config: AppConfig,
-    downloadStates: Map<Int, ChapterDownloadState> = emptyMap(),
+    downloadStates: Map<Int, DownloadState> = emptyMap(),
     onChapterClick: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
     onChapterLongPress: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
 ) {
@@ -178,7 +180,7 @@ internal fun ChapterListV2(
                                 .aspectRatio(2f / 3f),
                     )
                     val downloadState = downloadStates[chapter.id]
-                    if (downloadState == ChapterDownloadState.Complete || downloadState == ChapterDownloadState.Partial) {
+                    if (downloadState == DownloadState.Complete || downloadState == DownloadState.Partial) {
                         Box(
                             modifier =
                                 Modifier
@@ -191,7 +193,7 @@ internal fun ChapterListV2(
                         ) {
                             Icon(
                                 imageVector =
-                                    if (downloadState == ChapterDownloadState.Complete) {
+                                    if (downloadState == DownloadState.Complete) {
                                         Icons.Filled.DownloadDone
                                     } else {
                                         Icons.Filled.Downloading
@@ -260,10 +262,178 @@ internal fun ChapterListV2(
     }
 }
 
-internal enum class ChapterDownloadState {
-    None,
-    Partial,
-    Complete,
+@OptIn(ExperimentalMaterialApi::class)
+@Composable
+internal fun ChapterCompactList(
+    chapters: List<net.dom53.inkita.data.api.dto.ChapterDto>,
+    downloadStates: Map<Int, DownloadState> = emptyMap(),
+    onChapterClick: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
+    onChapterLongPress: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
+    onToggleDownload: (net.dom53.inkita.data.api.dto.ChapterDto, Boolean) -> Unit = { _, _ -> },
+    onUpdateProgress: (net.dom53.inkita.data.api.dto.ChapterDto, Int) -> Unit = { _, _ -> },
+) {
+    if (chapters.isEmpty()) return
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        val shape = RoundedCornerShape(10.dp)
+        chapters.forEachIndexed { index, chapter ->
+            val pagesRead = chapter.pagesRead ?: 0
+            val pagesTotal = chapter.pages ?: 0
+            val isRead = pagesTotal > 0 && pagesRead >= pagesTotal
+            val isCurrent = pagesRead in 1 until pagesTotal
+            val downloadState = downloadStates[chapter.id]
+            val isDownloaded = downloadState == DownloadState.Complete || downloadState == DownloadState.Partial
+            val containerColor =
+                if (isRead) {
+                    MaterialTheme.colorScheme.surfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.surface
+                }
+            val textColor =
+                when {
+                    isCurrent -> MaterialTheme.colorScheme.primary
+                    isRead -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            val border =
+                if (isCurrent) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+            val title =
+                chapter.titleName?.takeIf { it.isNotBlank() }
+                    ?: chapter.title?.takeIf { it.isNotBlank() }
+                    ?: chapter.range?.takeIf { it.isNotBlank() }
+                    ?: stringResource(R.string.series_detail_chapter_fallback, index + 1)
+            val label = stringResource(R.string.series_detail_chapter_fallback, index + 1)
+            val density = LocalDensity.current
+            val swipeDistance = with(density) { 160.dp.toPx() }
+            val swipeState = rememberSwipeableState(initialValue = 0)
+            val anchors = remember(swipeDistance) { mapOf(0f to 0, -swipeDistance to -1, swipeDistance to 1) }
+            var actionTriggered by remember { mutableStateOf(false) }
+            LaunchedEffect(swipeState.currentValue) {
+                if (swipeState.currentValue != 0 && !actionTriggered) {
+                    actionTriggered = true
+                    if (swipeState.currentValue == 1) {
+                        val targetPage = if (isRead) 0 else pagesTotal
+                        onUpdateProgress(chapter, targetPage)
+                    } else {
+                        onToggleDownload(chapter, isDownloaded)
+                    }
+                    swipeState.animateTo(0)
+                    actionTriggered = false
+                }
+            }
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min)
+                        .swipeable(
+                            state = swipeState,
+                            anchors = anchors,
+                            thresholds = { _, _ -> FractionalThreshold(0.25f) },
+                            orientation = Orientation.Horizontal,
+                        ),
+            ) {
+                val downloadIcon =
+                    if (isDownloaded) {
+                        Icons.Filled.Delete
+                    } else {
+                        Icons.Filled.FileDownload
+                    }
+                val downloadTint =
+                    if (isDownloaded) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                val progressIcon =
+                    if (isRead) {
+                        Icons.Filled.Undo
+                    } else {
+                        Icons.Filled.Done
+                    }
+                val progressTint =
+                    if (isRead) {
+                        MaterialTheme.colorScheme.secondary
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                Box(
+                    modifier =
+                        Modifier
+                            .matchParentSize()
+                            .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            imageVector = progressIcon,
+                            contentDescription = null,
+                            tint = progressTint,
+                            modifier = Modifier.align(Alignment.CenterStart),
+                        )
+                        Icon(
+                            imageVector = downloadIcon,
+                            contentDescription = null,
+                            tint = downloadTint,
+                            modifier = Modifier.align(Alignment.CenterEnd),
+                        )
+                    }
+                }
+                Row(
+                    modifier =
+                        Modifier
+                            .offset { IntOffset(swipeState.offset.value.roundToInt(), 0) }
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min)
+                            .background(containerColor, shape)
+                            .then(
+                                if (border != null) {
+                                    Modifier.border(border, shape)
+                                } else {
+                                    Modifier
+                                },
+                            ).combinedClickable(
+                                onClick = { onChapterClick(chapter, index) },
+                                onLongClick = { onChapterLongPress(chapter, index) },
+                            ).padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = textColor,
+                        modifier = Modifier.width(96.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = textColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (downloadState == DownloadState.Complete || downloadState == DownloadState.Partial) {
+                        Icon(
+                            imageVector =
+                                if (downloadState == DownloadState.Complete) {
+                                    Icons.Filled.DownloadDone
+                                } else {
+                                    Icons.Filled.Downloading
+                                },
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterialApi::class)
@@ -478,13 +648,19 @@ internal fun CoverImage(
                     .crossfade(true)
                     .build(),
             contentDescription = null,
-            modifier = modifier,
+            modifier =
+                modifier
+                    .clip(
+                        androidx.compose.foundation.shape
+                            .RoundedCornerShape(8.dp),
+                    ),
             contentScale = ContentScale.Crop,
         )
     } else {
         androidx.compose.foundation.layout.Box(
             modifier =
                 modifier
+                    .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
         )
     }
@@ -656,10 +832,12 @@ internal fun CollectionDialogV2(
 @Composable
 internal fun SummarySectionV2(
     summary: String?,
-    genres: List<String>,
-    tags: List<String>,
+    genres: List<Pair<Int?, String>>,
+    tags: List<Pair<Int?, String>>,
     expanded: Boolean,
     onToggle: () -> Unit,
+    onGenreClick: (Int, String) -> Unit = { _, _ -> },
+    onTagClick: (Int, String) -> Unit = { _, _ -> },
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -688,10 +866,16 @@ internal fun SummarySectionV2(
             ChipGroup(
                 title = stringResource(R.string.general_genres),
                 items = genres,
+                onItemClick = { id, name ->
+                    if (id != null) onGenreClick(id, name)
+                },
             )
             ChipGroup(
                 title = stringResource(R.string.general_tags),
                 items = tags,
+                onItemClick = { id, name ->
+                    if (id != null) onTagClick(id, name)
+                },
             )
         }
     }
@@ -701,9 +885,10 @@ internal fun SummarySectionV2(
 @Composable
 internal fun ChipGroup(
     title: String,
-    items: List<String>,
+    items: List<Pair<Int?, String>>,
+    onItemClick: (Int?, String) -> Unit = { _, _ -> },
 ) {
-    val trimmed = items.mapNotNull { it.trim().takeIf { titleText -> titleText.isNotEmpty() } }
+    val trimmed = items.mapNotNull { (id, label) -> label.trim().takeIf { it.isNotEmpty() }?.let { id to it } }
     if (trimmed.isEmpty()) {
         return
     }
@@ -719,8 +904,11 @@ internal fun ChipGroup(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            trimmed.forEach { item ->
-                AssistChip(onClick = {}, label = { Text(item) })
+            trimmed.forEach { (id, label) ->
+                AssistChip(
+                    onClick = { onItemClick(id, label) },
+                    label = { Text(label) },
+                )
             }
         }
     }

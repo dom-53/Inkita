@@ -2,37 +2,40 @@ package net.dom53.inkita.data.repository
 
 import android.content.Context
 import android.net.Uri
-import android.os.Environment
 import kotlinx.coroutines.flow.first
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.sync.ProgressSyncWorker
-import net.dom53.inkita.data.local.db.dao.DownloadDao
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
 import net.dom53.inkita.data.local.db.entity.CachedPageEntity
+import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
-import net.dom53.inkita.data.local.db.entity.DownloadedPageEntity
 import net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity
 import net.dom53.inkita.data.mapper.toDomain
 import net.dom53.inkita.data.mapper.toDto
 import net.dom53.inkita.domain.model.ReaderBookInfo
 import net.dom53.inkita.domain.model.ReaderChapterNav
+import net.dom53.inkita.domain.model.ReaderImageResult
 import net.dom53.inkita.domain.model.ReaderPageResult
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.ReaderTimeLeft
 import net.dom53.inkita.domain.repository.ReaderRepository
 import java.io.File
 import java.io.IOException
+import java.util.Locale
+import java.util.zip.ZipFile
 
 class ReaderRepositoryImpl(
     private val context: Context,
     private val appPreferences: AppPreferences,
     private val readerDao: ReaderDao,
-    private val downloadDao: DownloadDao? = null,
     private val downloadV2Dao: DownloadV2Dao? = null,
 ) : ReaderRepository {
+    private val archiveEntryCache = mutableMapOf<String, List<String>>()
+
     class PageNotDownloadedException(
         message: String,
     ) : IOException(message)
@@ -51,18 +54,8 @@ class ReaderRepositoryImpl(
                     null
                 }
             }
-        val downloaded = downloadDao?.getDownloadedPage(chapterId, page)
-        val downloadedHtml =
-            downloaded?.let { pageEntity ->
-                if (isPathPresent(pageEntity.htmlPath)) {
-                    readDownloadedHtml(pageEntity.htmlPath)
-                } else {
-                    runCatching { downloadDao?.deleteDownloadedPage(chapterId, page) }
-                    null
-                }
-            }
         val cached = readerDao.getPage(chapterId, page)?.html
-        val offlineHtml = downloadedHtmlV2 ?: downloadedHtml
+        val offlineHtml = downloadedHtmlV2
 
         if (!isOnlineAllowed() && offlineHtml == null) {
             throw PageNotDownloadedException("Page not downloaded for offline reading")
@@ -105,6 +98,36 @@ class ReaderRepositoryImpl(
         throw PageNotDownloadedException("Page not downloaded for offline reading")
     }
 
+    override suspend fun getImageResult(
+        chapterId: Int,
+        page: Int,
+    ): ReaderImageResult {
+        val downloadedV2 = downloadV2Dao?.getDownloadedPageForChapter(chapterId, page)
+        val downloadedPath =
+            downloadedV2?.localPath?.takeIf { isPathPresent(it) }
+        if (downloadedPath != null) {
+            return ReaderImageResult(downloadedPath, true)
+        }
+        val archiveItem = downloadV2Dao?.getDownloadedFileForChapter(chapterId)
+        val archivePath = archiveItem?.localPath?.takeIf { isPathPresent(it) }
+        if (archivePath != null) {
+            extractImageFromArchive(archivePath, chapterId, page)?.let { path ->
+                return ReaderImageResult(path, true)
+            }
+        }
+        if (!isOnlineAllowed()) {
+            throw PageNotDownloadedException("Page not downloaded for offline reading")
+        }
+        val config = appPreferences.configFlow.first()
+        if (!config.isConfigured) {
+            throw IOException("Server or API key not configured")
+        }
+        val base = if (config.serverUrl.endsWith("/")) config.serverUrl.dropLast(1) else config.serverUrl
+        val keyParam = config.apiKey.takeIf { it.isNotBlank() }?.let { "&apiKey=$it" } ?: ""
+        val url = "$base/api/reader/image?chapterId=$chapterId&page=$page$keyParam"
+        return ReaderImageResult(url, false)
+    }
+
     override suspend fun getPage(
         chapterId: Int,
         page: Int,
@@ -123,12 +146,13 @@ class ReaderRepositoryImpl(
                 return present
             }
         }
-        val downloaded = downloadDao?.getDownloadedPage(chapterId, page) ?: return false
-        val present = isPathPresent(downloaded.htmlPath)
-        if (!present) {
-            runCatching { downloadDao?.deleteDownloadedPage(chapterId, page) }
+        val archiveItem = downloadV2Dao?.getDownloadedFileForChapter(chapterId)
+        val archivePath = archiveItem?.localPath?.takeIf { isPathPresent(it) }
+        if (archivePath != null) {
+            val entryNames = listArchiveImageEntries(archivePath)
+            return page in entryNames.indices
         }
-        return present
+        return false
     }
 
     override suspend fun getProgress(chapterId: Int): ReaderProgress? {
@@ -211,12 +235,34 @@ class ReaderRepositoryImpl(
 
     override suspend fun getPdfFile(chapterId: Int): File? {
         val config = appPreferences.configFlow.first()
-        val target =
+        val existing =
+            downloadV2Dao
+                ?.getDownloadedFileForChapter(chapterId)
+        if (existing != null && existing.localPath?.let { File(it).exists() } == true) {
+            return File(existing.localPath!!)
+        }
+        val bookInfo = getBookInfo(chapterId)
+        val storedPdf =
+            bookInfo
+                ?.seriesId
+                ?.let { DownloadPaths.pdfFile(context, it, bookInfo.volumeId, chapterId) }
+        if (storedPdf?.exists() == true) {
+            recordPdfDownloadIfMissing(chapterId, storedPdf)
+            return storedPdf
+        }
+        val legacyTarget =
             File(
-                context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
-                "Inkita/pdfs/inkita-pdf-$chapterId.pdf",
+                context.getExternalFilesDir("Inkita/downloads/pdfs"),
+                "pdf-$chapterId.pdf",
             )
-        if (target.exists()) return target
+        if (legacyTarget.exists()) {
+            recordPdfDownloadIfMissing(chapterId, legacyTarget)
+            return legacyTarget
+        }
+        val tempTarget = DownloadPaths.pdfTempFile(context, chapterId)
+        if (tempTarget.exists()) {
+            return tempTarget
+        }
 
         val api =
             try {
@@ -228,17 +274,104 @@ class ReaderRepositoryImpl(
             api.getPdf(
                 chapterId,
                 apiKey = config.apiKey.takeIf { it.isNotBlank() },
-                extractPdf = true,
+                extractPdf = false,
             )
         if (!response.isSuccessful) return null
         val body = response.body() ?: return null
-        target.parentFile?.mkdirs()
-        target.outputStream().use { out ->
+        tempTarget.parentFile?.mkdirs()
+        tempTarget.outputStream().use { out ->
             body.byteStream().use { input ->
                 input.copyTo(out)
             }
         }
-        return target
+        if (net.dom53.inkita.core.logging.LoggingManager
+                .isDebugEnabled()
+        ) {
+            net.dom53.inkita.core.logging.LoggingManager.d(
+                "PdfReader",
+                "Saved temp PDF: ${tempTarget.absolutePath}",
+            )
+        }
+        return tempTarget
+    }
+
+    private suspend fun recordPdfDownloadIfMissing(
+        chapterId: Int,
+        target: File,
+    ) {
+        val dao = downloadV2Dao ?: return
+        val now = System.currentTimeMillis()
+        val existingItems = dao.getItemsForChapter(chapterId)
+        val fileItem =
+            existingItems.firstOrNull { it.type == DownloadedItemV2Entity.TYPE_FILE }
+        val bookInfo = getBookInfo(chapterId)
+        val seriesId = fileItem?.seriesId ?: bookInfo?.seriesId
+        val volumeId = fileItem?.volumeId ?: bookInfo?.volumeId
+        val bytes = target.length()
+        if (fileItem != null) {
+            dao.upsertItems(
+                listOf(
+                    fileItem.copy(
+                        seriesId = seriesId,
+                        volumeId = volumeId,
+                        localPath = target.absolutePath,
+                        bytes = bytes,
+                        status = DownloadedItemV2Entity.STATUS_COMPLETED,
+                        updatedAt = now,
+                        error = null,
+                    ),
+                ),
+            )
+            val jobId = fileItem.jobId
+            dao.getJob(jobId)?.let { job ->
+                dao.updateJob(
+                    job.copy(
+                        seriesId = seriesId ?: job.seriesId,
+                        volumeId = volumeId ?: job.volumeId,
+                        status = DownloadJobV2Entity.STATUS_COMPLETED,
+                        completedItems = 1,
+                        updatedAt = now,
+                        error = null,
+                    ),
+                )
+            }
+            return
+        }
+        val job =
+            DownloadJobV2Entity(
+                type = DownloadJobV2Entity.TYPE_CHAPTER,
+                format = net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2.FORMAT_PDF,
+                strategy = net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2.FORMAT_PDF,
+                seriesId = seriesId,
+                volumeId = volumeId,
+                chapterId = chapterId,
+                status = DownloadJobV2Entity.STATUS_COMPLETED,
+                totalItems = 1,
+                completedItems = 1,
+                priority = 0,
+                createdAt = now,
+                updatedAt = now,
+                error = null,
+            )
+        val jobId = dao.insertJob(job)
+        val item =
+            DownloadedItemV2Entity(
+                jobId = jobId,
+                type = DownloadedItemV2Entity.TYPE_FILE,
+                seriesId = seriesId,
+                volumeId = volumeId,
+                chapterId = chapterId,
+                page = null,
+                url = null,
+                localPath = target.absolutePath,
+                bytes = bytes,
+                checksum = null,
+                status = DownloadedItemV2Entity.STATUS_COMPLETED,
+                createdAt = now,
+                updatedAt = now,
+                error = null,
+            )
+        dao.upsertItems(listOf(item))
     }
 
     override suspend fun getNextChapter(
@@ -417,6 +550,95 @@ class ReaderRepositoryImpl(
         return File(path).exists()
     }
 
+    private fun extractImageFromArchive(
+        archivePath: String,
+        chapterId: Int,
+        page: Int,
+    ): String? {
+        val entries = listArchiveImageEntries(archivePath)
+        val entryName = entries.getOrNull(page) ?: return null
+        val extension =
+            entryName
+                .substringAfterLast('.', "jpg")
+                .lowercase(Locale.US)
+                .ifBlank { "jpg" }
+        val target =
+            DownloadPaths.imagePageCacheFile(
+                context = context,
+                chapterId = chapterId,
+                page = page,
+                extension = extension,
+            )
+        if (target.exists()) {
+            return target.absolutePath
+        }
+        target.parentFile?.mkdirs()
+        return runCatching {
+            ZipFile(archivePath).use { zip ->
+                val entry = zip.getEntry(entryName) ?: return@runCatching null
+                zip.getInputStream(entry).use { input ->
+                    target.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                target.absolutePath
+            }
+        }.getOrNull()
+    }
+
+    private fun listArchiveImageEntries(path: String): List<String> {
+        archiveEntryCache[path]?.let { return it }
+        val entries =
+            runCatching {
+                ZipFile(path).use { zip ->
+                    zip
+                        .entries()
+                        .asSequence()
+                        .filter { !it.isDirectory }
+                        .map { it.name }
+                        .filter { isImageFile(it) }
+                        .sortedWith { a, b -> naturalCompare(a, b) }
+                        .toList()
+                }
+            }.getOrDefault(emptyList())
+        archiveEntryCache[path] = entries
+        return entries
+    }
+
+    private fun isImageFile(name: String): Boolean {
+        val ext = name.substringAfterLast('.', "").lowercase(Locale.US)
+        return ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp")
+    }
+
+    private fun naturalCompare(
+        a: String,
+        b: String,
+    ): Int {
+        if (a == b) return 0
+        val partsA = splitNatural(a.lowercase(Locale.US))
+        val partsB = splitNatural(b.lowercase(Locale.US))
+        val max = maxOf(partsA.size, partsB.size)
+        for (i in 0 until max) {
+            val partA = partsA.getOrNull(i) ?: return -1
+            val partB = partsB.getOrNull(i) ?: return 1
+            val isNumA = partA.all { it.isDigit() }
+            val isNumB = partB.all { it.isDigit() }
+            val cmp =
+                if (isNumA && isNumB) {
+                    partA.toLong().compareTo(partB.toLong())
+                } else {
+                    partA.compareTo(partB)
+                }
+            if (cmp != 0) return cmp
+        }
+        return 0
+    }
+
+    private fun splitNatural(value: String): List<String> {
+        val regex = Regex("(\\d+)|(\\D+)")
+        return regex.findAll(value).map { it.value }.toList()
+    }
+
     private fun isOnlineAllowed(): Boolean =
         NetworkMonitor
             .getInstance(context, appPreferences)
@@ -430,9 +652,38 @@ class ReaderRepositoryImpl(
                 .filter { it.status == DownloadedItemV2Entity.STATUS_COMPLETED }
                 .filter { it.page != null }
                 .filter { isPathPresent(it.localPath ?: return@filter false) }
-        if (completed.isEmpty()) return null
-        val maxPage = completed.maxOf { it.page ?: 0 }
         val progress = readerDao.getLocalProgress(chapterId)
+        if (completed.isEmpty()) {
+            val fileItem =
+                items.firstOrNull { item ->
+                    item.status == DownloadedItemV2Entity.STATUS_COMPLETED &&
+                        item.type == DownloadedItemV2Entity.TYPE_FILE &&
+                        item.localPath?.let { isPathPresent(it) } == true
+                }
+            val archivePath = fileItem?.localPath
+            if (archivePath != null) {
+                val entries = listArchiveImageEntries(archivePath)
+                if (entries.isNotEmpty()) {
+                    val title =
+                        runCatching {
+                            context.getString(
+                                net.dom53.inkita.R.string.series_detail_chapter_fallback,
+                                chapterId,
+                            )
+                        }.getOrNull()
+                    return ReaderBookInfo(
+                        pages = entries.size,
+                        seriesId = progress?.seriesId ?: fileItem.seriesId,
+                        volumeId = progress?.volumeId ?: fileItem.volumeId,
+                        libraryId = progress?.libraryId,
+                        title = null,
+                        pageTitle = title,
+                    )
+                }
+            }
+            return null
+        }
+        val maxPage = completed.maxOf { it.page ?: 0 }
         val seriesId = progress?.seriesId ?: completed.firstOrNull()?.seriesId
         val volumeId = progress?.volumeId ?: completed.firstOrNull()?.volumeId
         val libraryId = progress?.libraryId
@@ -483,53 +734,66 @@ class ReaderRepositoryImpl(
         seriesId: Int?,
         volumeIds: List<Int>?,
     ) {
-        val dao = downloadDao ?: return
+        val dao = downloadV2Dao ?: return
         val enabled = appPreferences.deleteAfterMarkReadFlow.first()
         if (!enabled) return
         val depth = appPreferences.deleteAfterReadDepthFlow.first().coerceIn(1, 5)
 
         if (volumeIds.isNullOrEmpty()) {
             if (seriesId != null) {
-                deleteDownloadedPages(dao.getDownloadedPagesBySeries(seriesId))
+                deleteDownloadedSeries(seriesId)
             }
             return
         }
 
         if (depth == 1) {
             volumeIds.forEach { id ->
-                deleteDownloadedPages(dao.getDownloadedPagesByVolume(id))
+                deleteDownloadedVolume(id)
             }
             return
         }
 
         // For volume-level completion, just delete the completed volumes when depth is 1.
         if (depth == 1) {
-            volumeIds.forEach { id -> deleteDownloadedPages(dao.getDownloadedPagesByVolume(id)) }
+            volumeIds.forEach { id -> deleteDownloadedVolume(id) }
         }
     }
 
     private suspend fun clearDeleteAfterHistory(seriesId: Int?) {
         if (seriesId != null) {
-            downloadDao?.let { dao -> deleteDownloadedPages(dao.getDownloadedPagesBySeries(seriesId)) }
+            deleteDownloadedSeries(seriesId)
         }
     }
 
-    private suspend fun deleteDownloadedPages(pages: List<DownloadedPageEntity>) {
-        if (pages.isEmpty()) return
-        pages.forEach { page ->
+    private suspend fun deleteDownloadedItems(items: List<DownloadedItemV2Entity>) {
+        if (items.isEmpty()) return
+        items.forEach { item ->
             runCatching {
-                if (!page.htmlPath.startsWith("content://")) {
-                    File(page.htmlPath).delete()
+                val path = item.localPath ?: return@runCatching
+                if (path.startsWith("content://")) {
+                    context.contentResolver.delete(Uri.parse(path), null, null)
                 } else {
-                    context.contentResolver.delete(Uri.parse(page.htmlPath), null, null)
-                }
-                page.assetsDir?.let { dir ->
-                    val file = File(dir)
-                    if (file.exists()) file.deleteRecursively()
+                    File(path).delete()
                 }
             }
-            runCatching { downloadDao?.deleteDownloadedPage(page.chapterId, page.page) }
         }
+        items.forEach { item ->
+            runCatching { downloadV2Dao?.deleteItemById(item.id) }
+        }
+    }
+
+    private suspend fun deleteDownloadedSeries(seriesId: Int) {
+        val dao = downloadV2Dao ?: return
+        deleteDownloadedItems(dao.getItemsForSeries(seriesId))
+        dao.deleteItemsForSeries(seriesId)
+        dao.deleteJobsForSeries(seriesId)
+    }
+
+    private suspend fun deleteDownloadedVolume(volumeId: Int) {
+        val dao = downloadV2Dao ?: return
+        deleteDownloadedItems(dao.getItemsForVolume(volumeId))
+        dao.deleteItemsForVolume(volumeId)
+        dao.deleteJobsForVolume(volumeId)
     }
 
     private suspend fun maybeDeleteAfterCompletion(
@@ -552,10 +816,8 @@ class ReaderRepositoryImpl(
         val page = progress.page ?: return
         val cutoff = page - depth + 1
         if (cutoff < 0) return
-        val pages =
-            downloadDao
-                ?.getDownloadedPagesBefore(progress.chapterId, cutoff)
-                .orEmpty()
-        deleteDownloadedPages(pages)
+        val dao = downloadV2Dao ?: return
+        val items = dao.getItemsForChapterBeforePage(progress.chapterId, cutoff)
+        deleteDownloadedItems(items)
     }
 }

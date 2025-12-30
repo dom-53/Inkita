@@ -1,10 +1,16 @@
-package net.dom53.inkita.ui.reader
+package net.dom53.inkita.ui.reader.screen
 
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import net.dom53.inkita.core.downloadv2.DownloadPaths
+import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.domain.repository.ReaderRepository
+import net.dom53.inkita.ui.reader.renderer.PdfReader
+import net.dom53.inkita.ui.reader.viewmodel.PdfReaderViewModel
 
 @Composable
 fun PdfReaderScreen(
@@ -22,6 +28,21 @@ fun PdfReaderScreen(
     bottomBarContent: (@Composable (ReaderBottomBarState, ReaderBottomBarCallbacks) -> Unit)? = null,
     overlayExtras: @Composable BoxScope.() -> Unit = {},
 ) {
+    val context = LocalContext.current
+    DisposableEffect(chapterId) {
+        onDispose {
+            val tempFile = DownloadPaths.pdfTempFile(context, chapterId)
+            if (tempFile.exists()) {
+                tempFile.delete()
+                if (LoggingManager.isDebugEnabled()) {
+                    LoggingManager.d(
+                        "PdfReader",
+                        "Deleted temp PDF after reader exit: ${tempFile.absolutePath}",
+                    )
+                }
+            }
+        }
+    }
     BaseReaderScreen(
         chapterId = chapterId,
         initialPage = initialPage,
@@ -29,7 +50,7 @@ fun PdfReaderScreen(
             viewModel(
                 key = "reader-$chapterId",
                 factory =
-                    PdfReaderViewModel.provideFactory(
+                    PdfReaderViewModel.Companion.provideFactory(
                         chapterId = chapterId,
                         initialPage = initialPage ?: 0,
                         readerRepository = readerRepository,

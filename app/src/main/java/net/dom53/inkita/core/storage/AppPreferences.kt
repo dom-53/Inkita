@@ -22,6 +22,8 @@ enum class AppTheme { System, Light, Dark }
 
 enum class ReaderThemeMode { Light, Dark, DarkHighContrast, Sepia, SepiaHighContrast, Gray }
 
+enum class ImageReaderMode { LeftToRight, RightToLeft, Vertical, Webtoon }
+
 data class AppConfig(
     val serverUrl: String,
     val apiKey: String,
@@ -40,9 +42,12 @@ data class ReaderPrefs(
     val useSerif: Boolean = true,
     val fontFamily: String = DEFAULT_FONT_FAMILY,
     val readerTheme: ReaderThemeMode = ReaderThemeMode.Light,
+    val imageReaderMode: ImageReaderMode = ImageReaderMode.LeftToRight,
+    val imagePrefetchPages: Int = 8,
 ) {
     companion object {
         const val DEFAULT_FONT_FAMILY = "literata"
+        const val DEFAULT_IMAGE_PREFETCH_PAGES = 8
     }
 }
 
@@ -68,6 +73,8 @@ class AppPreferences(
         private val KEY_USE_SERIF = booleanPreferencesKey("reader_use_serif")
         private val KEY_FONT_FAMILY = stringPreferencesKey("reader_font_family")
         private val KEY_READER_THEME = stringPreferencesKey("reader_theme")
+        private val KEY_IMAGE_READER_MODE = stringPreferencesKey("image_reader_mode")
+        private val KEY_IMAGE_PREFETCH_PAGES = intPreferencesKey("image_prefetch_pages")
 
         private val KEY_APP_LANGUAGE = stringPreferencesKey("app_language")
         private val KEY_APP_THEME = stringPreferencesKey("app_theme")
@@ -111,6 +118,7 @@ class AppPreferences(
         private val KEY_BROWSE_PAGE_SIZE = intPreferencesKey("browse_page_size")
         private val KEY_MAX_THUMBNAILS_PARALLEL = intPreferencesKey("max_thumbnails_parallel")
         private val KEY_DISABLE_BROWSE_THUMBNAILS = booleanPreferencesKey("disable_browse_thumbnails")
+        private val KEY_SHOW_DOWNLOAD_BADGES = booleanPreferencesKey("show_download_badges")
 
         private const val REFRESH_CACHE_DEFAULT = 720
         private const val STALE_CACHE_DEFAULT_MIN = 15
@@ -148,6 +156,8 @@ class AppPreferences(
                     prefs[KEY_FONT_FAMILY]
                         ?: if ((prefs[KEY_USE_SERIF] ?: true)) ReaderPrefs.DEFAULT_FONT_FAMILY else "noto_sans",
                 readerTheme = prefs.toReaderTheme(),
+                imageReaderMode = prefs.toImageReaderMode(),
+                imagePrefetchPages = prefs[KEY_IMAGE_PREFETCH_PAGES] ?: ReaderPrefs.DEFAULT_IMAGE_PREFETCH_PAGES,
             )
         }
 
@@ -198,7 +208,7 @@ class AppPreferences(
     val libraryCacheBrowsePeopleFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_BROWSE_PEOPLE] ?: false }
     val libraryCacheDetailsFlow: Flow<Boolean> =
-        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_DETAILS] ?: false }
+        context.dataStore.data.map { prefs -> prefs[KEY_LIBRARY_CACHE_DETAILS] ?: true }
     val offlineModeFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_OFFLINE_MODE] ?: false }
     val cacheRefreshTtlMinutesFlow: Flow<Int> =
@@ -245,6 +255,8 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> (prefs[KEY_MAX_THUMBNAILS_PARALLEL] ?: 4).coerceIn(2, 6) }
     val disableBrowseThumbnailsFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_DISABLE_BROWSE_THUMBNAILS] ?: false }
+    val showDownloadBadgesFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[KEY_SHOW_DOWNLOAD_BADGES] ?: true }
 
     val prefetchCollectionsAllFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_COLLECTIONS_ALL] ?: true }
@@ -340,6 +352,8 @@ class AppPreferences(
                         prefs[KEY_FONT_FAMILY]
                             ?: if ((prefs[KEY_USE_SERIF] ?: true)) ReaderPrefs.DEFAULT_FONT_FAMILY else "noto_sans",
                     readerTheme = prefs.toReaderTheme(),
+                    imageReaderMode = prefs.toImageReaderMode(),
+                    imagePrefetchPages = prefs[KEY_IMAGE_PREFETCH_PAGES] ?: ReaderPrefs.DEFAULT_IMAGE_PREFETCH_PAGES,
                 )
             val next = current.transform()
             prefs[KEY_FONT_SIZE] = next.fontSize
@@ -349,6 +363,8 @@ class AppPreferences(
             prefs[KEY_USE_SERIF] = next.useSerif
             prefs[KEY_FONT_FAMILY] = next.fontFamily
             prefs[KEY_READER_THEME] = encodeReaderTheme(next.readerTheme)
+            prefs[KEY_IMAGE_READER_MODE] = encodeImageReaderMode(next.imageReaderMode)
+            prefs[KEY_IMAGE_PREFETCH_PAGES] = next.imagePrefetchPages.coerceAtLeast(0)
         }
     }
 
@@ -611,6 +627,12 @@ class AppPreferences(
         }
     }
 
+    suspend fun setShowDownloadBadges(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_SHOW_DOWNLOAD_BADGES] = enabled
+        }
+    }
+
     suspend fun loadCachedCollections(): List<Collection> {
         val prefs = context.dataStore.data.first()
         val encoded = prefs[KEY_CACHED_COLLECTIONS] ?: return emptyList()
@@ -666,5 +688,21 @@ class AppPreferences(
             ReaderThemeMode.Sepia -> "sepia"
             ReaderThemeMode.SepiaHighContrast -> "sepia_hc"
             ReaderThemeMode.Gray -> "gray"
+        }
+
+    private fun Preferences.toImageReaderMode(): ImageReaderMode =
+        when (this[KEY_IMAGE_READER_MODE]) {
+            "rtl" -> ImageReaderMode.RightToLeft
+            "vertical" -> ImageReaderMode.Vertical
+            "webtoon" -> ImageReaderMode.Webtoon
+            else -> ImageReaderMode.LeftToRight
+        }
+
+    private fun encodeImageReaderMode(mode: ImageReaderMode): String =
+        when (mode) {
+            ImageReaderMode.LeftToRight -> "ltr"
+            ImageReaderMode.RightToLeft -> "rtl"
+            ImageReaderMode.Vertical -> "vertical"
+            ImageReaderMode.Webtoon -> "webtoon"
         }
 }

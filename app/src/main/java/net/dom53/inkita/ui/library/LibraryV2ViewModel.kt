@@ -5,83 +5,35 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.data.local.db.InkitaDatabase
+import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.domain.model.Collection
+import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.model.Library
-import net.dom53.inkita.domain.model.Person
-import net.dom53.inkita.domain.model.ReadingList
 import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
 import net.dom53.inkita.domain.repository.PersonRepository
 import net.dom53.inkita.domain.repository.ReadingListRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
+import net.dom53.inkita.ui.common.DownloadState
+import net.dom53.inkita.ui.common.DownloadStateResolver
+import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 
-data class HomeSeriesItem(
-    val id: Int,
-    val title: String,
-    val localThumbPath: String? = null,
-)
-
-enum class LibraryV2Section {
-    Home,
-    WantToRead,
-    Collections,
-    ReadingList,
-    BrowsePeople,
-    LibrarySeries,
-}
-
-data class LibraryV2UiState(
-    val libraries: List<Library> = emptyList(),
-    val isLoading: Boolean = true,
-    val error: String? = null,
-    val onDeck: List<HomeSeriesItem> = emptyList(),
-    val recentlyUpdated: List<HomeSeriesItem> = emptyList(),
-    val recentlyAdded: List<HomeSeriesItem> = emptyList(),
-    val isHomeLoading: Boolean = true,
-    val homeError: String? = null,
-    val wantToRead: List<net.dom53.inkita.domain.model.Series> = emptyList(),
-    val isWantToReadLoading: Boolean = false,
-    val wantToReadError: String? = null,
-    val collections: List<Collection> = emptyList(),
-    val isCollectionsLoading: Boolean = false,
-    val collectionsError: String? = null,
-    val selectedCollectionId: Int? = null,
-    val selectedCollectionName: String? = null,
-    val collectionSeries: List<net.dom53.inkita.domain.model.Series> = emptyList(),
-    val isCollectionSeriesLoading: Boolean = false,
-    val collectionSeriesError: String? = null,
-    val readingLists: List<ReadingList> = emptyList(),
-    val isReadingListsLoading: Boolean = false,
-    val readingListsError: String? = null,
-    val people: List<Person> = emptyList(),
-    val isPeopleLoading: Boolean = false,
-    val peopleError: String? = null,
-    val peoplePage: Int = 1,
-    val canLoadMorePeople: Boolean = true,
-    val isPeopleLoadingMore: Boolean = false,
-    val selectedLibraryId: Int? = null,
-    val selectedLibraryName: String? = null,
-    val librarySeries: List<net.dom53.inkita.domain.model.Series> = emptyList(),
-    val isLibrarySeriesLoading: Boolean = false,
-    val isLibrarySeriesLoadingMore: Boolean = false,
-    val librarySeriesError: String? = null,
-    val librarySeriesPage: Int = 1,
-    val canLoadMoreLibrarySeries: Boolean = true,
-    val libraryAccessDenied: Boolean = false,
-    val selectedSection: LibraryV2Section = LibraryV2Section.Home,
-)
-
+@Suppress("LargeClass")
 class LibraryV2ViewModel(
     private val libraryRepository: LibraryRepository,
     private val seriesRepository: SeriesRepository,
@@ -93,10 +45,14 @@ class LibraryV2ViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(LibraryV2UiState())
     val state: StateFlow<LibraryV2UiState> = _state
+    private val downloadDao =
+        InkitaDatabase.getInstance(appPreferences.appContext).downloadV2Dao()
+    private var lastDownloadedItems: List<DownloadedItemV2Entity> = emptyList()
 
     init {
         loadLibraries()
         loadHome()
+        observeDownloadStates()
     }
 
     fun selectSection(section: LibraryV2Section) {
@@ -116,6 +72,26 @@ class LibraryV2ViewModel(
         }
         if (section == LibraryV2Section.BrowsePeople) {
             ensurePeople()
+        }
+    }
+
+    fun openCollectionFromExternal(
+        collectionId: Int,
+        collectionName: String?,
+    ) {
+        _state.update {
+            it.copy(
+                selectedSection = LibraryV2Section.Collections,
+                selectedCollectionId = collectionId,
+                selectedCollectionName = collectionName,
+                collectionSeries = emptyList(),
+                isCollectionSeriesLoading = true,
+                collectionSeriesError = null,
+            )
+        }
+        viewModelScope.launch {
+            ensureCollections()
+            loadCollectionSeries(collectionId)
         }
     }
 
@@ -278,6 +254,7 @@ class LibraryV2ViewModel(
                         homeError = null,
                     )
                 }
+                updateDownloadStates(lastDownloadedItems)
                 if (!isOnline || (!alwaysRefresh && !isStale)) {
                     logCacheDecision("home", "using cached data only")
                     if (showDebugToast) {
@@ -397,6 +374,7 @@ class LibraryV2ViewModel(
                     homeError = error?.message,
                 )
             }
+            updateDownloadStates(lastDownloadedItems)
         }
     }
 
@@ -435,6 +413,7 @@ class LibraryV2ViewModel(
                     logCacheDecision("want", "using cached data only")
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isWantToReadLoading = false) }
+                    updateDownloadStates(lastDownloadedItems)
                     return@launch
                 }
                 val message =
@@ -462,6 +441,7 @@ class LibraryV2ViewModel(
                     wantToReadError = result.exceptionOrNull()?.message,
                 )
             }
+            updateDownloadStates(lastDownloadedItems)
             cacheManager.cacheLibraryV2SeriesList(
                 LibraryV2CacheKeys.WANT_TO_READ,
                 "",
@@ -640,6 +620,7 @@ class LibraryV2ViewModel(
                     logCacheDecision("people", "using cached data only")
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isPeopleLoading = false) }
+                    updateDownloadStates(lastDownloadedItems)
                     return@launch
                 }
                 val message =
@@ -670,6 +651,7 @@ class LibraryV2ViewModel(
                     canLoadMorePeople = pageItems.size == 50,
                 )
             }
+            updateDownloadStates(lastDownloadedItems)
             cacheManager.cacheLibraryV2People(
                 LibraryV2CacheKeys.BROWSE_PEOPLE,
                 1,
@@ -715,6 +697,7 @@ class LibraryV2ViewModel(
                     canLoadMoreLibrarySeries = pageItems.size == 25,
                 )
             }
+            updateDownloadStates(lastDownloadedItems)
         }
     }
 
@@ -757,6 +740,7 @@ class LibraryV2ViewModel(
                     canLoadMorePeople = pageItems.size == 50,
                 )
             }
+            updateDownloadStates(lastDownloadedItems)
         }
     }
 
@@ -796,6 +780,7 @@ class LibraryV2ViewModel(
                     logCacheDecision("collection:$collectionId", "using cached data only")
                     maybeShowDebugToast(R.string.debug_cache_use)
                     _state.update { it.copy(isCollectionSeriesLoading = false) }
+                    updateDownloadStates(lastDownloadedItems)
                     return@launch
                 }
                 val message =
@@ -823,6 +808,7 @@ class LibraryV2ViewModel(
                     collectionSeriesError = result.exceptionOrNull()?.message,
                 )
             }
+            updateDownloadStates(lastDownloadedItems)
             cacheManager.cacheLibraryV2SeriesList(
                 LibraryV2CacheKeys.COLLECTION_SERIES,
                 cacheKey,
@@ -879,6 +865,102 @@ class LibraryV2ViewModel(
                 }
             maybeShowDebugToast(message)
         }
+    }
+
+    private fun observeDownloadStates() {
+        viewModelScope.launch {
+            downloadDao
+                .observeItemsByStatus(DownloadedItemV2Entity.STATUS_COMPLETED)
+                .collectLatest { items ->
+                    lastDownloadedItems = items
+                    updateDownloadStates(items)
+                }
+        }
+    }
+
+    private suspend fun updateDownloadStates(items: List<DownloadedItemV2Entity>) {
+        val seriesInfoById = buildSeriesInfoMap(_state.value)
+        if (seriesInfoById.isEmpty()) {
+            _state.update { it.copy(downloadStates = emptyMap()) }
+            return
+        }
+        val cacheIds =
+            seriesInfoById.values
+                .filter { info ->
+                    info.format == null ||
+                        info.format == Format.Pdf ||
+                        (info.pages ?: 0) <= 0
+                }.map { it.id }
+                .distinct()
+                .sorted()
+        val cachedDetails =
+            withContext(Dispatchers.IO) {
+                val result = mutableMapOf<Int, InkitaDetailV2>()
+                cacheIds.forEach { id ->
+                    cacheManager.getCachedSeriesDetailV2(id)?.let { result[id] = it }
+                }
+                result
+            }
+        val states =
+            buildSeriesDownloadStates(
+                seriesInfoById = seriesInfoById,
+                downloadedItems = items,
+                cachedDetails = cachedDetails,
+            )
+        _state.update { it.copy(downloadStates = states) }
+    }
+
+    private data class SeriesDownloadInfo(
+        val id: Int,
+        val format: Format?,
+        val pages: Int?,
+    )
+
+    private fun buildSeriesInfoMap(state: LibraryV2UiState): Map<Int, SeriesDownloadInfo> {
+        val map = mutableMapOf<Int, SeriesDownloadInfo>()
+
+        fun add(
+            id: Int,
+            format: Format?,
+            pages: Int?,
+        ) {
+            val current = map[id]
+            val resolvedFormat = format ?: current?.format
+            val resolvedPages = pages ?: current?.pages
+            map[id] = SeriesDownloadInfo(id, resolvedFormat, resolvedPages)
+        }
+        state.onDeck.forEach { add(it.id, null, null) }
+        state.recentlyUpdated.forEach { add(it.id, null, null) }
+        state.recentlyAdded.forEach { add(it.id, null, null) }
+        state.wantToRead.forEach { add(it.id, it.format, it.pages) }
+        state.collectionSeries.forEach { add(it.id, it.format, it.pages) }
+        state.librarySeries.forEach { add(it.id, it.format, it.pages) }
+        return map
+    }
+
+    private fun buildSeriesDownloadStates(
+        seriesInfoById: Map<Int, SeriesDownloadInfo>,
+        downloadedItems: List<DownloadedItemV2Entity>,
+        cachedDetails: Map<Int, InkitaDetailV2>,
+    ): Map<Int, DownloadState> {
+        val itemsBySeries =
+            downloadedItems
+                .filter { it.seriesId != null }
+                .groupBy { it.seriesId!! }
+        val result = mutableMapOf<Int, DownloadState>()
+        seriesInfoById.forEach { (id, info) ->
+            val items = itemsBySeries[id].orEmpty()
+            val detail = cachedDetails[id]
+            val format = info.format ?: Format.fromId(detail?.series?.format)
+            result[id] =
+                DownloadStateResolver.resolveSeriesState(
+                    format = format,
+                    pagesHint = info.pages,
+                    detail = detail?.detail,
+                    items = items,
+                )
+        }
+        return result
     }
 
     companion object {

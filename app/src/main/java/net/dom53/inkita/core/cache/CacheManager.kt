@@ -4,15 +4,10 @@ import net.dom53.inkita.domain.model.Collection
 import net.dom53.inkita.domain.model.Person
 import net.dom53.inkita.domain.model.ReadingList
 import net.dom53.inkita.domain.model.Series
-import net.dom53.inkita.domain.model.SeriesDetail
-import net.dom53.inkita.domain.model.filter.SeriesQuery
-import net.dom53.inkita.domain.model.library.LibraryTabCacheKey
 import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 
 /**
- * Cache interface covering legacy and V2 cache layers.
- *
- * V2 cache focuses on Library V2 lists and Series Detail V2 payloads.
+ * Cache interface for Library V2 lists and Series Detail V2 payloads.
  */
 interface CacheManager {
     /** Returns the current cache policy (feature toggles + limits). */
@@ -20,37 +15,6 @@ interface CacheManager {
 
     /** Enrich series with locally cached thumbnails when available. */
     suspend fun enrichThumbnails(series: List<Series>): List<Series>
-
-    /** Legacy: cache tab results. */
-    suspend fun cacheTabResults(
-        key: LibraryTabCacheKey,
-        series: List<Series>,
-    )
-
-    /** Legacy: cache a browse page. */
-    suspend fun cacheBrowsePage(
-        queryKey: String,
-        page: Int,
-        series: List<Series>,
-    )
-
-    /** Legacy: cache Series Detail V1. */
-    suspend fun cacheSeriesDetail(detail: SeriesDetail)
-
-    /** Legacy: read cached series for a query. */
-    suspend fun getCachedSeries(query: SeriesQuery): List<Series>
-
-    /** Legacy: read cached series for a tab. */
-    suspend fun getCachedSeriesForTab(key: LibraryTabCacheKey): List<Series>
-
-    /** Legacy: read cached browse page. */
-    suspend fun getCachedBrowsePage(
-        queryKey: String,
-        page: Int,
-    ): List<Series>
-
-    /** Legacy: read cached Series Detail V1. */
-    suspend fun getCachedSeriesDetail(seriesId: Int): SeriesDetail?
 
     /** Cache a list of series for Library V2. */
     suspend fun cacheLibraryV2SeriesList(

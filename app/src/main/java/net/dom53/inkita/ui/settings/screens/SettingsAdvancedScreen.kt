@@ -45,12 +45,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
 import net.dom53.inkita.core.cache.CacheManager
-import net.dom53.inkita.core.download.DownloadManager
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.repository.CollectionsRepositoryImpl
-import net.dom53.inkita.data.repository.DownloadRepositoryImpl
 import net.dom53.inkita.domain.model.Collection
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -103,12 +102,7 @@ fun SettingsAdvancedScreen(
     var maxThumbnailsParallel by remember { mutableStateOf(4) }
     var disableBrowseThumbnails by remember { mutableStateOf(false) }
     val collectionsRepo = remember { CollectionsRepositoryImpl(context, appPreferences) }
-    val downloadRepo =
-        remember {
-            val db = InkitaDatabase.getInstance(context)
-            val manager = DownloadManager(context)
-            DownloadRepositoryImpl(db.downloadDao(), manager, context.applicationContext)
-        }
+    val downloadV2Dao = remember { InkitaDatabase.getInstance(context).downloadV2Dao() }
 
     LaunchedEffect(Unit) {
         cacheSizeBytes = cacheManager.getCacheSizeBytes()
@@ -939,7 +933,11 @@ fun SettingsAdvancedScreen(
                                         ClearTarget.Database -> cacheManager.clearDatabase()
                                         ClearTarget.Details -> cacheManager.clearDetails()
                                         ClearTarget.Thumbnails -> cacheManager.clearThumbnails()
-                                        ClearTarget.DownloadedPages -> downloadRepo.clearAllDownloads()
+                                        ClearTarget.DownloadedPages -> {
+                                            downloadV2Dao.clearAllItems()
+                                            downloadV2Dao.clearAllJobs()
+                                            DownloadPaths.baseDir(context).deleteRecursively()
+                                        }
                                     }
                                     appPreferences.setLastLibraryRefresh(0)
                                     appPreferences.setLastBrowseRefresh(0)

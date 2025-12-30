@@ -4,6 +4,43 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Added
+- Downloads V2: Added default Download API strategy for series/volume/chapter archives.
+- Downloads V2: Added fallback DownloadApiStrategyV2 for unsupported formats.
+- Downloads V2: Normalized on-disk layout for series/volumes/chapters/specials to avoid duplicated files.
+- Downloads V2: Added image/archive chapter downloads that store CBZ files.
+- Downloads V2: PDF download requests now enqueue and appear in the Download Queue.
+- Downloads V2: Centralized download state resolution for series/volume/chapter badges.
+- Downloads V2: Download queue entries now show series/volume/chapter labels when available.
+- Library/Browse: Download status badges now appear on series covers (complete/partial).
+- Settings: Toggle to show/hide download status badges in Download settings.
+- Settings: Added download stats dialog to Download settings.
+- Series Detail V2: Menu now shows a tree view of downloaded files/structure.
+- Reader: Offline Image/Archive reading now loads pages from downloaded CBZ files.
+- Reader: Added basic Image/Archive reader (image pages + swipe navigation).
+- Reader: Image reader now supports selectable reading modes (LTR/RTL/Vertical).
+- Reader: PDF opened for reading no longer persists on disk unless downloaded; temp files are cleaned on exit/startup (with verbose logs).
+- Series Detail V2: Chapters list now supports swipe read/unread and download.
+- Series Detail V2: Tapping a genre or tag opens Browse with the filter pre-applied.
+- Series Detail V2: Clicking a collection opens Library V2 collections with that collection selected.
+
+### Changed
+- Downloads V2: Downloaded PDF items now open with the correct MIME type.
+- Downloads V2: Queue/Completed rows now wrap titles cleanly instead of truncating them.
+- Reader: Split EpubReaderViewModel and PdfReaderViewModel into separate files.
+- Reader: Page navigation now jumps across chapters at the edges (next/previous).
+- Reader: Next Chapter now prompts to mark the current chapter as read when leaving early.
+- Reader: Image/Archive format routing now preserves format id in navigation.
+- UI: Rounded corners aligned across Library V2, Series Detail V2, and Volume Detail V2 covers.
+- Series Detail: Removed legacy Series Detail screen/viewmodel implementation.
+- Downloads: Removed legacy (v1) download manager/worker/DB tables in favor of V2.
+- Library: Removed legacy Library screen/viewmodel and legacy cache APIs; Browse now uses V2 cache lists.
+
+### Fixed
+- Cache: Series Detail V2 caching now defaults to enabled to prevent offline cache misses.
+- History: Reading history list no longer crashes due to duplicate LazyColumn keys.
+- Navigation: Bottom bar now remains visible when opening Library/Browse with query params (collections/tags/genres).
+
 ## v0.3.0-beta
 
 ### Added
@@ -34,7 +71,7 @@ All notable changes to this project will be documented here.
 - Settings: Prefetch switches in Advanced are temporarily disabled until the new prefetch pipeline is implemented.
 - Logging: Added verbose logs for Library V2 cache decisions, Series/Volume Detail V2 flows, and Download V2 enqueue/worker events.
 - Downloads: Download settings now use dedicated metered/low-battery preferences; download workers respect those constraints.
-- Cache: “Cache stale after” now supports minutes or hours with a 15-minute default.
+- Cache: "Cache stale after" now supports minutes or hours with a 15-minute default.
 - Network: Increased global HTTP timeouts to 30 seconds.
 
 ### Fixed

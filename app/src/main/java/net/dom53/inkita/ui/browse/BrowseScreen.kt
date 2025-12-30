@@ -1,6 +1,7 @@
 package net.dom53.inkita.ui.browse
 
 import android.content.Context
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
@@ -94,6 +95,8 @@ import net.dom53.inkita.domain.usecase.ReadStatusFilter
 import net.dom53.inkita.domain.usecase.SpecialFilter
 import net.dom53.inkita.ui.browse.utils.AgeRatings
 import net.dom53.inkita.ui.browse.utils.PublicationState
+import net.dom53.inkita.ui.common.DownloadState
+import net.dom53.inkita.ui.common.DownloadStateBadge
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,12 +106,17 @@ fun BrowseScreen(
     appPreferences: AppPreferences,
     cacheManager: CacheManager,
     onOpenSeries: (Int) -> Unit,
+    initialGenreId: Int? = null,
+    initialGenreName: String? = null,
+    initialTagId: Int? = null,
+    initialTagName: String? = null,
 ) {
     val viewModel: BrowseViewModel =
         viewModel(
             factory = BrowseViewModel.provideFactory(seriesRepository, appPreferences, cacheManager),
         )
     val uiState by viewModel.state.collectAsState()
+    var presetApplied by remember { mutableStateOf(false) }
 
     var showFilterSheet by remember { mutableStateOf(false) }
     var sheetHasFocus by remember { mutableStateOf(false) }
@@ -130,8 +138,41 @@ fun BrowseScreen(
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
+    val showDownloadBadges by appPreferences.showDownloadBadgesFlow.collectAsState(initial = true)
     val browsePageSize by appPreferences.browsePageSizeFlow.collectAsState(initial = 25)
     val disableBrowseThumbnails by appPreferences.disableBrowseThumbnailsFlow.collectAsState(initial = false)
+    val context = LocalContext.current
+
+    LaunchedEffect(initialGenreId, initialTagId) {
+        if (presetApplied) return@LaunchedEffect
+        when {
+            initialGenreId != null -> {
+                viewModel.applyQuickGenreFilter(initialGenreId, initialGenreName)
+                Toast
+                    .makeText(
+                        context,
+                        context.getString(
+                            R.string.browse_filter_applied_genre,
+                            initialGenreName ?: initialGenreId.toString(),
+                        ),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+            }
+            initialTagId != null -> {
+                viewModel.applyQuickTagFilter(initialTagId, initialTagName)
+                Toast
+                    .makeText(
+                        context,
+                        context.getString(
+                            R.string.browse_filter_applied_tag,
+                            initialTagName ?: initialTagId.toString(),
+                        ),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+            }
+        }
+        presetApplied = initialGenreId != null || initialTagId != null
+    }
 
     LaunchedEffect(gridState) {
         snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
@@ -233,6 +274,8 @@ fun BrowseScreen(
                             loadingPlaceholderCount = browsePageSize,
                             gridState = gridState,
                             disableThumbnails = disableBrowseThumbnails,
+                            downloadStates = uiState.downloadStates,
+                            showDownloadBadges = showDownloadBadges,
                             onSeriesClick = { onOpenSeries(it.id) },
                             onLoadMore = { viewModel.loadNextPage() },
                         )
@@ -614,6 +657,8 @@ private fun SeriesGrid(
     loadingPlaceholderCount: Int,
     gridState: LazyGridState,
     disableThumbnails: Boolean,
+    downloadStates: Map<Int, DownloadState>,
+    showDownloadBadges: Boolean,
     onLoadMore: () -> Unit,
     onSeriesClick: (Series) -> Unit,
 ) {
@@ -693,6 +738,15 @@ private fun SeriesGrid(
                                 }
                                 else -> SubcomposeAsyncImageContent()
                             }
+                        }
+                        if (showDownloadBadges) {
+                            DownloadStateBadge(
+                                state = downloadStates[series.id] ?: DownloadState.None,
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(end = 6.dp, bottom = 10.dp),
+                            )
                         }
                     }
                 }
