@@ -104,8 +104,22 @@ object ImageReader : BaseReader {
                     transitionSpec = {
                         val direction =
                             when {
-                                targetState.pageIndex > initialState.pageIndex -> if (isVertical) 1 else if (isRtl) -1 else 1
-                                targetState.pageIndex < initialState.pageIndex -> if (isVertical) -1 else if (isRtl) 1 else -1
+                                targetState.pageIndex > initialState.pageIndex ->
+                                    if (isVertical) {
+                                        1
+                                    } else if (isRtl) {
+                                        -1
+                                    } else {
+                                        1
+                                    }
+                                targetState.pageIndex < initialState.pageIndex ->
+                                    if (isVertical) {
+                                        -1
+                                    } else if (isRtl) {
+                                        1
+                                    } else {
+                                        -1
+                                    }
                                 else -> 0
                             }
                         if (direction == 0) {
