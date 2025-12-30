@@ -135,46 +135,45 @@ private const val IMPORTANT_INFO_HEADER =
 
 private val IMPORTANT_INFO_ADDED =
     listOf(
-        "Library V2 navigation with Home/Want to Read/Collections/Reading Lists/Browse People + pagination",
-        "Series Detail V2 with richer metadata, actions, and tabs",
-        "Volume Detail V2 with chapters list and deep link from series",
-        "Continue reading now routes to the correct reader with accurate labels",
-        "Progress overlays on volumes/chapters (unread triangle + in-progress bar)",
-        "Downloads V2: per-volume/chapter actions, queue screen, and state icons",
-        "Downloads V2: swipe to download/remove with haptics",
-        "Downloads queue redesign (cards, chips, progress bars, empty states)",
-        "Offline reading improvements + “Offline data” indicator",
-        "Specials now open into per-page lists with download/reader actions",
-        "Kavita Images API key field in Settings",
-        "Mark series/volume/chapter read/unread actions",
-        "EPUB TOC page titles for Volume Detail and Specials",
-        "Important update modal shown once per version",
+        "Downloads V2: default Download API strategy for series/volume/chapter archives",
+        "Downloads V2: fallback DownloadApiStrategyV2 for unsupported formats",
+        "Downloads V2: normalized on-disk layout for series/volumes/chapters/specials",
+        "Downloads V2: image/archive chapter downloads stored as CBZ",
+        "Downloads V2: PDF downloads now show in the queue",
+        "Downloads V2: centralized download state for series/volume/chapter badges",
+        "Downloads V2: queue items show series/volume/chapter labels",
+        "Library/Browse: download badges on series covers",
+        "Settings: toggle to show/hide download badges",
+        "Settings: download stats dialog",
+        "Series Detail V2: tree view of downloaded files",
+        "Reader: offline Image/Archive reading from downloaded CBZ",
+        "Reader: basic Image/Archive reader (image pages + swipe)",
+        "Reader: image reader modes (LTR/RTL/Vertical)",
+        "Reader: PDF temp files cleaned on exit/startup unless downloaded",
+        "Series Detail V2: chapters list swipe read/unread + download",
+        "Series Detail V2: tap genre/tag to open Browse with filter",
+        "Series Detail V2: collection click opens Library V2 collection",
     )
 
 private val IMPORTANT_INFO_CHANGED =
     listOf(
-        "Completed Kavita DTOs needed for Detail V2 aggregation",
-        "Detail V2 now fetches full series payloads + related data",
-        "Reader remaining time updates on page/chapter changes (rounded to 1 decimal)",
-        "Downloads V2 respects max concurrent + retry limits",
-        "Download-all now includes volumes, chapters, specials, storyline chapters",
-        "Prefetch switches are disabled until the new pipeline lands",
-        "Verbose logging added for cache decisions, detail flows, and downloads",
-        "Download settings now use dedicated metered/low-battery preferences",
-        "Cache stale window supports minutes/hours (default 15 min)",
-        "Global HTTP timeouts increased to 30 seconds",
+        "Downloads V2: PDF items open with correct MIME type",
+        "Downloads V2: queue/completed rows wrap titles cleanly",
+        "Reader: EpubReaderViewModel/PdfReaderViewModel split into separate files",
+        "Reader: navigation jumps across chapters at edges",
+        "Reader: next chapter prompts to mark current as read when leaving early",
+        "Reader: image/archive routing preserves format id",
+        "UI: rounded corners aligned across Library/Series/Volume covers",
+        "Series Detail: legacy screen/viewmodel removed",
+        "Downloads: legacy V1 download manager/DB removed",
+        "Library: legacy screen/viewmodel and cache APIs removed",
     )
 
 private val IMPORTANT_INFO_FIXED =
     listOf(
-        "Progress/continue point refresh after returning from reader",
-        "Volume name no longer overwritten by numeric-only API values",
-        "Remaining time refreshes on page changes",
-        "Downloads V2 deduplicates pages and keeps the queue moving",
-        "Offline overlays show page/title from downloaded files",
-        "Progress sync respects Kavita timestamps",
-        "Clearing downloads removes items from the Downloaded tab",
-        "Browse thumbnail shimmer stays active per-item until load completes",
+        "Series Detail V2 cache defaults to enabled to prevent offline cache misses",
+        "History list no longer crashes due to duplicate LazyColumn keys",
+        "Bottom bar stays visible when opening Library/Browse via filters",
     )
 
 private const val FORCE_SHOW_IMPORTANT_INFO = false
@@ -324,6 +323,7 @@ fun InkitaApp(
             )
         }
         if (showImportantInfoDialog.value) {
+            val pkg = context.packageManager.getPackageInfo(context.packageName, 0)
             AlertDialog(
                 onDismissRequest = {},
                 title = { Text(text = context.getString(R.string.update_info_title)) },
@@ -344,7 +344,7 @@ fun InkitaApp(
                             )
                             Spacer(modifier = Modifier.size(12.dp))
                             Text(
-                                text = "📌 Unreleased",
+                                text = "📌 ${pkg.versionName}",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             )
                             Spacer(modifier = Modifier.size(8.dp))

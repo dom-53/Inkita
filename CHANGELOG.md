@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented here.
 
-## Unreleased
+## v0.3.1-beta
 
 ### Added
 - Downloads V2: Added default Download API strategy for series/volume/chapter archives.
