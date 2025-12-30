@@ -458,10 +458,16 @@ fun SeriesDetailScreenV2(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = stringResource(id = net.dom53.inkita.R.string.general_loading),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            CircularProgressIndicator()
+                            Text(
+                                text = stringResource(id = net.dom53.inkita.R.string.general_loading),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
                     }
                 }
 
