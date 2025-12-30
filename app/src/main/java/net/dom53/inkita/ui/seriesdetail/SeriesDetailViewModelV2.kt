@@ -43,8 +43,8 @@ class SeriesDetailViewModelV2(
         _state.update { it.copy(showLoadedToast = false) }
     }
 
-    fun reload() {
-        load()
+    fun reload(forceRefresh: Boolean = false) {
+        load(forceRefresh)
     }
 
     fun loadCollections() {
@@ -266,13 +266,14 @@ class SeriesDetailViewModelV2(
         }
     }
 
-    private fun load() {
+    private fun load(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             val offlineMode = appPreferences.offlineModeFlow.first()
             val isOnline = !offlineMode && NetworkUtils.isOnline(appPreferences.appContext)
             val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
             val staleMinutes = appPreferences.cacheStaleMinutesFlow.first()
+            val shouldRefresh = forceRefresh || alwaysRefresh
             val policy = cacheManager.policy()
             val canCache = policy.globalEnabled && policy.libraryEnabled && policy.libraryDetailsEnabled
             if (LoggingManager.isDebugEnabled()) {
@@ -309,7 +310,7 @@ class SeriesDetailViewModelV2(
                         error = null,
                     )
                 }
-                if (!isOnline || (!alwaysRefresh && !isStale)) {
+                if (!isOnline || (!shouldRefresh && !isStale)) {
                     showDebugToast(net.dom53.inkita.R.string.debug_cache_use)
                     if (LoggingManager.isDebugEnabled()) {
                         LoggingManager.d("SeriesDetailV2", "Using cached detail only (series=$seriesId)")
@@ -318,7 +319,7 @@ class SeriesDetailViewModelV2(
                     return@launch
                 }
                 val message =
-                    if (alwaysRefresh) {
+                    if (shouldRefresh) {
                         net.dom53.inkita.R.string.debug_cache_force_online
                     } else {
                         net.dom53.inkita.R.string.debug_cache_stale_reload

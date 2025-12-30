@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DownloadDone
@@ -38,6 +39,9 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -106,6 +110,7 @@ import java.io.File
 import java.util.Locale
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun SeriesDetailScreenV2(
     seriesId: Int,
@@ -186,6 +191,13 @@ fun SeriesDetailScreenV2(
         downloadDao
             .observeItemsForSeries(seriesId)
             .collectAsState(initial = emptyList())
+    val hasDetail = uiState.detail != null
+    val isRefreshing = uiState.isLoading && hasDetail
+    val pullRefreshState =
+        rememberPullRefreshState(
+            refreshing = isRefreshing,
+            onRefresh = { viewModel.reload(forceRefresh = true) },
+        )
     val downloadManagerV2 =
         remember(context.applicationContext) {
             val epubStrategy =
@@ -453,7 +465,7 @@ fun SeriesDetailScreenV2(
                 }
             }
             when {
-                uiState.isLoading -> {
+                uiState.isLoading && !hasDetail -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
@@ -471,7 +483,7 @@ fun SeriesDetailScreenV2(
                     }
                 }
 
-                uiState.error != null -> {
+                uiState.error != null && !hasDetail -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
@@ -488,13 +500,19 @@ fun SeriesDetailScreenV2(
                     val series = detail?.series
                     val metadata = detail?.metadata
                     val coverUrl = series?.id?.let { seriesCoverUrl(config, it) }
-                    Column(
+                    Box(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 16.dp)
-                                .verticalScroll(rememberScrollState()),
+                                .pullRefresh(pullRefreshState),
                     ) {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 16.dp)
+                                    .verticalScroll(rememberScrollState()),
+                        ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1346,6 +1364,11 @@ fun SeriesDetailScreenV2(
                         }
                         Spacer(modifier = Modifier.height(24.dp))
                     }
+                    PullRefreshIndicator(
+                        refreshing = isRefreshing,
+                        state = pullRefreshState,
+                        modifier = Modifier.align(Alignment.TopCenter),
+                    )
                 }
             }
         }
@@ -1769,6 +1792,8 @@ fun SeriesDetailScreenV2(
         }
     }
 }
+}
+
 
 private fun isItemPathPresent(path: String?): Boolean {
     if (path.isNullOrBlank()) return false
