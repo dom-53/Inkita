@@ -522,7 +522,12 @@ fun InkitaApp(
                     composable(MainScreen.Downloads.route) {
                         val ctx = LocalContext.current
                         val vm = remember { DownloadQueueViewModelFactory.create(ctx, cacheManager) }
-                        DownloadQueueScreen(viewModel = vm)
+                        DownloadQueueScreen(
+                            viewModel = vm,
+                            onOpenReader = { chapterId, page, sid, vid, fmt ->
+                                navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: -1}")
+                            }
+                        )
                     }
                     composable(MainScreen.Settings.route) {
                         SettingsScreen(

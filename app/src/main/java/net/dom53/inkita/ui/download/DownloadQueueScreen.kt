@@ -1,7 +1,5 @@
 package net.dom53.inkita.ui.download
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.indication
@@ -40,15 +38,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import net.dom53.inkita.R
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
-import java.io.File
+import net.dom53.inkita.domain.model.Format
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -74,7 +70,10 @@ enum class DownloadTabs {
 }
 
 @Composable
-fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
+fun DownloadQueueScreen(
+    viewModel: DownloadQueueViewModel,
+    onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit
+) {
     val tasks by viewModel.tasks.collectAsState()
     val downloaded by viewModel.downloaded.collectAsState()
     val downloadedBySeries = downloaded
@@ -146,6 +145,7 @@ fun DownloadQueueScreen(viewModel: DownloadQueueViewModel) {
                                 seriesId = downloads.first,
                                 downloads = downloads.second,
                                 lookup = lookup,
+                                onOpenReader = onOpenReader,
                                 deleteDownloaded = viewModel::deleteDownloaded
                             )
                         }
@@ -344,10 +344,10 @@ private fun DownloadedRow(
     seriesId: Int,
     downloads: List<DownloadedItemV2Entity>,
     lookup: DownloadLookup,
+    onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
     deleteDownloaded: (itemId: Long) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val context = LocalContext.current
     val interactionSource = remember { MutableInteractionSource() }
 
     ElevatedCard(
@@ -356,14 +356,18 @@ private fun DownloadedRow(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                ) { expanded = !expanded },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                    ) { expanded = !expanded },
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 val seriesLabel = lookup.seriesNames[seriesId] ?: "—"
@@ -390,28 +394,28 @@ private fun DownloadedRow(
                             item = item,
                             lookup = lookup,
                             onOpen = {
-                                val path = item.localPath ?: return@DownloadedItem
-                                val uri =
-                                    if (path.startsWith("file://") || path.startsWith("content://")) {
-                                        path.toUri()
+                                val fileType = if (item.localPath == null) {
+                                        return@DownloadedItem
+                                    } else if (item.localPath.endsWith(".epub")) {
+                                        Format.Epub
+                                    } else if (item.localPath.endsWith(".pdf")) {
+                                        Format.Pdf
+                                    } else if (item.localPath.endsWith(".jpg") || item.localPath.endsWith(".png")) {
+                                        Format.Image
+                                    } else if (item.localPath.endsWith(".cbz")) {
+                                        Format.Archive
                                     } else {
-                                        Uri.fromFile(File(path))
+                                        Format.Unknown
                                     }
-                                val mime =
-                                    if (item.type == DownloadedItemV2Entity.TYPE_FILE) {
-                                        if (path.endsWith(".pdf")) {
-                                            "application/pdf"
-                                        } else {
-                                            "application/octet-stream"
-                                        }
-                                    } else {
-                                        "text/html"
-                                    }
-                                val intent =
-                                    Intent(Intent.ACTION_VIEW)
-                                        .setDataAndType(uri, mime)
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                runCatching { context.startActivity(intent) }
+                                if (item.chapterId != null && item.seriesId != null && item.volumeId != null) {
+                                    onOpenReader(
+                                        item.chapterId,
+                                        item.page ?: 0,
+                                        item.seriesId,
+                                        item.volumeId,
+                                        fileType.ordinal
+                                    )
+                                }
                             },
                             onDelete = { deleteDownloaded(item.id) }
                         )
