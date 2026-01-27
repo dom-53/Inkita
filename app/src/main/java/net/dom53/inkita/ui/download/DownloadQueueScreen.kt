@@ -65,20 +65,23 @@ private fun formatBytes(value: Long): String {
 }
 
 enum class DownloadTabs {
-    TAB_QUEUE, TAB_COMPLETED, TAB_DOWNLOADED
+    TAB_QUEUE,
+    TAB_COMPLETED,
+    TAB_DOWNLOADED,
 }
 
 @Composable
 fun DownloadQueueScreen(
     viewModel: DownloadQueueViewModel,
-    onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit
+    onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
 ) {
     val tasks by viewModel.tasks.collectAsState()
     val downloaded by viewModel.downloaded.collectAsState()
-    val downloadedBySeries = downloaded
-        .filter{it.seriesId != null}
-        .groupBy { it.seriesId ?: 0 }
-        .map { Pair(it.key, it.value) }
+    val downloadedBySeries =
+        downloaded
+            .filter { it.seriesId != null }
+            .groupBy { it.seriesId ?: 0 }
+            .map { Pair(it.key, it.value) }
     val lookup by viewModel.lookup.collectAsState()
     var selectedTab by remember { mutableStateOf(DownloadTabs.TAB_QUEUE) }
 
@@ -137,7 +140,7 @@ fun DownloadQueueScreen(
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(0.dp, 4.dp)
+                        contentPadding = PaddingValues(0.dp, 4.dp),
                     ) {
                         items(downloadedBySeries, key = { it.first }) { downloads ->
                             DownloadedRow(
@@ -145,7 +148,7 @@ fun DownloadQueueScreen(
                                 downloads = downloads.second,
                                 lookup = lookup,
                                 onOpenReader = onOpenReader,
-                                deleteDownloaded = viewModel::deleteDownloaded
+                                deleteDownloaded = viewModel::deleteDownloaded,
                             )
                         }
                     }
@@ -174,7 +177,7 @@ fun DownloadQueueScreen(
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(0.dp, 4.dp)
+                        contentPadding = PaddingValues(0.dp, 4.dp),
                     ) {
                         items(visibleTasks, key = { it.id }) { task ->
                             TaskRow(
@@ -217,12 +220,13 @@ private fun TaskRow(
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
@@ -344,7 +348,7 @@ private fun DownloadedRow(
     downloads: List<DownloadedItemV2Entity>,
     lookup: DownloadLookup,
     onOpenReader: (chapterId: Int, page: Int, seriesId: Int, volumeId: Int, formatId: Int?) -> Unit,
-    deleteDownloaded: (itemId: Long) -> Unit
+    deleteDownloaded: (itemId: Long) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
@@ -352,22 +356,24 @@ private fun DownloadedRow(
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                    ) { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                        ) { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 val seriesLabel = lookup.seriesNames[seriesId] ?: "—"
                 Text(
@@ -375,18 +381,19 @@ private fun DownloadedRow(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Icon(
-                    modifier = Modifier.indication(
-                        interactionSource = interactionSource,
-                        indication = ripple(bounded = false)
-                    ),
+                    modifier =
+                        Modifier.indication(
+                            interactionSource = interactionSource,
+                            indication = ripple(bounded = false),
+                        ),
                     imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = stringResource(R.string.download_completed_toggle_description)
+                    contentDescription = stringResource(R.string.download_completed_toggle_description),
                 )
             }
             AnimatedVisibility(visible = expanded) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     downloads.forEach { item ->
                         DownloadedItem(
@@ -399,11 +406,11 @@ private fun DownloadedRow(
                                         item.page ?: 0,
                                         item.seriesId,
                                         item.volumeId,
-                                        item.format.ordinal
+                                        item.format.ordinal,
                                     )
                                 }
                             },
-                            onDelete = { deleteDownloaded(item.id) }
+                            onDelete = { deleteDownloaded(item.id) },
                         )
                     }
                 }
@@ -417,14 +424,14 @@ private fun DownloadedItem(
     item: DownloadedItemV2Entity,
     lookup: DownloadLookup,
     onOpen: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
 ) {
     val volumeLabel = lookup.volumeNames[item.volumeId]
     val chapterLabel = lookup.chapterTitles[item.chapterId]
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (volumeLabel != null) {

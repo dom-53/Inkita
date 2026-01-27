@@ -550,7 +550,8 @@ abstract class InkitaDatabase : RoomDatabase() {
             object : Migration(20, 21) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE download_items_v2 ADD COLUMN format TEXT")
-                    db.execSQL("""
+                    db.execSQL(
+                        """
                         UPDATE download_items_v2
                         SET format = CASE
                             WHEN localPath LIKE '%.epub' THEN 'Epub'
@@ -559,7 +560,8 @@ abstract class InkitaDatabase : RoomDatabase() {
                             WHEN localPath LIKE '%.png' OR localPath LIKE '%.jpeg' OR localPath LIKE '%.jpg' OR localPath LIKE '%.webp' OR localPath LIKE '%.gif' OR localPath LIKE '%.avif' THEN 'Image'
                             ELSE 'Unknown'
                         END
-                        """.trimIndent())
+                        """.trimIndent(),
+                    )
                 }
             }
 

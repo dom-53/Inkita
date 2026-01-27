@@ -526,7 +526,7 @@ fun InkitaApp(
                             viewModel = vm,
                             onOpenReader = { chapterId, page, sid, vid, fmt ->
                                 navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: -1}")
-                            }
+                            },
                         )
                     }
                     composable(MainScreen.Settings.route) {

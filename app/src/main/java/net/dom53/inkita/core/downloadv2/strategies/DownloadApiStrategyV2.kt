@@ -234,12 +234,11 @@ class DownloadApiStrategyV2(
     }
 }
 
-private fun translateFormatFromRequest(incomingFormat: String): Format {
-    return when(incomingFormat) {
+private fun translateFormatFromRequest(incomingFormat: String): Format =
+    when (incomingFormat) {
         PdfDownloadStrategyV2.FORMAT_PDF -> Format.Pdf
         EpubDownloadStrategyV2.FORMAT_EPUB -> Format.Epub
         ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE -> Format.Image
         ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE -> Format.Archive
         else -> Format.Unknown
     }
-}
