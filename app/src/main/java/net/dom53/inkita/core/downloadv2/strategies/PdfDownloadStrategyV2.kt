@@ -15,6 +15,7 @@ import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
+import net.dom53.inkita.domain.model.Format
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okio.buffer
@@ -83,6 +84,7 @@ class PdfDownloadStrategyV2(
                 status = DownloadedItemV2Entity.STATUS_PENDING,
                 createdAt = now,
                 updatedAt = now,
+                format = Format.Pdf,
                 error = null,
             )
         downloadDao.upsertItems(listOf(item))

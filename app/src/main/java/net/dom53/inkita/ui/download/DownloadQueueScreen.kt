@@ -44,7 +44,6 @@ import androidx.compose.ui.unit.dp
 import net.dom53.inkita.R
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
-import net.dom53.inkita.domain.model.Format
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -394,26 +393,13 @@ private fun DownloadedRow(
                             item = item,
                             lookup = lookup,
                             onOpen = {
-                                val fileType = if (item.localPath == null) {
-                                        return@DownloadedItem
-                                    } else if (item.localPath.endsWith(".epub")) {
-                                        Format.Epub
-                                    } else if (item.localPath.endsWith(".pdf")) {
-                                        Format.Pdf
-                                    } else if (item.localPath.endsWith(".jpg") || item.localPath.endsWith(".png")) {
-                                        Format.Image
-                                    } else if (item.localPath.endsWith(".cbz")) {
-                                        Format.Archive
-                                    } else {
-                                        Format.Unknown
-                                    }
-                                if (item.chapterId != null && item.seriesId != null && item.volumeId != null) {
+                                if (item.chapterId != null && item.seriesId != null && item.volumeId != null && item.format != null) {
                                     onOpenReader(
                                         item.chapterId,
                                         item.page ?: 0,
                                         item.seriesId,
                                         item.volumeId,
-                                        fileType.ordinal
+                                        item.format.ordinal
                                     )
                                 }
                             },
