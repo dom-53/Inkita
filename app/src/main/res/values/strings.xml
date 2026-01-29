@@ -488,6 +488,8 @@
     <string name="download_completed_size">Size: %1$s</string>
     <string name="download_completed_open">Open</string>
     <string name="download_completed_delete">Delete</string>
+    <string name="download_complete_series_group">%1$s (%2$d)</string>
+    <string name="download_completed_toggle_description">Toggle list of downloaded items</string>
     <!-- Download settings -->
     <string name="settings_downloads_title">Downloads</string>
     <string name="settings_downloads_allow_metered_title">Allow metered data</string>

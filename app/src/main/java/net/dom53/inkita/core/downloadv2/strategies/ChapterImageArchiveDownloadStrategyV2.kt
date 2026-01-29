@@ -15,6 +15,7 @@ import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
+import net.dom53.inkita.domain.model.Format
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okio.buffer
@@ -46,7 +47,7 @@ class ChapterImageArchiveDownloadStrategyV2(
             if (LoggingManager.isDebugEnabled()) {
                 LoggingManager.d("ArchiveDownloadV2", "Skip enqueue; already downloaded chapter=$chapterId")
             }
-            return existing.jobId ?: -1L
+            return existing.jobId
         }
         val now = System.currentTimeMillis()
         val job =
@@ -81,6 +82,7 @@ class ChapterImageArchiveDownloadStrategyV2(
                 status = DownloadedItemV2Entity.STATUS_PENDING,
                 createdAt = now,
                 updatedAt = now,
+                format = Format.Archive,
                 error = null,
             )
         downloadDao.upsertItems(listOf(item))

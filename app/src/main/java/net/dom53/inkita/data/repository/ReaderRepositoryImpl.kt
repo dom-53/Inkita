@@ -16,6 +16,7 @@ import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity
 import net.dom53.inkita.data.mapper.toDomain
 import net.dom53.inkita.data.mapper.toDto
+import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.model.ReaderBookInfo
 import net.dom53.inkita.domain.model.ReaderChapterNav
 import net.dom53.inkita.domain.model.ReaderImageResult
@@ -369,6 +370,7 @@ class ReaderRepositoryImpl(
                 status = DownloadedItemV2Entity.STATUS_COMPLETED,
                 createdAt = now,
                 updatedAt = now,
+                format = Format.Pdf,
                 error = null,
             )
         dao.upsertItems(listOf(item))
