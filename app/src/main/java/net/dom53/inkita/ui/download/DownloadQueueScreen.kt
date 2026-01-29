@@ -64,6 +64,18 @@ private fun formatBytes(value: Long): String {
     return String.format(Locale.getDefault(), "%.1f %s", v, units[idx])
 }
 
+private fun downloadedItemSort(item: DownloadedItemV2Entity): Int {
+    val epubPageNumMatch = Regex("-(?<page>[0-9]+).html$").find(item.localPath ?: "")
+    val page =
+        if (epubPageNumMatch != null) {
+            epubPageNumMatch.groups["page"]?.value?.toInt() ?: 0
+        } else {
+            0
+        }
+    val itemSortValue = (item.chapterId ?: 0) * 100000 + page // hopefully we don't have EPUBs with 100,000 pages in a chapter
+    return itemSortValue
+}
+
 enum class DownloadTabs {
     TAB_QUEUE,
     TAB_COMPLETED,
@@ -81,7 +93,7 @@ fun DownloadQueueScreen(
         downloaded
             .filter { it.seriesId != null }
             .groupBy { it.seriesId ?: 0 }
-            .map { Pair(it.key, it.value) }
+            .map { Pair(it.key, it.value.sortedBy { item -> downloadedItemSort(item) }) }
     val lookup by viewModel.lookup.collectAsState()
     var selectedTab by remember { mutableStateOf(DownloadTabs.TAB_QUEUE) }
 
@@ -243,19 +255,20 @@ private fun TaskRow(
                 )
                 DownloadStatusChip(status = task.status)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (volumeLabel != null) {
-                    Text(
-                        text = "$volumeLabel:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            val volumeAndChapter =
+                if (volumeLabel != null && chapterLabelText != null) {
+                    "$volumeLabel: $chapterLabelText"
+                } else {
+                    chapterLabelText
                 }
-                if (chapterLabelText != null) {
+            if (volumeAndChapter != null) {
+                Box(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = chapterLabelText,
+                        text = volumeAndChapter,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -379,6 +392,9 @@ private fun DownloadedRow(
                 Text(
                     stringResource(R.string.download_complete_series_group, seriesLabel, downloads.size),
                     style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Icon(
                     modifier =
@@ -433,19 +449,20 @@ private fun DownloadedItem(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (volumeLabel != null) {
-                Text(
-                    text = volumeLabel,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        val volumeAndChapter =
+            if (volumeLabel != null && chapterLabel != null) {
+                "$volumeLabel: $chapterLabel"
+            } else {
+                chapterLabel
             }
-            if (chapterLabel != null) {
+        if (volumeAndChapter != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = chapterLabel,
+                    text = volumeAndChapter,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
