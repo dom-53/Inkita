@@ -24,14 +24,14 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.LocalLibrary
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,6 +48,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -57,7 +58,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -129,10 +129,9 @@ fun LibraryV2Screen(
     )
     val showDownloadBadges by appPreferences.showDownloadBadgesFlow.collectAsState(initial = true)
     val downloadStates = uiState.downloadStates
-    val showDrawerDebug = false
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    var drawerWidthPx by remember { mutableStateOf(0) }
+    var drawerWidthPx by remember { mutableIntStateOf(0) }
     val drawerAlpha by remember(drawerState, drawerWidthPx) {
         derivedStateOf {
             val width = drawerWidthPx.toFloat()
@@ -152,7 +151,7 @@ fun LibraryV2Screen(
                     Modifier
                         .fillMaxWidth(0.75f)
                         .fillMaxHeight()
-                        .background(if (showDrawerDebug) Color.Red else Color(0xFF121212))
+                        .background(MaterialTheme.colorScheme.surface)
                         .onSizeChanged { drawerWidthPx = it.width }
                         .alpha(drawerAlpha)
                         .padding(16.dp)
@@ -188,7 +187,7 @@ fun LibraryV2Screen(
                     },
                 )
                 DrawerItem(
-                    icon = Icons.Filled.MenuBook,
+                    icon = Icons.AutoMirrored.Filled.MenuBook,
                     label = "Reading List",
                     selected = uiState.selectedSection == LibraryV2Section.ReadingList,
                     onClick = {
@@ -209,7 +208,7 @@ fun LibraryV2Screen(
                     },
                 )
                 DrawerItem(
-                    icon = Icons.Filled.LibraryBooks,
+                    icon = Icons.AutoMirrored.Filled.LibraryBooks,
                     label = "All Series",
                     onClick = {
                         android.widget.Toast
