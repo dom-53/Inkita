@@ -2,6 +2,7 @@ package net.dom53.inkita.data.local.db.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import net.dom53.inkita.domain.model.Format
 
 @Entity(tableName = "download_items_v2")
 data class DownloadedItemV2Entity(
@@ -19,6 +20,7 @@ data class DownloadedItemV2Entity(
     val status: String,
     val createdAt: Long,
     val updatedAt: Long,
+    val format: Format?,
     val error: String?,
 ) {
     companion object {

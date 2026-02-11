@@ -13,6 +13,7 @@ import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
+import net.dom53.inkita.domain.model.Format
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okio.buffer
@@ -49,7 +50,7 @@ class DownloadApiStrategyV2(
             if (LoggingManager.isDebugEnabled()) {
                 LoggingManager.d("DownloadApiV2", "Skip enqueue; already downloaded ${request.type}=$endpoint")
             }
-            return existing.jobId ?: -1L
+            return existing.jobId
         }
         val job =
             DownloadJobV2Entity(
@@ -83,6 +84,7 @@ class DownloadApiStrategyV2(
                 status = DownloadedItemV2Entity.STATUS_PENDING,
                 createdAt = now,
                 updatedAt = now,
+                format = translateFormatFromRequest(request.format),
                 error = null,
             )
         downloadDao.upsertItems(listOf(item))
@@ -231,3 +233,12 @@ class DownloadApiStrategyV2(
         const val FORMAT_DOWNLOAD = "download"
     }
 }
+
+private fun translateFormatFromRequest(incomingFormat: String): Format =
+    when (incomingFormat) {
+        PdfDownloadStrategyV2.FORMAT_PDF -> Format.Pdf
+        EpubDownloadStrategyV2.FORMAT_EPUB -> Format.Epub
+        ChapterImageArchiveDownloadStrategyV2.FORMAT_IMAGE -> Format.Image
+        ChapterImageArchiveDownloadStrategyV2.FORMAT_ARCHIVE -> Format.Archive
+        else -> Format.Unknown
+    }
