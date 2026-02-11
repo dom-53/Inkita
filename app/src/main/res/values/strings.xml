@@ -165,6 +165,8 @@
     <string name="general_language_label">Language</string>
     <string name="general_language_en">English</string>
     <string name="general_language_cs">Czech</string>
+    <string name="general_language_ko">Korean</string>
+    <string name="general_language_zh">Chinese</string>
     <string name="general_title">General</string>
     <string name="settings_cache_section_title">Cache</string>
     <string name="settings_cache_global_title">Enable cache</string>

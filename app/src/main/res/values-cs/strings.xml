@@ -110,6 +110,8 @@
     <string name="general_language_label">Jazyk</string>
     <string name="general_language_en">Angličtina</string>
     <string name="general_language_cs">Čeština</string>
+    <string name="general_language_ko">Korejština</string>
+    <string name="general_language_zh">Čínština</string>
     <string name="general_title">Obecné</string>
     <string name="settings_general_offline_mode_title">Offline režim</string>
     <string name="settings_general_offline_mode_subtitle">Přinutit aplikaci chovat se jako offline (přeskočit síťové požadavky/práci), i když je dostupné připojení.</string>
