@@ -1,0 +1,535 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Inkita</string>
+    <string name="general_back">뒤로</string>
+    <string name="will_be_implemented">이 섹션은 구현 예정입니다.</string>
+    <string name="general_error">오류</string>
+    <string name="general_empty_collection">이 컬렉션에는 시리즈가 없습니다.</string>
+    <string name="general_want_to_read">읽고 싶어요</string>
+    <string name="library_in_progress">읽는 중</string>
+    <string name="library_empty_in_progress">읽는 중인 시리즈가 없습니다</string>
+    <string name="library_prefetch_running">세부 항목 캐시중…</string>
+    <string name="library_prefetch_done">세부 항목 캐시 완료</string>
+    <string name="library_prefetch_title">오프라인 데이터 캐시중</string>
+    <string name="library_prefetch_progress">%1$d / %2$d 캐시중</string>
+    <string name="general_reading_status_completed">완료</string>
+    <string name="general_reading_status_in_progress">읽는 중</string>
+    <string name="general_reading_status_unread">읽지 않음</string>
+    <string name="general_option_soon">테마 옵션은 곧 제공될 예정입니다</string>
+    <string name="general_nav_option_soon">탐색 옵션은 곧 제공될 예정입니다</string>
+    <string name="general_decrease">감소</string>
+    <string name="general_increase">증가</string>
+    <string name="general_page">페이지</string>
+
+    <!-- Todo: Plural -->
+    <string name="general_prev">이전</string>
+    <string name="general_next">다음</string>
+    <string name="general_server_or_api_key_not_set">서버 또는 API 키가 설정되지 않았습니다.</string>
+    <string name="general_today">오늘</string>
+    <string name="general_yesterday">어제</string>
+    <string name="general_unknown_date">날짜 불명</string>
+    <string name="general_detail">세부</string>
+    <string name="general_url_not_available">유효하지 않은 URL입니다.</string>
+    <string name="general_series">시리즈</string>
+    <string name="general_unable_to_share">공유할 수 없습니다.</string>
+    <string name="general_completed">완료</string>
+    <string name="general_start_reading">읽기 시작</string>
+    <string name="general_continue_reading">계속 읽기</string>
+    <string name="general_cancel">취소</string>
+    <string name="general_no_server_logged_in">로그인된 서버가 없습니다.</string>
+    <string name="general_collections">컬렉션</string>
+    <string name="general_copied_to_clipboard">클립보드로 복사</string>
+    <string name="general_create_new_coll">새 컬렉션 생성</string>
+    <string name="general_coll_name">컬렉션 이름</string>
+    <string name="general_create_and_add">생성 및 추가</string>
+    <string name="general_offline">오프라인</string>
+    <string name="general_close">닫기</string>
+    <string name="general_author">저자</string>
+    <string name="general_authors">저자</string>
+    <string name="general_publication">출판</string>
+    <string name="general_state">상태</string>
+    <string name="general_reading_time">읽기 시간</string>
+    <string name="general_remaining_time">남은 시간</string>
+    <string name="general_open_in_browser">브라우저에서 열기</string>
+    <string name="general_share">공유</string>
+    <string name="general_filter">필터</string>
+    <string name="general_chapters">챕터</string>
+    <string name="general_related">연관</string>
+    <string name="general_mark_unread">읽지 않음으로 표시</string>
+    <string name="general_mark_read">읽음으로 표시</string>
+    <string name="general_less">이하</string>
+
+    <!-- méně -->
+    <string name="general_more">이상</string>
+
+    <!-- více -->
+    <string name="general_tags">태크</string>
+
+    <!-- Publication statuses -->
+    <string name="general_pub_status_cancelled">취소됨</string>
+    <string name="general_pub_status_completed">완료됨</string>
+    <string name="general_pub_status_ended">완결</string>
+    <string name="general_pub_status_hiatus">휴재</string>
+    <string name="general_pub_status_ongoing">연재중</string>
+
+    <!-- Age ratings -->
+    <string name="general_age_rating_unknown">불명</string>
+    <string name="general_age_rating_rating_pending">등급 심사중</string>
+    <string name="general_age_rating_early_childhood">유아</string>
+    <string name="general_age_rating_everyone">전체</string>
+    <string name="general_age_rating_g">G</string>
+    <string name="general_age_rating_everyone_10p">10+</string>
+    <string name="general_age_rating_pg">PG</string>
+    <string name="general_age_rating_kids_to_adults">Kids to Adults</string>
+    <string name="general_age_rating_teen">Teen</string>
+    <string name="general_age_rating_ma15p">MA15+</string>
+    <string name="general_age_rating_m17p">Mature 17+</string>
+    <string name="general_age_rating_m">M</string>
+    <string name="general_age_rating_r18p">R18+</string>
+    <string name="general_age_rating_adults_only_18p">Adults Only 18+</string>
+    <string name="general_age_rating_x18p">X18+</string>
+    <string name="general_no_results">결과 없음</string>
+    <string name="general_search">검색</string>
+    <string name="general_combination">조합</string>
+    <string name="general_min">최소</string>
+    <string name="general_max">최대</string>
+    <string name="general_genres">장르</string>
+    <string name="general_languages">언어</string>
+    <string name="general_publication_status">출판 상태</string>
+    <string name="general_libraries">라이브러리</string>
+    <string name="general_none">없음</string>
+    <string name="general_reset">리셋</string>
+    <string name="general_any">모든</string>
+    <string name="general_pages">페이지</string>
+    <string name="general_words">단어</string>
+    <string name="general_time">시간</string>
+    <string name="general_weekly">주간</string>
+
+    <!-- Languages -->
+    <string name="general_language_system">시스템</string>
+    <string name="general_language_label">언어</string>
+    <string name="general_language_en">영어</string>
+    <string name="general_language_cs">체코어</string>
+    <string name="general_title">일반</string>
+    <string name="settings_cache_section_title">캐시</string>
+    <string name="settings_cache_global_title">캐시 활성화</string>
+    <string name="settings_cache_global_subtitle">오프라인 상태에서 캐시 데이터를 사용하고 온라인일 때 새로고침합니다.</string>
+    <string name="settings_cache_library_title">오프라인용으로 라이브러리 캐시</string>
+    <string name="settings_cache_library_subtitle">캐시된 데이터를 오프라인 상태에서 표시하고 백그라운드에서 새로고침합니다.</string>
+    <string name="settings_cache_browse_title">캐시 탐색 결과</string>
+    <string name="settings_cache_browse_subtitle">온라인 상태일 때 캐시된 검색 결과를 더 빠르게 불러옵니다.</string>
+    <string name="settings_cache_refresh_label">캐시 새로고침 창 (%1$s)</string>
+    <string name="settings_cache_refresh_hint">0 = 항상 즉시 새로고침</string>
+    <string name="settings_units_minutes">분</string>
+    <string name="settings_units_hours">시간</string>
+    <string name="settings_cache_prefetch_inprogress_title">읽는 중 목록 미리 불러오기</string>
+    <string name="settings_cache_prefetch_inprogress_subtitle">앱을 시작할 때 읽는 중인 시리즈를 자동으로 캐시합니다.</string>
+    <string name="settings_cache_prefetch_want_title">읽고 싶어요 목록 미리 불러오기</string>
+    <string name="settings_cache_prefetch_want_subtitle">앱을 시작할 때 읽고 싶어요 시리즈 목록을 자동으로 캐시합니다.</string>
+    <string name="settings_cache_prefetch_collections_title">컬렉션 미리 불러오기</string>
+    <string name="settings_cache_prefetch_collections_subtitle">앱을 시작할 때 모든 동적 컬렉션을 자동으로 캐시합니다.</string>
+    <string name="settings_cache_prefetch_collections_scope_title">미리 불러올 컬렉션</string>
+    <string name="settings_cache_prefetch_collections_all">모든 컬렉션</string>
+    <string name="settings_cache_prefetch_collections_selected">선택된 컬렉션</string>
+    <string name="settings_cache_prefetch_collections_selected_hint">앱을 시작할 때 체크된 컬렉션만 캐시합니다.</string>
+    <string name="settings_cache_prefetch_collections_empty">이용 가능한 컬렉션이 없습니다.</string>
+    <string name="settings_cache_prefetch_details_title">세부 정보 미리 불러오기</string>
+    <string name="settings_cache_prefetch_details_subtitle">앱을 시작할 때 시리즈 세부 정보(권/챕터)를 자동으로 캐시합니다.</string>
+    <string name="settings_prefetch_allow_metered_title">모바일 데이터 허용</string>
+    <string name="settings_prefetch_allow_metered_subtitle">과금 네트워크(모바일 데이터)에서 미리 불러오기를 활성화합니다.</string>
+    <string name="settings_prefetch_allow_low_battery_title">배터리 부족 시 허용</string>
+    <string name="settings_prefetch_allow_low_battery_subtitle">배터리가 부족할 때에도 미리 불러오기를 활성화합니다.</string>
+    <string name="settings_cache_clear_title">캐시를 삭제하시겠습니까?</string>
+    <string name="settings_cache_clear_message">제거할 항목을 선택하십시오.</string>
+    <string name="settings_cache_clear_confirm">삭제</string>
+    <string name="settings_cache_clear_all">모두 (DB + 썸네일)</string>
+    <string name="settings_cache_clear_db">데이터베이스만</string>
+    <string name="settings_cache_clear_details">세부 정보 / 권 / 챕터 정보만</string>
+    <string name="settings_cache_clear_thumbnails">썸네일만</string>
+    <string name="settings_cache_cleared_toast">캐시 삭제됨</string>
+    <string name="settings_cache_size_label">캐시 크기: %1$s</string>
+    <string name="settings_cache_stats_button">캐시 통계 보기</string>
+    <string name="settings_cache_stats_title">캐시 통계</string>
+    <string name="reader_offline_indicator">오프라인에서 읽기</string>
+    <string name="reader_page_not_downloaded">이 페이지는 다운로드되지 않았습니다</string>
+    <string name="series_detail_specials">특별호</string>
+    <string name="series_detail_no_specials">특별호가 없습니다.</string>
+
+    <!-- Browse -->
+    <string name="browse_filter_match_all">모두 일치</string>
+    <string name="browse_filter_match_any">하나라도 일치</string>
+    <string name="browse_filter_sort_name">이름</string>
+    <string name="browse_filter_sort_by">정렬 기준</string>
+    <string name="browse_filter_sort_created">생성됨</string>
+    <string name="browse_filter_sort_last_modified">마지막 수정</string>
+    <string name="browse_filter_sort_item_added">항목 추가</string>
+    <string name="browse_filter_sort_time_to_read">독서 시간</string>
+    <string name="browse_filter_sort_release_year">발매 연도</string>
+    <string name="browse_filter_sort_last_read">마지막으로 읽음</string>
+    <string name="browse_filter_sort_avg_rating">평균 평점</string>
+    <string name="browse_filter_sort_random">무작위</string>
+    <string name="browse_filter_status">상태</string>
+    <string name="browse_filter_release_year">발매 연도</string>
+    <string name="browse_filter_age_rating">연령 등급</string>
+    <string name="browse_filter_special_list">스페셜 목록</string>
+    <string name="browse_filter_filter_no_others">이 필터들은 다른 필터와 함께 조합할 수 없습니다.</string>
+    <string name="browse_filter_smart_filters">스마트 필터</string>
+
+    <!-- History screen -->
+    <string name="history_no_history">아직 히스토리가 없습니다.</string>
+
+    <!-- ibrary Screen -->
+    <string name="library_empty_want_to_read">\'읽고 싶어요\'로 표시된 책이 없습니다.</string>
+
+    <!-- Reader screen -->
+    <string name="reader_title">리더</string>
+    <string name="reader_no_previous_chapter">이전 챕터 없음</string>
+    <string name="reader_no_next_chapter">마지막 권</string>
+    <string name="reader_time_left">남은 시간</string>
+    <string name="reader_prev_chapter">이전 챕터</string>
+    <string name="reader_jump_to_start">처음으로</string>
+    <string name="reader_prev_page">이전 페이지</string>
+    <string name="reader_reader_settings">리더 설정</string>
+    <string name="reader_next_page">다음 페이지</string>
+    <string name="reader_jump_to_end">마지막으로</string>
+    <string name="reader_next_chapter">다음 챕터</string>
+    <string name="reader_font_selection">글꼴 선택</string>
+    <string name="reader_text_settings">텍스트 설정</string>
+    <string name="reader_font_size">글꼴 크기</string>
+    <string name="reader_line_height">줄 간격</string>
+    <string name="reader_padding">여백</string>
+    <string name="reader_alignment">정렬</string>
+    <string name="reader_font_family">글꼴 패밀리</string>
+    <string name="reader_theme_header">리더 테마</string>
+    <string name="reader_theme_day">낮</string>
+    <string name="reader_theme_night">밤</string>
+    <string name="reader_theme_night_high_contrast">밤 (고대비)</string>
+    <string name="reader_theme_sepia">세피아</string>
+    <string name="reader_theme_sepia_high_contrast">세피아 (고대비)</string>
+    <string name="reader_theme_gray">그레이</string>
+
+    <!-- Series detail -->
+    <string name="series_detail_detail">세부 정보</string>
+    <string name="series_detail_share_series">시리즈 공유</string>
+    <string name="series_detail_chapter_not_available">해당 챕터는 읽을 수 없습니다.</string>
+    <string name="series_detail_start_over_question">처음부터 읽으시겠습니까?</string>
+    <string name="series_detail_reset_and_start_again">읽기 진행상황을 초기화하고 처음부터 시작합니다.</string>
+    <string name="series_detail_reset_progress">진행상황 초기화</string>
+    <string name="series_detail_no_related_items">연관 항목 없음.</string>
+    <string name="series_detail_no_related">연관 항목 없음.</string>
+    <string name="series_detail_mark_prev_q">이전 권을 읽은 것으로 표시하시겠습니까?</string>
+    <string name="series_detail_mark_read_this_and_prev">%1$s 권이 읽은 것으로 표시됩니다. 이전에 읽지 않은 권도 읽은 상태로 표시하시겠습니까?</string>
+    <string name="series_detail_mark_with_prev">이전 권도 표시</string>
+    <string name="series_detail_only_this_vol">이 권만</string>
+    <string name="series_detail_mark_this_and_later">%1$s 권이 읽지 않음으로 표시됩니다. 이후에 읽은 권도 읽지 않음으로 표시하시겠습니까?</string>
+    <string name="series_detail_mark_all">모두 표시</string>
+    <string name="series_detail_mark_this_vol">이 권만</string>
+    <string name="series_detail_prev_unread_mark_read_too_q">이전 권을 읽지 않았습니다. 읽은 것으로 표시하시겠습니까, 또는 이 페이지만 설정하시겠습니까?</string>
+    <string name="series_detail_mark_prev_and_continue">이전 권에 표시하고 계속하기</string>
+    <string name="series_detail_only_this_page">이 페이지만</string>
+    <string name="series_detail_mark_later_vol_unr_q">이후 권을 읽지 않음으로 표시하시겠습니까?</string>
+    <string name="series_detail_mark_unred_vol_and_later_too_q">이후 권은 읽은 것으로 표시되었습니다. 읽지 않음으로 표시하시겠습니까, 또는 이 권만 변경하시겠습니까?</string>
+    <string name="series_detail_scroll_top">맨 위로 스크롤</string>
+    <string name="series_detail_no_colls_reload">컬렉션 없음. 새로고침.</string>
+    <string name="series_detail_load_colls">컬렉션 불러오기</string>
+    <string name="series_detail_resume_page">재개: 페이지</string>
+    <string name="series_detail_ch_loading_err">챕터를 불러올 수 없습니다(해당 권에 해당하는 책이 없습니다).</string>
+
+    <!-- Settings -->
+    <string name="settings_title">설정</string>
+    <string name="settings_item_general">일반</string>
+    <string name="settings_item_appearance">외형</string>
+    <string name="settings_item_reader">리더</string>
+    <string name="settings_item_downloads">다운로드</string>
+    <string name="settings_item_security">보안</string>
+    <string name="settings_item_kavita">Kavita</string>
+    <string name="settings_item_advanced">고급</string>
+    <string name="settings_item_stats">내 통계</string>
+    <string name="settings_item_about">앱 정보</string>
+
+    <!-- Kavita -->
+    <string name="settings_kavita_server">Kavita 서버 URL</string>
+    <string name="settings_kavita_use_https">HTTPS 사용</string>
+    <string name="settings_kavita_api_key">API 키</string>
+    <string name="settings_kavita_status_in">상태: 설정됨 (API 키 저장됨)</string>
+    <string name="settings_kavita_status_out">상태: 설정되지 않음</string>
+    <string name="settings_kavita_button_login">저장</string>
+    <string name="settings_kavita_logout">로그아웃</string>
+    <string name="settings_kavita_logged_out">설정이 초기화되었습니다.</string>
+    <string name="settings_kavita_http_warning_title">HTTP를 사용하시겠습니까?</string>
+    <string name="settings_kavita_http_warning_body">HTTP는 암호화되지 않습니다. 신뢰할 수 있는 로컬 네트워크에서만 사용하십시오. 계속하시겠습니까?</string>
+    <string name="settings_kavita_http_warning_confirm">HTTP로 계속</string>
+    <string name="settings_kavita_http_warning_cancel">취소</string>
+
+    <!-- About Inkita -->
+    <string name="settings_about_version">버전</string>
+    <string name="settings_about_build_time">빌드 시간</string>
+    <string name="settings_about_label_whats_new">새로운 소식</string>
+    <string name="settings_about_changelog_title">이 버전의 새로운 소식</string>
+    <string name="settings_about_changelog_desc">변경사항</string>
+    <string name="settings_about_check_updates">업데이트 확인</string>
+    <string name="settings_about_label_community">커뮤니티</string>
+    <string name="settings_about_label_contribute">기여</string>
+    <string name="settings_about_help_transalate">번역을 도와주세요</string>
+    <string name="settings_about_kofi">Ko-fi에서 지원하기</string>
+
+    <!-- About Inkita -->
+    <string name="settings_about_osl">오픈 소스 라이선스</string>
+    <string name="settings_about_osl_3rd">제3자 라이브러리</string>
+    <string name="settings_about_license">라이선스</string>
+    <string name="settings_about_update_available">업데이트 가능: %1$s</string>
+    <string name="settings_about_up_to_date">최신 버전입니다</string>
+    <string name="settings_about_update_failed">업데이트를 확인할 수 없습니다</string>
+    <string name="settings_about_update_downloading">업데이트 다운로드 중…</string>
+    <string name="settings_about_update_prompt">새 버전이 출시되었습니다. 지금 다운로드하여 설치하시겠습니까?</string>
+    <string name="settings_about_update_confirm">다운로드</string>
+
+    <!-- Others -->
+    <string name="settings_about_title">Inkita에 대하여</string>
+    <string name="settings_about_website">Kavita 웹사이트</string>
+    <string name="settings_kavita_login_toast">URL과 API 키를 입력하십시오.</string>
+    <string name="settings_appearance_by_system">시스템 설정</string>
+    <string name="settings_appearance_dark">다크</string>
+    <string name="settings_appearance_light">라이트</string>
+
+    <!-- Stats -->
+    <string name="stats_failed_stat_load">통계 데이터를 불러오지 못했습니다.</string>
+    <string name="stats_reading_sum">요약 읽기</string>
+    <string name="stats_activity_last_30d">활동 (최근 30일)</string>
+
+    <!-- Update -->
+    <string name="update_notification_title">업데이트 가능: %1$s</string>
+    <string name="update_notification_text">탭하여 최신 버전을 다운로드합니다.</string>
+    <string name="update_checking_title">업데이트 확인 중…</string>
+    <string name="update_checking_text">새 Inkita 빌드를 찾고 있습니다.</string>
+    <string name="notifications_prompt_title">알림 활성화</string>
+    <string name="notifications_prompt_body">업데이트 및 다운로드 알림을 받으려면 알림을 허용해 주십시오.</string>
+    <string name="notifications_prompt_accept">활성화</string>
+    <string name="notifications_prompt_dismiss">나중에</string>
+    <string name="general_queue">대기열</string>
+    <string name="general_downloaded">다운로드됨</string>
+    <string name="general_unknown_error">알려지지 않은 오류</string>
+    <string name="settings_kavita_saved_toast">설정이 저장되었습니다. 앱을 다시 시작해 주십시오.</string>
+    <string name="settings_kavita_save_failed">저장 실패: %1$s</string>
+    <string name="stats_pages_per_year">연간 읽은 페이지</string>
+    <string name="stats_words_per_year">연간 읽은 단어</string>
+
+    <!-- Series detail actions -->
+    <string name="series_download_all">모두 다운로드</string>
+    <string name="series_download_missing">누락된 파일 다운로드</string>
+    <string name="series_clear_downloads">다운로드 기록 삭제</string>
+    <string name="series_open_download_queue">다운로드 대기열</string>
+
+    <!-- Advanced settings -->
+    <string name="advanced_clear_cache">캐시 삭제</string>
+    <string name="advanced_downloaded_pages">다운로드된 페이지</string>
+    <string name="advanced_cache_stats_series">시리즈: %1$d</string>
+    <string name="advanced_cache_stats_tabs">탭 참조: %1$d</string>
+    <string name="advanced_cache_stats_browse">탐색 참조: %1$d</string>
+    <string name="advanced_cache_stats_details">세부 항목: %1$d</string>
+    <string name="advanced_cache_stats_volumes">권: %1$d</string>
+    <string name="advanced_cache_stats_chapters">챕터: %1$d</string>
+    <string name="advanced_cache_stats_db_size">DB 크기: %1$s</string>
+    <string name="advanced_cache_stats_thumbnails">썸네일: %1$s</string>
+    <string name="advanced_cache_stats_last_library">마지막 라이브러리 새로고침: %1$s</string>
+    <string name="advanced_cache_stats_last_browse">마지막 탐색 새로고침: %1$s</string>
+    <string name="advanced_cache_clear_downloaded_pages">다운로드된 페이지</string>
+
+    <!-- Appearance settings -->
+    <string name="settings_appearance_title">외형</string>
+
+    <!-- Downloads queue -->
+    <string name="download_screen_title">다운로드</string>
+    <string name="download_clear_completed">완료된 항목 삭제</string>
+    <string name="download_type_volume">권</string>
+    <string name="download_item_title">시리즈 %1$s · %2$s</string>
+    <string name="download_item_chapter_pages">챕터 %1$s 페이지 %2$s..%3$s</string>
+    <string name="download_item_state">상태: %1$s</string>
+    <string name="download_item_created">생성됨: %1$s</string>
+    <string name="download_item_updated">업데이트됨: %1$s</string>
+    <string name="download_item_progress">진행중: %1$d/%2$d (%3$d%%)</string>
+    <string name="download_item_bytes">바이트: %1$s / %2$s (%3$d%%)</string>
+    <string name="download_item_error">오류: %1$s</string>
+    <string name="download_action_pause">일시정지</string>
+    <string name="download_action_resume">다시 시작</string>
+    <string name="download_action_retry">다시 시도</string>
+    <string name="download_action_clear">기록 삭제</string>
+    <string name="download_completed_title">%1$s 시리즈 · %2$s 챕터 · %3$s 페이지</string>
+    <string name="download_completed_status">상태: %1$s</string>
+    <string name="download_completed_updated">업데이트됨: %1$s</string>
+    <string name="download_completed_size">크기: %1$s</string>
+    <string name="download_completed_open">열기</string>
+    <string name="download_completed_delete">삭제</string>
+
+    <!-- Download settings -->
+    <string name="settings_downloads_title">다운로드</string>
+    <string name="settings_downloads_allow_metered_title">모바일 데이터 사용</string>
+    <string name="settings_downloads_allow_metered_subtitle">모바일 데이터로 다운로드를 허용합니다. 비활성화할 경우, 다운로드에 Wi-Fi가 필요합니다.</string>
+    <string name="settings_downloads_allow_low_battery_title">배터리가 부족할 때 허용</string>
+    <string name="settings_downloads_allow_low_battery_subtitle">비활성화할 경우, 배터리가 부족하지 않을 때까지 다운로드를 보류합니다.</string>
+    <string name="settings_downloads_prefer_offline_title">오프라인 페이지 선호</string>
+    <string name="settings_downloads_prefer_offline_subtitle">활성화할 경우, 온라인 상태에서도 다운로드된 페이지를 사용합니다.</string>
+    <string name="settings_downloads_delete_after_section">읽은 후 삭제</string>
+    <string name="settings_downloads_delete_after_mark_title">읽음 표시 항목 삭제</string>
+    <string name="settings_downloads_delete_after_mark_subtitle">항목을 읽음으로 표시한 후 다운로드된 항목을 자동으로 삭제합니다.</string>
+    <string name="settings_downloads_keep_recent_title">최근 다운로드된 페이지 보관</string>
+    <string name="settings_downloads_keep_recent_subtitle">다운로드된 페이지를 몇 개나 기기에 유지할지 결정합니다. 초과할 경우 오래된 것부터 삭제합니다.</string>
+    <string name="settings_downloads_auto_retry_title">자동으로 재시도</string>
+    <string name="settings_downloads_auto_retry_subtitle">실패한 다운로드를 자동으로 재시도합니다.</string>
+    <string name="settings_downloads_max_retry_title">최대 재시도 횟수</string>
+    <string name="settings_downloads_max_retry_subtitle">작업 실패로 처리하기 전까지 시도할 총 횟수.</string>
+    <string name="settings_downloads_limits_note">이 제한은 다운로드 및 미리 불러오기 작업에 적용됩니다.</string>
+    <string name="settings_downloads_clear_downloaded">다운로드한 페이지 삭제</string>
+    <string name="settings_downloads_clear_downloaded_confirm_title">다운로드한 페이지 삭제</string>
+    <string name="settings_downloads_clear_downloaded_confirm_text">다운로드한 모든 HTML 페이지 및 에셋을 기기 저장소에서 삭제하시겠습니까?</string>
+    <string name="settings_downloads_clear_downloaded_toast">다운로드한 페이지 삭제됨</string>
+    <string name="settings_downloads_clear">삭제</string>
+    <string name="settings_downloads_cancel">취소</string>
+    <string name="settings_downloads_max_concurrent_title">최대 동시 다운로드 수</string>
+    <string name="settings_downloads_max_concurrent_subtitle">동시에 실행되는 페이지 다운로드 수를 제한합니다 (1-6).</string>
+    <string name="settings_downloads_selection_placeholder">선택</string>
+    <string name="settings_downloads_delete_after_option">%1$s 읽은 후</string>
+
+    <!-- General settings -->
+    <string name="settings_general_offline_mode_title">오프라인 모드</string>
+    <string name="settings_general_offline_mode_subtitle">연결이 활성화되어도 앱을 오프라인 상태로 강제합니다 (네트워크 호출/작업 생략).</string>
+
+    <!-- History -->
+    <string name="history_error_http">HTTP %1$d</string>
+    <string name="history_no_cover">표지 없음</string>
+    <string name="history_entries_count">항목: %1$d</string>
+    <string name="history_chapter_range">챕터. %1$s–%2$s</string>
+    <string name="history_chapter_single">챕터. %1$s</string>
+    <string name="general_clear">삭제</string>
+    <string name="settings_browse_page_size_title">탐색할 페이지 크기</string>
+    <string name="settings_browse_page_size_subtitle">탐색/검색 시 페이지당 불러올 항목 수. 느린 연결 환경에서는 낮은 값으로 설정하십시오.</string>
+    <string name="settings_browse_thumb_parallel_title">최대 썸네일 동시 처리 수</string>
+    <string name="settings_browse_thumb_parallel_subtitle">썸네일 동시 다운로드 수를 제한하여 네트워크 트래픽 급증을 완화합니다.</string>
+    <string name="settings_about_kavita_version">Kavita로 테스트됨</string>
+    <string name="advanced_logs_title">로그</string>
+    <string name="advanced_logs_export">로그 공유</string>
+    <string name="advanced_logs_save">로그 저장</string>
+    <string name="advanced_logs_clear">로그 삭제</string>
+    <string name="advanced_logs_share_chooser">로그 공유</string>
+    <string name="advanced_logs_none">내보낼 로그 없음</string>
+    <string name="advanced_logs_export_failed">내보내기 실패</string>
+    <string name="advanced_logs_cleared">로그 삭제됨</string>
+    <string name="advanced_logs_saved">%1$s에 저장됨</string>
+    <string name="advanced_logs_verbose_title">상세 로깅</string>
+    <string name="advanced_logs_verbose_subtitle">디버깅을 위해 공유할 상세 진단 로그를 작성합니다. 디스크 사용량이 우려될 경우 활성화하지 마십시오.</string>
+    <string name="general_loading">불러오는 중…</string>
+    <string name="general_not_implemented">미구현</string>
+    <string name="general_offline_mode">오프라인 모드</string>
+    <string name="series_detail_missing_library_id">누락된 라이브러리 id</string>
+    <string name="series_detail_series_fallback">%1$d 시리즈</string>
+    <string name="series_detail_collection_fallback">%1$d 컬렉션</string>
+    <string name="series_detail_volume_fallback">%1$d 권</string>
+    <string name="series_detail_vol_short">%1$s 권</string>
+    <string name="series_detail_vol_short_plain">권</string>
+    <string name="series_detail_continue_vol_ch">%1$s권 %2$d페이지에서 계속</string>
+    <string name="series_detail_continue_ch">%1$d페이지에서 계속</string>
+    <string name="series_detail_start_reading">읽기 시작</string>
+    <string name="series_detail_chapter_fallback">%1$d 챕터</string>
+    <string name="series_detail_pages_unavailable">페이지를 사용할 수 없습니다.</string>
+    <string name="series_detail_download_volume_title">해당 권 다운로드</string>
+    <string name="series_detail_download_volume_body">%1$s(을)를 다운로드하시겠습니까?</string>
+    <string name="series_detail_download_volume_confirm">다운로드</string>
+    <string name="series_detail_resume_volume_title">계속해서 다운로드</string>
+    <string name="series_detail_resume_volume_body">%1$s(을)를 계속해서 다운로드하시겠습니까?</string>
+    <string name="series_detail_resume_volume_confirm">계속</string>
+    <string name="series_detail_remove_volume_title">다운로드 제거</string>
+    <string name="series_detail_remove_volume_body">%1$s 다운로드를 제거하시겠습니까?</string>
+    <string name="series_detail_remove_volume_confirm">제거</string>
+    <string name="series_detail_download_chapter_title">해당 챕터 다운로드</string>
+    <string name="series_detail_download_chapter_body">%1$s(을)를 다운로드하시겠습니까?</string>
+    <string name="series_detail_download_chapter_confirm">다운로드</string>
+    <string name="series_detail_resume_chapter_title">계속해서 다운로드</string>
+    <string name="series_detail_resume_chapter_body">%1$s(을)를 계속해서 다운로드하시겠습니까?</string>
+    <string name="series_detail_resume_chapter_confirm">계속</string>
+    <string name="series_detail_remove_chapter_title">다운로드 제거</string>
+    <string name="series_detail_remove_chapter_body">%1$s 다운로드를 제거하시겠습니까?</string>
+    <string name="series_detail_remove_chapter_confirm">제거</string>
+    <string name="download_queued">대기열 항목 다운로드</string>
+    <string name="series_detail_author_label">저자: %1$s</string>
+    <string name="series_detail_publication_label">출판: %1$s</string>
+    <string name="series_detail_release_year_label">발매 연도: %1$s</string>
+    <string name="series_detail_avg_time_label">평균 시간: %1$s / %2$s</string>
+    <string name="series_detail_status_label">상태: %1$s</string>
+    <string name="series_detail_last_read_label">마지막 열람: %1$s</string>
+    <string name="series_detail_last_update_label">마지막 업데이트: %1$s</string>
+    <string name="series_detail_related_sequels">속편</string>
+    <string name="series_detail_related_prequels">프리퀄</string>
+    <string name="series_detail_related_spin_offs">스핀오프</string>
+    <string name="series_detail_related_adaptations">개작</string>
+    <string name="series_detail_related_side_stories">사이트 스토리</string>
+    <string name="series_detail_related_characters">챕터</string>
+    <string name="series_detail_related_contains">포함</string>
+    <string name="series_detail_related_others">기타</string>
+    <string name="series_detail_related_alternative_settings">대체 설정</string>
+    <string name="series_detail_related_alternative_versions">대체 버전</string>
+    <string name="series_detail_related_doujinshis">동인지</string>
+    <string name="series_detail_related_parent">원작</string>
+    <string name="series_detail_related_editions">에디션</string>
+    <string name="series_detail_related_annuals">연례 특집</string>
+    <string name="volume_detail_not_found">해당하는 권을 찾을 수 없습니다</string>
+    <string name="volume_detail_time_label">시간: %1$s</string>
+    <string name="volume_detail_release_year_label">발매 연도: %1$s</string>
+    <string name="volume_detail_re_read">다시 읽기</string>
+    <string name="volume_detail_start_reading">읽기 시작 %1$s</string>
+    <string name="volume_detail_continue_label">계속 읽기 %1$s 페이지 %2$d</string>
+    <string name="settings_browse_thumbnails_off_title">썸네일 탐색 비활성화</string>
+    <string name="settings_browse_thumbnails_off_subtitle">탐색에서 텍스트로만 결과를 표시해 데이터를 절약합니다.</string>
+    <string name="library_empty_reading_list">읽기 목록 없음.</string>
+    <string name="download_empty_queue">다운로드 대기열 없음.</string>
+    <string name="download_empty_completed">완료된 다운로드 없음.</string>
+    <string name="download_empty_downloaded">다운로드한 페이지 없음.</string>
+    <string name="update_info_title">중요 업데이트</string>
+    <string name="update_info_body">이번 릴리즈의 최신 변경사항 및 참고사항을 검토하여 주십시오.</string>
+    <string name="series_detail_mark_volume_read">이 권을 읽음으로 표시</string>
+    <string name="series_detail_mark_volume_unread">이 권을 읽지 않음으로 표시</string>
+    <string name="library_no_access">이 라이브러리에 대한 접근 권한이 없습니다.</string>
+    <string name="settings_advanced_section_global_cache">글로벌 캐시</string>
+    <string name="settings_advanced_section_library_cache">라이브러리 캐시</string>
+    <string name="settings_advanced_section_browse_cache">탐색 캐시</string>
+    <string name="settings_advanced_section_prefetch">미리 불러오기</string>
+    <string name="settings_advanced_section_cache_maintenance">캐시 유지 관리</string>
+    <string name="settings_cache_library_sections_title">라이브러리 V2 섹션</string>
+    <string name="settings_cache_library_home_title">홈</string>
+    <string name="settings_cache_library_home_subtitle">오프라인 사용을 위해 홈 스트림을 캐시합니다.</string>
+    <string name="settings_cache_library_want_title">읽고 싶어요</string>
+    <string name="settings_cache_library_want_subtitle">오프라인 사용을 위해 읽고 싶어요 목록을 캐시합니다.</string>
+    <string name="settings_cache_library_collections_title">컬렉션</string>
+    <string name="settings_cache_library_collections_subtitle">오프라인 사용을 위해 컬렉션 목록을 캐시합니다.</string>
+    <string name="settings_cache_library_reading_lists_title">읽기 목록</string>
+    <string name="settings_cache_library_reading_lists_subtitle">오프라인 사용을 위해 읽기 목록을 캐시합니다.</string>
+    <string name="settings_cache_library_browse_people_title">인물 탐색</string>
+    <string name="settings_cache_library_browse_people_subtitle">오프라인 사용을 위해 인물 탐색 결과를 캐시합니다.</string>
+    <string name="settings_cache_library_details_title">시리즈 세부 정보</string>
+    <string name="settings_cache_library_details_subtitle">오프라인 사용을 위해 시리즈 세부 정보를 캐시합니다.</string>
+    <string name="settings_cache_always_refresh_title">온라인일 때 항상 새로고침</string>
+    <string name="settings_cache_always_refresh_subtitle">온라인 상태일 경우, 캐시된 데이터보다 새 데이터를 우선 사용합니다.</string>
+    <string name="settings_cache_stale_hours_label">캐시 만료 (시간)</string>
+    <string name="settings_cache_stale_hours_hint">이보다 오래될 경우 캐시가 자동으로 새로고침됩니다.</string>
+    <string name="settings_cache_stale_label">(%s) 이후 캐시 만료</string>
+    <string name="settings_cache_units_hours">시간</string>
+    <string name="settings_debug_toasts_title">디버그 토스트</string>
+    <string name="settings_debug_toasts_subtitle">디버그 캐시 결정을 토스트 알림으로 표시합니다.</string>
+    <string name="debug_cache_use">캐시 사용</string>
+    <string name="debug_cache_force_online">온라인 데이터 강제</string>
+    <string name="debug_cache_stale_reload">오래된 캐시를 새 데이터로 다시 불러옴</string>
+    <string name="debug_cache_no_cache">캐시 없음, 온라인에서 가져옴</string>
+    <string name="debug_cache_use_fresh">최신 데이터 사용</string>
+    <string name="settings_kavita_image_api_key">이미지 API 키</string>
+    <string name="advanced_cache_stats_series_refs">시리즈 참조: %1$d</string>
+    <string name="advanced_cache_stats_collections">컬렉션: %1$d</string>
+    <string name="advanced_cache_stats_collection_refs">컬렉션 참조: %1$d</string>
+    <string name="advanced_cache_stats_reading_lists">읽기 리스트: %1$d</string>
+    <string name="advanced_cache_stats_reading_list_refs">읽기 리스트 참조: %1$d</string>
+    <string name="advanced_cache_stats_people">인물: %1$d</string>
+    <string name="advanced_cache_stats_person_refs">인물 참조: %1$d</string>
+    <string name="advanced_cache_stats_related_refs">연관 항목 참조: %1$d</string>
+    <string name="advanced_cache_stats_series_volume_refs">시리즈 권 참조: %1$d</string>
+    <string name="advanced_cache_stats_volume_chapter_refs">권 챕터 참조: %1$d</string>
+    <string name="advanced_cache_stats_thumbnails_count">썸네일 (수): %1$d</string>
+    <string name="download_item_v2_title">%1$d 항목 · %2$s 챕터 · %3$s 페이지</string>
+</resources>
