@@ -5,6 +5,7 @@ All notable changes to this project will be documented here.
 ## Unreleased
 
 ### Added
+- Settings: Added Korean and Chinese language options.
 
 ### Changed
 
