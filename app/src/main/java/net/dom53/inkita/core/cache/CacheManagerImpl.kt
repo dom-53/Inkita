@@ -2,13 +2,13 @@ package net.dom53.inkita.core.cache
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.core.graphics.scale
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.storage.AppPreferences
@@ -25,8 +25,10 @@ import net.dom53.inkita.data.api.dto.SeriesDetailDto
 import net.dom53.inkita.data.api.dto.SeriesDetailPlusDto
 import net.dom53.inkita.data.api.dto.SeriesDto
 import net.dom53.inkita.data.api.dto.SeriesMetadataDto
+import net.dom53.inkita.data.api.dto.VolumeDto
 import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
 import net.dom53.inkita.data.local.db.dao.SeriesDetailV2Dao
+import net.dom53.inkita.data.local.db.entity.CachedChapterV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedCollectionRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedCollectionV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
@@ -35,6 +37,7 @@ import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedVolumeV2Entity
 import net.dom53.inkita.domain.model.Collection
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.model.Person
@@ -363,6 +366,15 @@ class CacheManagerImpl(
         if (!p.globalEnabled || !p.libraryEnabled || !p.libraryDetailsEnabled) return
         val now = System.currentTimeMillis()
         val metadata = detail.metadata
+        val innerDetail =
+            SeriesDetailDto(
+                null,
+                detail.detail?.unreadCount,
+                detail.detail?.totalCount,
+                null,
+                null,
+                null,
+            )
         val entity =
             net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity(
                 seriesId = seriesId,
@@ -380,7 +392,7 @@ class CacheManagerImpl(
                 wantToRead = detail.wantToRead,
                 seriesJson = detail.series?.let { seriesAdapter.toJson(it) },
                 metadataJson = metadata?.let { metadataAdapter.toJson(it) },
-                detailJson = detail.detail?.let { detailAdapter.toJson(it) },
+                detailJson = innerDetail.let { detailAdapter.toJson(it) },
                 relatedJson = detail.related?.let { relatedAdapter.toJson(it) },
                 ratingJson = detail.rating?.let { ratingAdapter.toJson(it) },
                 continuePointJson = detail.continuePoint?.let { chapterAdapter.toJson(it) },
@@ -394,8 +406,89 @@ class CacheManagerImpl(
                 updatedAt = now,
             )
         dao.upsertSeriesDetail(entity)
+        if (detail.detail != null) {
+            cacheSeriesDetailVolumesAndChapters(dao, seriesId, detail.detail, metadata, now)
+        }
         if (LoggingManager.isDebugEnabled()) {
             LoggingManager.d("CacheV2", "Store series detail series=$seriesId")
+        }
+    }
+
+    private suspend fun cacheSeriesDetailVolumesAndChapters(
+        dao: SeriesDetailV2Dao,
+        seriesId: Int,
+        detail: SeriesDetailDto,
+        metadata: SeriesMetadataDto?,
+        now: Long,
+    ) {
+        val volumes =
+            detail.volumes?.map {
+                CachedVolumeV2Entity(
+                    id = it.id,
+                    seriesId = seriesId,
+                    name = it.name,
+                    number = it.number?.toString(),
+                    pages = it.pages,
+                    pagesRead = it.pagesRead,
+                    wordCount = it.wordCount,
+                    minHoursToRead = it.minHoursToRead?.toDouble(),
+                    maxHoursToRead = it.maxHoursToRead?.toDouble(),
+                    avgHoursToRead = it.avgHoursToRead?.toDouble(),
+                    summary = metadata?.summary,
+                    releaseYear = null,
+                    updatedAt = now,
+                )
+            }
+        if (volumes != null) {
+            dao.upsertVolumes(volumes)
+        }
+        val chapters =
+            detail.chapters?.map {
+                CachedChapterV2Entity(
+                    id = it.id,
+                    volumeId = it.volumeId ?: 0,
+                    title = it.title,
+                    pages = it.pages,
+                    pagesRead = it.pagesRead,
+                    summary = it.summary,
+                    releaseDate = it.releaseDate,
+                    updatedAt = now,
+                )
+            }
+        if (chapters != null) {
+            dao.upsertChapters(chapters)
+        }
+        val specials =
+            detail.specials?.map {
+                CachedChapterV2Entity(
+                    id = it.id,
+                    volumeId = it.volumeId ?: 0,
+                    title = it.title,
+                    pages = it.pages,
+                    pagesRead = it.pagesRead,
+                    summary = it.summary,
+                    releaseDate = it.releaseDate,
+                    updatedAt = now,
+                )
+            }
+        if (specials != null) {
+            dao.upsertChapters(specials)
+        }
+        val storylineChapters =
+            detail.storylineChapters?.map {
+                CachedChapterV2Entity(
+                    id = it.id,
+                    volumeId = it.volumeId ?: 0,
+                    title = it.title,
+                    pages = it.pages,
+                    pagesRead = it.pagesRead,
+                    summary = it.summary,
+                    releaseDate = it.releaseDate,
+                    updatedAt = now,
+                )
+            }
+        if (storylineChapters != null) {
+            dao.upsertChapters(storylineChapters)
         }
     }
 
@@ -451,9 +544,52 @@ class CacheManagerImpl(
             continuePoint = continuePoint,
             seriesDetailPlus = seriesDetailPlus,
             related = related,
-            detail = detail,
+            detail = getSeriesDetailVolumesAndChapters(dao, seriesId, detail),
             rating = rating,
             readerProgress = readerProgress,
+        )
+    }
+
+    private suspend fun getSeriesDetailVolumesAndChapters(
+        dao: SeriesDetailV2Dao,
+        seriesId: Int,
+        detail: SeriesDetailDto?,
+    ): SeriesDetailDto {
+        val allChapters = mutableListOf<ChapterDto>()
+        val volumes =
+            dao.getSeriesVolumes(seriesId)?.map { volume ->
+                val chapters =
+                    dao.getSeriesVolumeChapters(volume.id)?.map { chapter ->
+                        ChapterDto(
+                            id = chapter.id,
+                            volumeId = chapter.volumeId,
+                            title = chapter.title,
+                            pages = chapter.pages,
+                            pagesRead = chapter.pagesRead,
+                            summary = chapter.summary,
+                            releaseDate = chapter.releaseDate,
+                        )
+                    }
+                if (chapters != null) {
+                    allChapters.addAll(chapters)
+                }
+                VolumeDto(
+                    id = volume.id,
+                    name = volume.name,
+                    number = volume.number?.toInt(),
+                    pages = volume.pages,
+                    pagesRead = volume.pagesRead,
+                    seriesId = seriesId,
+                    chapters = chapters,
+                )
+            }
+        return SeriesDetailDto(
+            volumes = volumes,
+            unreadCount = detail?.unreadCount,
+            totalCount = detail?.totalCount,
+            chapters = allChapters,
+            specials = null,
+            storylineChapters = null,
         )
     }
 
@@ -768,7 +904,7 @@ class CacheManagerImpl(
                                     val targetW = (bitmap.width / scale).toInt().coerceAtLeast(1)
                                     val targetH = (bitmap.height / scale).toInt().coerceAtLeast(1)
                                     val scaled =
-                                        if (scale > 1f) Bitmap.createScaledBitmap(bitmap, targetW, targetH, true) else bitmap
+                                        if (scale > 1f) bitmap.scale(targetW, targetH) else bitmap
                                     FileOutputStream(file).use { out ->
                                         scaled.compress(Bitmap.CompressFormat.JPEG, THUMBNAIL_QUALITY, out)
                                     }
