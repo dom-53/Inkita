@@ -95,6 +95,7 @@ import net.dom53.inkita.core.storage.ReaderThemeMode
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.repository.ReaderRepository
 import net.dom53.inkita.ui.reader.model.ReaderFontOption
+import net.dom53.inkita.ui.reader.model.fontFaceCss
 import net.dom53.inkita.ui.reader.model.readerFontOptions
 import net.dom53.inkita.ui.reader.model.readerThemeOptions
 import net.dom53.inkita.ui.reader.renderer.BaseReader
@@ -1114,17 +1115,7 @@ internal fun ReaderWebView(
             html
         }
     val paddingTopPx = paddingPx / 2f
-    val fontFaceCss =
-        fontOption.assetPath?.let {
-            """
-        @font-face {
-            font-family: '${fontOption.cssFamily}';
-            src: url('$it');
-            font-weight: 100 900;
-            font-style: normal;
-        }
-        """
-        } ?: ""
+    val fontFaceCss = fontOption.fontFaceCss()
     val (bgColor, textColor) = themeColorsFor(themeMode)
     val themeCss =
         """
