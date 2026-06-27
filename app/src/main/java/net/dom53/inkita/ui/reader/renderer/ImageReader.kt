@@ -68,7 +68,7 @@ object ImageReader : BaseReader {
                         animationSpec =
                             spring(
                                 dampingRatio = Spring.DampingRatioNoBouncy,
-                                stiffness = Spring.StiffnessMedium,
+                                stiffness = Spring.StiffnessHigh,
                             ),
                     ) { value, _ ->
                         dragOffsetPx = value
@@ -152,14 +152,22 @@ object ImageReader : BaseReader {
                                                 dragAtRelease < 0
                                             }
                                         val targetOffset = if (dragAtRelease < 0) -width else width
-                                        settleTo(
-                                            targetOffset = targetOffset,
-                                        ) {
+                                        val targetImageUrl = if (next) nextImageUrl else previousImageUrl
+                                        val turnPage = {
                                             if (next) {
                                                 callbacks.onSwipeNext()
                                             } else {
                                                 callbacks.onSwipePrev()
                                             }
+                                        }
+                                        if (targetImageUrl == null) {
+                                            dragOffsetPx = 0f
+                                            turnPage()
+                                        } else {
+                                            settleTo(
+                                                targetOffset = targetOffset,
+                                                onSettled = turnPage,
+                                            )
                                         }
                                     } else {
                                         dragOffsetPx = 0f
