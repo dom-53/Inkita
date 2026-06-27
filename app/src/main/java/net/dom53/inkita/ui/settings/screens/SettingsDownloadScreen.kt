@@ -1,7 +1,11 @@
 package net.dom53.inkita.ui.settings.screens
 
+import android.content.Intent
+import android.net.Uri
 import android.text.format.Formatter
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,13 +48,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import net.dom53.inkita.core.downloadv2.DownloadPaths
+import net.dom53.inkita.core.downloadv2.DownloadStorageManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
-import java.io.File
 
 @Composable
 fun SettingsDownloadScreen(
@@ -72,10 +75,50 @@ fun SettingsDownloadScreen(
     var statsBody by remember { mutableStateOf("") }
     var deleteAfterMarkRead by remember { mutableStateOf(false) }
     var deleteAfterReadDepth by remember { mutableStateOf(1) }
+    var downloadLocationUri by remember { mutableStateOf<String?>(null) }
+    var downloadLocationLabel by remember { mutableStateOf("") }
+    var pendingLocationUri by remember { mutableStateOf<String?>(null) }
+    var showLocationConfirmDialog by remember { mutableStateOf(false) }
+    var migrationInProgress by remember { mutableStateOf(false) }
 
     val downloadV2Dao =
         remember {
             InkitaDatabase.getInstance(context).downloadV2Dao()
+        }
+    val downloadStorageManager =
+        remember {
+            DownloadStorageManager(context, appPreferences)
+        }
+
+    fun requestLocationChange(uri: String?) {
+        scope.launch {
+            val pending = withContext(Dispatchers.IO) { downloadV2Dao.countJobsByStatus(DownloadJobV2Entity.STATUS_PENDING) }
+            val running = withContext(Dispatchers.IO) { downloadV2Dao.countJobsByStatus(DownloadJobV2Entity.STATUS_RUNNING) }
+            if (pending > 0 || running > 0) {
+                Toast
+                    .makeText(
+                        context,
+                        context.getString(net.dom53.inkita.R.string.settings_downloads_location_queue_busy),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                return@launch
+            }
+            pendingLocationUri = uri
+            showLocationConfirmDialog = true
+        }
+    }
+
+    val folderPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+            if (uri != null) {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    )
+                }
+                requestLocationChange(uri.toString())
+            }
         }
 
     LaunchedEffect(Unit) {
@@ -105,6 +148,15 @@ fun SettingsDownloadScreen(
     LaunchedEffect(Unit) {
         appPreferences.deleteAfterReadDepthFlow.collectLatest { deleteAfterReadDepth = it }
     }
+    LaunchedEffect(Unit) {
+        appPreferences.downloadLocationUriFlow.collectLatest { uri ->
+            downloadLocationUri = uri
+            downloadLocationLabel =
+                uri
+                    ?.let { downloadStorageManager.displayName(it) }
+                    ?: context.getString(net.dom53.inkita.R.string.settings_downloads_location_default)
+        }
+    }
 
     Column(
         modifier =
@@ -119,6 +171,16 @@ fun SettingsDownloadScreen(
             }
             Text(stringResource(net.dom53.inkita.R.string.settings_downloads_title), style = MaterialTheme.typography.titleLarge)
         }
+
+        DownloadLocationRow(
+            label = downloadLocationLabel.ifBlank { stringResource(net.dom53.inkita.R.string.settings_downloads_location_default) },
+            isDefault = downloadLocationUri == null,
+            enabled = !migrationInProgress,
+            onChoose = { folderPicker.launch(null) },
+            onReset = { requestLocationChange(null) },
+        )
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
 
         SettingToggleRow(
             title = stringResource(net.dom53.inkita.R.string.settings_downloads_allow_metered_title),
@@ -241,7 +303,7 @@ fun SettingsDownloadScreen(
                 scope.launch {
                     val body =
                         withContext(Dispatchers.IO) {
-                            buildDownloadStats(context, downloadV2Dao)
+                            buildDownloadStats(context, downloadV2Dao, downloadStorageManager)
                         }
                     statsBody = body
                     statsLoading = false
@@ -264,7 +326,7 @@ fun SettingsDownloadScreen(
                         showClearDialog = false
                         scope.launch {
                             withContext(Dispatchers.IO) {
-                                clearDownloadV2(context, downloadV2Dao)
+                                clearDownloadV2(context, downloadV2Dao, downloadStorageManager)
                             }
                             Toast.makeText(context, context.getString(net.dom53.inkita.R.string.settings_downloads_clear_downloaded_toast), Toast.LENGTH_SHORT).show()
                         }
@@ -304,16 +366,93 @@ fun SettingsDownloadScreen(
             },
         )
     }
+
+    if (showLocationConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!migrationInProgress) {
+                    showLocationConfirmDialog = false
+                    pendingLocationUri = null
+                }
+            },
+            title = { Text(stringResource(net.dom53.inkita.R.string.settings_downloads_location_confirm_title)) },
+            text = { Text(stringResource(net.dom53.inkita.R.string.settings_downloads_location_confirm_text)) },
+            confirmButton = {
+                Button(
+                    enabled = !migrationInProgress,
+                    onClick = {
+                        val target = pendingLocationUri
+                        migrationInProgress = true
+                        scope.launch {
+                            val result =
+                                runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        downloadStorageManager.migrateDownloadLocation(downloadV2Dao, target)
+                                    }
+                                }
+                            migrationInProgress = false
+                            showLocationConfirmDialog = false
+                            pendingLocationUri = null
+                            Toast
+                                .makeText(
+                                    context,
+                                    result.fold(
+                                        onSuccess = {
+                                            context.getString(net.dom53.inkita.R.string.settings_downloads_location_changed)
+                                        },
+                                        onFailure = {
+                                            context.getString(
+                                                net.dom53.inkita.R.string.settings_downloads_location_failed,
+                                                it.message ?: "Unknown error",
+                                            )
+                                        },
+                                    ),
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                        }
+                    },
+                ) {
+                    Text(stringResource(net.dom53.inkita.R.string.settings_downloads_location_confirm_action))
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    enabled = !migrationInProgress,
+                    onClick = {
+                        showLocationConfirmDialog = false
+                        pendingLocationUri = null
+                    },
+                ) {
+                    Text(stringResource(net.dom53.inkita.R.string.general_cancel))
+                }
+            },
+        )
+    }
+
+    if (migrationInProgress) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text(stringResource(net.dom53.inkita.R.string.settings_downloads_location_moving_title)) },
+            text = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    CircularProgressIndicator()
+                    Text(stringResource(net.dom53.inkita.R.string.settings_downloads_location_moving_text))
+                }
+            },
+            confirmButton = {},
+        )
+    }
 }
 
 private suspend fun clearDownloadV2(
     context: android.content.Context,
     downloadV2Dao: DownloadV2Dao,
+    downloadStorageManager: DownloadStorageManager,
 ) {
-    val root = DownloadPaths.baseDir(context)
-    if (root.exists()) {
-        runCatching { root.deleteRecursively() }
-    }
+    downloadStorageManager.clearAll()
     downloadV2Dao.clearAllItems()
     downloadV2Dao.clearAllJobs()
 }
@@ -321,6 +460,7 @@ private suspend fun clearDownloadV2(
 private suspend fun buildDownloadStats(
     context: android.content.Context,
     downloadV2Dao: DownloadV2Dao,
+    downloadStorageManager: DownloadStorageManager,
 ): String {
     val completedItems = downloadV2Dao.getItemsByStatus(DownloadedItemV2Entity.STATUS_COMPLETED)
     val pendingItems = downloadV2Dao.getItemsByStatus(DownloadedItemV2Entity.STATUS_PENDING)
@@ -340,7 +480,7 @@ private suspend fun buildDownloadStats(
     val jobCompleted = downloadV2Dao.countJobsByStatus(DownloadJobV2Entity.STATUS_COMPLETED)
 
     val itemsTotal = completedItems.size + pendingItems.size + runningItems.size + failedItems.size
-    val diskBytes = dirSize(DownloadPaths.baseDir(context))
+    val diskBytes = downloadStorageManager.totalSize()
     val sizeText = Formatter.formatFileSize(context, diskBytes)
 
     return buildString {
@@ -373,12 +513,38 @@ private suspend fun buildDownloadStats(
     }.trimEnd()
 }
 
-private fun dirSize(dir: File?): Long {
-    if (dir == null || !dir.exists()) return 0L
-    return dir
-        .walkBottomUp()
-        .filter { it.isFile }
-        .sumOf { it.length() }
+@Composable
+private fun DownloadLocationRow(
+    label: String,
+    isDefault: Boolean,
+    enabled: Boolean,
+    onChoose: () -> Unit,
+    onReset: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(net.dom53.inkita.R.string.settings_downloads_location_title), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                enabled = enabled,
+                onClick = onChoose,
+            ) {
+                Text(stringResource(net.dom53.inkita.R.string.settings_downloads_location_choose))
+            }
+            OutlinedButton(
+                enabled = enabled && !isDefault,
+                onClick = onReset,
+            ) {
+                Text(stringResource(net.dom53.inkita.R.string.settings_downloads_location_reset))
+            }
+        }
+    }
 }
 
 @Composable

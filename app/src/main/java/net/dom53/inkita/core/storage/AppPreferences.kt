@@ -107,6 +107,7 @@ class AppPreferences(
         private val KEY_DOWNLOAD_ALLOW_METERED = booleanPreferencesKey("download_allow_metered")
         private val KEY_DOWNLOAD_ALLOW_LOW_BATTERY = booleanPreferencesKey("download_allow_low_battery")
         private val KEY_DOWNLOAD_MAX_CONCURRENT = intPreferencesKey("download_max_concurrent")
+        private val KEY_DOWNLOAD_LOCATION_URI = stringPreferencesKey("download_location_uri")
         private val KEY_PREFER_OFFLINE_PAGES = booleanPreferencesKey("prefer_offline_pages")
         private val KEY_DOWNLOAD_RETRY_ENABLED = booleanPreferencesKey("download_retry_enabled")
         private val KEY_DOWNLOAD_RETRY_MAX = intPreferencesKey("download_retry_max")
@@ -235,6 +236,8 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_ALLOW_LOW_BATTERY] ?: false }
     val downloadMaxConcurrentFlow: Flow<Int> =
         context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_MAX_CONCURRENT] ?: 2 }
+    val downloadLocationUriFlow: Flow<String?> =
+        context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_LOCATION_URI]?.takeIf { it.isNotBlank() } }
     val preferOfflinePagesFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFER_OFFLINE_PAGES] ?: true }
     val importantInfoVersionFlow: Flow<Int> =
@@ -552,6 +555,16 @@ class AppPreferences(
     suspend fun setDownloadMaxConcurrent(value: Int) {
         context.dataStore.edit { prefs ->
             prefs[KEY_DOWNLOAD_MAX_CONCURRENT] = value
+        }
+    }
+
+    suspend fun setDownloadLocationUri(uri: String?) {
+        context.dataStore.edit { prefs ->
+            if (uri.isNullOrBlank()) {
+                prefs.remove(KEY_DOWNLOAD_LOCATION_URI)
+            } else {
+                prefs[KEY_DOWNLOAD_LOCATION_URI] = uri
+            }
         }
     }
 
