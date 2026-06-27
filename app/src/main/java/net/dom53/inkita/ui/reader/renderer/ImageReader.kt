@@ -11,12 +11,14 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -41,6 +43,11 @@ object ImageReader : BaseReader {
         val isRtl = params.imageReaderMode == ImageReaderMode.RightToLeft
         val isVertical = params.imageReaderMode == ImageReaderMode.Vertical
         val swipeThresholdPx = with(LocalDensity.current) { 64.dp.toPx() }
+        val toggleOverlayModifier =
+            Modifier.clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { callbacks.onToggleOverlay() }
         Box(
             modifier =
                 Modifier
@@ -86,7 +93,7 @@ object ImageReader : BaseReader {
                                 onDragCancel = { totalDrag = 0f },
                             )
                         }
-                    }.clickable { callbacks.onToggleOverlay() },
+                    }.then(toggleOverlayModifier),
             contentAlignment = Alignment.Center,
         ) {
             if (imageUrl.isNullOrBlank()) {
