@@ -12,7 +12,13 @@ plugins {
 spotless {
     kotlin {
         target("**/*.kt") // Apply to all `.kt` files recursively
-        targetExclude("**/build/**", "**/generated/**") // Skip generated/build files
+        targetExclude(
+            "**/build/**",
+            "**/generated/**",
+            "**/.gradle/**",
+            "**/.gradle-local/**",
+            "**/.kotlin/**",
+        ) // Skip generated/build/cache files
 
         ktlint()
 //            .editorConfigOverride(
@@ -29,6 +35,7 @@ spotless {
 
     kotlinGradle {
         target("**/*.gradle.kts")
+        targetExclude("**/.gradle/**", "**/.gradle-local/**", "**/.kotlin/**")
         ktlint()
         trimTrailingWhitespace()
         endWithNewline()
@@ -36,7 +43,7 @@ spotless {
 
     format("xml") {
         target("**/*.xml")
-        targetExclude("**/build/**")
+        targetExclude("**/build/**", "**/.gradle/**", "**/.gradle-local/**", "**/.kotlin/**")
         trimTrailingWhitespace()
         leadingTabsToSpaces(4)
         endWithNewline()
@@ -44,6 +51,7 @@ spotless {
 
     format("misc") {
         target("**/*.md", "**/.gitignore")
+        targetExclude("**/build/**", "**/.gradle/**", "**/.gradle-local/**", "**/.kotlin/**")
         trimTrailingWhitespace()
         endWithNewline()
     }

@@ -55,6 +55,7 @@ object ImageReader : BaseReader {
         var viewportSize by remember { mutableStateOf(IntSize.Zero) }
         var dragOffsetPx by remember { mutableFloatStateOf(0f) }
         var settleJob by remember { mutableStateOf<Job?>(null) }
+
         fun settleTo(
             targetOffset: Float,
             onSettled: () -> Unit,
@@ -206,19 +207,21 @@ object ImageReader : BaseReader {
                         leftImageUrl?.let { url ->
                             ImagePage(
                                 imageUrl = url,
-                                offset = IntOffset(
-                                    x = dragOffsetPx.roundToInt() - width,
-                                    y = 0,
-                                ),
+                                offset =
+                                    IntOffset(
+                                        x = dragOffsetPx.roundToInt() - width,
+                                        y = 0,
+                                    ),
                             )
                         }
                         rightImageUrl?.let { url ->
                             ImagePage(
                                 imageUrl = url,
-                                offset = IntOffset(
-                                    x = dragOffsetPx.roundToInt() + width,
-                                    y = 0,
-                                ),
+                                offset =
+                                    IntOffset(
+                                        x = dragOffsetPx.roundToInt() + width,
+                                        y = 0,
+                                    ),
                             )
                         }
                     }
