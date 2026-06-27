@@ -20,6 +20,8 @@ data class ReaderUiState(
     val content: String? = null,
     val fromOffline: Boolean = false,
     val imageUrl: String? = null,
+    val previousImageUrl: String? = null,
+    val nextImageUrl: String? = null,
     val pageIndex: Int = 0,
     val pageCount: Int = 0,
     val timeLeft: ReaderTimeLeft? = null,
@@ -79,6 +81,7 @@ abstract class BaseReaderViewModel(
                             _state.update { st -> st.copy(bookInfo = info, pageCount = info.pages ?: st.pageCount) }
                         }
                     }
+                    onPageLoaded(index)
                 }.onFailure { e ->
                     _state.update {
                         it.copy(
@@ -137,6 +140,7 @@ abstract class BaseReaderViewModel(
                     if (reader.format != Format.Pdf) {
                         updateProgress(initialPage)
                     }
+                    onPageLoaded(initialPage)
                 }.onFailure { e ->
                     _state.update { it.copy(isLoading = false, error = e.message ?: "Error loading reader") }
                 }
@@ -198,6 +202,8 @@ abstract class BaseReaderViewModel(
 
     open suspend fun isPageDownloaded(pageIndex: Int): Boolean = runCatching { reader.isPageDownloaded(chapterId, pageIndex) }.getOrDefault(false)
 
+    protected open fun onPageLoaded(pageIndex: Int) = Unit
+
     protected fun applyLoadResult(
         result: ReaderLoadResult,
         pageIndex: Int,
@@ -211,6 +217,8 @@ abstract class BaseReaderViewModel(
                 error = null,
                 pdfPath = result.pdfPath ?: it.pdfPath,
                 imageUrl = result.imageUrl ?: it.imageUrl,
+                previousImageUrl = if (result.imageUrl != null) null else it.previousImageUrl,
+                nextImageUrl = if (result.imageUrl != null) null else it.nextImageUrl,
             )
         }
     }

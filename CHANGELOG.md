@@ -6,10 +6,16 @@ All notable changes to this project will be documented here.
 
 ### Added
 - Settings: Added Korean and Chinese language options.
+- Reader: Added OpenDyslexic as a selectable reader font.
+- Reader: Image reader now preloads adjacent pages and reveals the previous/next page while dragging horizontally.
 
 ### Changed
+- Reader: Image reader page turns now follow the drag position and complete in the swipe direction.
 
 ### Fixed
+- Reader: Removed the touch highlight animation from image pages while tapping or swiping.
+- Reader: Removed the conflicting image reader transition that could snap back and then swipe again after a drag turn.
+- Reader: Avoided the loading flash when turning to an already preloaded adjacent image page.
 
 ## v0.3.1-beta
 
