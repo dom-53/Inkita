@@ -11,13 +11,17 @@ plugins {
 
 spotless {
     kotlin {
-        target("**/*.kt") // Apply to all `.kt` files recursively
+        target("app/src/**/*.kt") // Apply only to checked-in app Kotlin sources
         targetExclude(
             "**/build/**",
             "**/generated/**",
+            ".gradle/**",
             "**/.gradle/**",
+            ".gradle-local/**",
             "**/.gradle-local/**",
+            ".idea/**",
             "**/.idea/**",
+            ".kotlin/**",
             "**/.kotlin/**",
         ) // Skip generated/build/cache files
 
@@ -36,7 +40,16 @@ spotless {
 
     kotlinGradle {
         target("**/*.gradle.kts")
-        targetExclude("**/.gradle/**", "**/.gradle-local/**", "**/.idea/**", "**/.kotlin/**")
+        targetExclude(
+            ".gradle/**",
+            "**/.gradle/**",
+            ".gradle-local/**",
+            "**/.gradle-local/**",
+            ".idea/**",
+            "**/.idea/**",
+            ".kotlin/**",
+            "**/.kotlin/**",
+        )
         ktlint()
         trimTrailingWhitespace()
         endWithNewline()
@@ -44,7 +57,17 @@ spotless {
 
     format("xml") {
         target("**/*.xml")
-        targetExclude("**/build/**", "**/.gradle/**", "**/.gradle-local/**", "**/.idea/**", "**/.kotlin/**")
+        targetExclude(
+            "**/build/**",
+            ".gradle/**",
+            "**/.gradle/**",
+            ".gradle-local/**",
+            "**/.gradle-local/**",
+            ".idea/**",
+            "**/.idea/**",
+            ".kotlin/**",
+            "**/.kotlin/**",
+        )
         trimTrailingWhitespace()
         leadingTabsToSpaces(4)
         endWithNewline()
@@ -52,7 +75,17 @@ spotless {
 
     format("misc") {
         target("**/*.md", "**/.gitignore")
-        targetExclude("**/build/**", "**/.gradle/**", "**/.gradle-local/**", "**/.idea/**", "**/.kotlin/**")
+        targetExclude(
+            "**/build/**",
+            ".gradle/**",
+            "**/.gradle/**",
+            ".gradle-local/**",
+            "**/.gradle-local/**",
+            ".idea/**",
+            "**/.idea/**",
+            ".kotlin/**",
+            "**/.kotlin/**",
+        )
         trimTrailingWhitespace()
         endWithNewline()
     }

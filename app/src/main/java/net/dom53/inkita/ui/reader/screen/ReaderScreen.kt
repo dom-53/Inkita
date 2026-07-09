@@ -90,6 +90,7 @@ import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
 import net.dom53.inkita.core.network.NetworkUtils
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.core.storage.ImageReaderMode
 import net.dom53.inkita.core.storage.ReaderPrefs
 import net.dom53.inkita.core.storage.ReaderThemeMode
 import net.dom53.inkita.domain.model.Format
@@ -219,6 +220,8 @@ internal fun BaseReaderScreen(
     var showSettingsPanel by remember { mutableStateOf(false) }
     var selectedSettingsTab by remember { mutableStateOf(ReaderSettingsTab.Font) }
     val selectedFont = fontOptions.firstOrNull { it.id == fontFamilyId } ?: readerFontOptions.first()
+    val isImageReader = renderer == net.dom53.inkita.ui.reader.renderer.ImageReader
+    val supportsReaderSettings = renderer.supportsTextSettings || isImageReader
 
     LaunchedEffect(readerPrefs) {
         fontSize = readerPrefs.fontSize
@@ -400,7 +403,7 @@ internal fun BaseReaderScreen(
                     pageIndex = uiState.pageIndex,
                     pageCount = uiState.pageCount,
                     timeLeft = uiState.timeLeftText(context),
-                    enableSettings = renderer.supportsTextSettings,
+                    enableSettings = supportsReaderSettings,
                 )
             val bottomBarCallbacks =
                 ReaderBottomBarCallbacks(
@@ -441,7 +444,7 @@ internal fun BaseReaderScreen(
                     },
                     onPrevPage = { goPrevPage() },
                     onNextPage = { goNextPage() },
-                    onOpenSettings = { if (renderer.supportsTextSettings) showSettingsPanel = !showSettingsPanel },
+                    onOpenSettings = { if (supportsReaderSettings) showSettingsPanel = !showSettingsPanel },
                     onPrevChapter = {
                         scope.launch {
                             val nav = readerViewModel.getPreviousChapter()
@@ -523,7 +526,7 @@ internal fun BaseReaderScreen(
             }
 
             AnimatedVisibility(
-                visible = renderer.supportsTextSettings && showSettingsPanel,
+                visible = supportsReaderSettings && showSettingsPanel,
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
@@ -539,6 +542,7 @@ internal fun BaseReaderScreen(
                         textAlign = textAlign,
                         fontOptions = fontOptions,
                         fontFamilyId = selectedFont.id,
+                        imageReaderMode = readerPrefs.imageReaderMode,
                     )
                 val settingsCallbacks =
                     ReaderSettingsCallbacks(
@@ -582,9 +586,26 @@ internal fun BaseReaderScreen(
                                 }
                             }
                         },
+                        onImageReaderModeChange = { mode ->
+                            if (mode == ImageReaderMode.Webtoon) {
+                                Toast
+                                    .makeText(
+                                        context,
+                                        R.string.general_not_implemented,
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                            } else {
+                                scope.launch { appPreferences.updateReaderPrefs { copy(imageReaderMode = mode) } }
+                            }
+                        },
                     )
                 if (settingsContent != null) {
                     settingsContent(settingsState, settingsCallbacks)
+                } else if (isImageReader) {
+                    ImageReaderSettingsPanel(
+                        mode = settingsState.imageReaderMode,
+                        onModeChange = settingsCallbacks.onImageReaderModeChange,
+                    )
                 } else {
                     SettingsPanel(
                         selectedTab = settingsState.selectedTab,
@@ -802,6 +823,7 @@ data class ReaderSettingsState(
     val textAlign: TextAlign,
     val fontOptions: List<ReaderFontOption>,
     val fontFamilyId: String,
+    val imageReaderMode: ImageReaderMode,
 )
 
 data class ReaderSettingsCallbacks(
@@ -812,6 +834,7 @@ data class ReaderSettingsCallbacks(
     val onThemeChange: (ReaderThemeMode) -> Unit,
     val onTextAlignChange: (TextAlign) -> Unit,
     val onFontFamilyChange: (ReaderFontOption) -> Unit,
+    val onImageReaderModeChange: (ImageReaderMode) -> Unit,
 )
 
 @Composable
@@ -1023,6 +1046,68 @@ private fun ThemeSettings(
                     selected = themeMode == option.mode,
                     onClick = { onThemeChange(option.mode) },
                     label = { Text(stringResource(option.labelRes)) },
+                    colors =
+                        FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            selectedLabelColor = MaterialTheme.colorScheme.primary,
+                            selectedLeadingIconColor = MaterialTheme.colorScheme.primary,
+                        ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageReaderSettingsPanel(
+    mode: ImageReaderMode,
+    onModeChange: (ImageReaderMode) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(16.dp),
+                ).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            stringResource(R.string.reader_reader_settings),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+        ImageReadingModeSettings(mode = mode, onModeChange = onModeChange)
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun ImageReadingModeSettings(
+    mode: ImageReaderMode,
+    onModeChange: (ImageReaderMode) -> Unit,
+) {
+    val options =
+        listOf(
+            ImageReaderMode.LeftToRight to R.string.reader_image_mode_ltr,
+            ImageReaderMode.RightToLeft to R.string.reader_image_mode_rtl,
+            ImageReaderMode.Vertical to R.string.reader_image_mode_vertical,
+            ImageReaderMode.Webtoon to R.string.reader_image_mode_webtoon,
+        )
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(R.string.reader_image_default_mode), style = MaterialTheme.typography.titleSmall)
+        Text(
+            stringResource(R.string.reader_image_default_mode_subtitle),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (option, labelRes) ->
+                FilterChip(
+                    selected = mode == option,
+                    onClick = { onModeChange(option) },
+                    label = { Text(stringResource(labelRes)) },
                     colors =
                         FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
