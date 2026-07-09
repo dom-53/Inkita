@@ -184,8 +184,7 @@ object ImageReader : BaseReader {
                                 },
                             )
                         }
-                    }
-                    .pointerInput(params.imageReaderMode, viewportSize) {
+                    }.pointerInput(params.imageReaderMode, viewportSize) {
                         detectTapGestures { offset ->
                             if (isVertical) {
                                 callbacks.onToggleOverlay()
