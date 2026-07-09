@@ -3,10 +3,9 @@ package net.dom53.inkita.ui.reader.renderer
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -82,11 +81,6 @@ object ImageReader : BaseReader {
             settleJob?.cancel()
             dragOffsetPx = 0f
         }
-        val toggleOverlayModifier =
-            Modifier.clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { callbacks.onToggleOverlay() }
         Box(
             modifier =
                 Modifier
@@ -190,7 +184,33 @@ object ImageReader : BaseReader {
                                 },
                             )
                         }
-                    }.then(toggleOverlayModifier),
+                    }
+                    .pointerInput(params.imageReaderMode, viewportSize) {
+                        detectTapGestures { offset ->
+                            if (isVertical) {
+                                callbacks.onToggleOverlay()
+                            } else {
+                                val width = viewportSize.width.toFloat().coerceAtLeast(1f)
+                                when {
+                                    offset.x < width * 0.4f -> {
+                                        if (isRtl) {
+                                            callbacks.onSwipeNext()
+                                        } else {
+                                            callbacks.onSwipePrev()
+                                        }
+                                    }
+                                    offset.x > width * 0.6f -> {
+                                        if (isRtl) {
+                                            callbacks.onSwipePrev()
+                                        } else {
+                                            callbacks.onSwipeNext()
+                                        }
+                                    }
+                                    else -> callbacks.onToggleOverlay()
+                                }
+                            }
+                        }
+                    },
             contentAlignment = Alignment.Center,
         ) {
             if (imageUrl.isNullOrBlank()) {
