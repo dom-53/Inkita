@@ -17,6 +17,7 @@ spotless {
             "**/generated/**",
             "**/.gradle/**",
             "**/.gradle-local/**",
+            "**/.idea/**",
             "**/.kotlin/**",
         ) // Skip generated/build/cache files
 
@@ -35,7 +36,7 @@ spotless {
 
     kotlinGradle {
         target("**/*.gradle.kts")
-        targetExclude("**/.gradle/**", "**/.gradle-local/**", "**/.kotlin/**")
+        targetExclude("**/.gradle/**", "**/.gradle-local/**", "**/.idea/**", "**/.kotlin/**")
         ktlint()
         trimTrailingWhitespace()
         endWithNewline()
@@ -43,7 +44,7 @@ spotless {
 
     format("xml") {
         target("**/*.xml")
-        targetExclude("**/build/**", "**/.gradle/**", "**/.gradle-local/**", "**/.kotlin/**")
+        targetExclude("**/build/**", "**/.gradle/**", "**/.gradle-local/**", "**/.idea/**", "**/.kotlin/**")
         trimTrailingWhitespace()
         leadingTabsToSpaces(4)
         endWithNewline()
@@ -51,7 +52,7 @@ spotless {
 
     format("misc") {
         target("**/*.md", "**/.gitignore")
-        targetExclude("**/build/**", "**/.gradle/**", "**/.gradle-local/**", "**/.kotlin/**")
+        targetExclude("**/build/**", "**/.gradle/**", "**/.gradle-local/**", "**/.idea/**", "**/.kotlin/**")
         trimTrailingWhitespace()
         endWithNewline()
     }

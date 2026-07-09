@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
+import net.dom53.inkita.core.downloadv2.DownloadStorageManager
 import net.dom53.inkita.core.downloadv2.DownloadStrategyV2
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
@@ -19,10 +20,7 @@ import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.domain.model.Format
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okio.buffer
-import okio.sink
 import retrofit2.HttpException
-import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.regex.Pattern
@@ -44,6 +42,7 @@ class EpubDownloadStrategyV2(
             .Builder()
             .addInterceptor(NetworkLoggingInterceptor)
             .build()
+    private val storageManager = DownloadStorageManager(appContext, appPreferences)
 
     /**
      * Create a job with missing pages only and return its id, or -1 if nothing to download.
@@ -57,11 +56,15 @@ class EpubDownloadStrategyV2(
         val now = System.currentTimeMillis()
         val existing = downloadDao.getItemsForChapter(chapterId)
         val completedPages =
-            existing
-                .filter { it.status == DownloadedItemV2Entity.STATUS_COMPLETED && it.page != null }
-                .filter { item -> isPathPresent(item.localPath) }
-                .mapNotNull { it.page }
-                .toSet()
+            buildSet {
+                existing
+                    .filter { it.status == DownloadedItemV2Entity.STATUS_COMPLETED && it.page != null }
+                    .forEach { item ->
+                        if (storageManager.exists(item.localPath)) {
+                            item.page?.let { add(it) }
+                        }
+                    }
+            }
         if (pageIndex == null && pageCount == null) return -1L
         if (pageIndex != null) {
             downloadDao.deleteItemsForChapterPageNotStatus(chapterId, pageIndex)
@@ -162,9 +165,7 @@ class EpubDownloadStrategyV2(
         val seriesId = job.seriesId ?: return
         val chapterId = job.chapterId ?: return
         val volumeId = job.volumeId
-        val chapterDir = DownloadPaths.chapterDir(appContext, seriesId, volumeId, chapterId)
-        if (!chapterDir.exists()) chapterDir.mkdirs()
-        val assetsDir = DownloadPaths.epubAssetsDir(chapterDir).apply { if (!exists()) mkdirs() }
+        val assetsRelativeDir = DownloadPaths.epubAssetsRelativeDir(seriesId, volumeId, chapterId)
 
         updateJob(job, DownloadJobV2Entity.STATUS_RUNNING, error = null)
         if (LoggingManager.isDebugEnabled()) {
@@ -186,19 +187,15 @@ class EpubDownloadStrategyV2(
                 val htmlResp = api.getBookPage(chapterId, page)
                 if (!htmlResp.isSuccessful) throw HttpException(htmlResp)
                 val htmlRaw = htmlResp.body() ?: ""
-                val (rewrittenHtml, assetsBytes) = rewriteAndDownloadImages(htmlRaw, assetsDir, config.serverUrl, config.apiKey)
-                val htmlName = DownloadPaths.epubPageFileName(seriesId, volumeId, chapterId, page)
-                val htmlFile = File(chapterDir, htmlName)
-                withContext(Dispatchers.IO) {
-                    htmlFile.sink().buffer().use { sink -> sink.writeString(rewrittenHtml, Charsets.UTF_8) }
-                }
-                val htmlSize = htmlFile.length()
-                val size = htmlSize + assetsBytes
+                val (rewrittenHtml, assetsBytes) = rewriteAndDownloadImages(htmlRaw, assetsRelativeDir, config.serverUrl, config.apiKey)
+                val htmlPath = DownloadPaths.epubPageRelativePath(seriesId, volumeId, chapterId, page)
+                val storedHtml = storageManager.writeText(htmlPath, rewrittenHtml)
+                val size = storedHtml.bytes + assetsBytes
                 downloadDao.upsertItems(
                     listOf(
                         item.copy(
                             status = DownloadedItemV2Entity.STATUS_COMPLETED,
-                            localPath = htmlFile.absolutePath,
+                            localPath = storedHtml.localPath,
                             bytes = size,
                             updatedAt = System.currentTimeMillis(),
                             error = null,
@@ -266,7 +263,7 @@ class EpubDownloadStrategyV2(
      */
     private suspend fun rewriteAndDownloadImages(
         html: String,
-        assetsDir: File,
+        assetsRelativeDir: String,
         baseUrl: String,
         apiKey: String,
     ): Pair<String, Long> =
@@ -296,15 +293,9 @@ class EpubDownloadStrategyV2(
                         .orEmpty()
                 val fileName = hashName(absoluteUrl) + ext
                 try {
-                    val (uri, bytes, legacyFile) = downloadBinary(absoluteUrl, fileName, assetsDir, apiKey)
+                    val (localPath, bytes) = downloadBinary(absoluteUrl, fileName, assetsRelativeDir, apiKey)
                     totalBytes += bytes
-                    val replacement =
-                        when {
-                            uri != null -> uri.toString()
-                            legacyFile != null -> Uri.fromFile(legacyFile).toString()
-                            else -> null
-                        }
-                    if (replacement != null) replacements[src] = replacement
+                    replacements[src] = toHtmlUri(localPath)
                 } catch (_: IOException) {
                     // ignore failed image
                 }
@@ -322,15 +313,10 @@ class EpubDownloadStrategyV2(
     private suspend fun downloadBinary(
         url: String,
         fileName: String,
-        targetDir: File,
+        assetsRelativeDir: String,
         apiKey: String,
-    ): Triple<Uri?, Long, File?> =
+    ): Pair<String, Long> =
         withContext(Dispatchers.IO) {
-            val existing = File(targetDir, fileName)
-            if (existing.exists()) {
-                return@withContext Triple(null, existing.length(), existing)
-            }
-
             val request =
                 Request
                     .Builder()
@@ -340,33 +326,25 @@ class EpubDownloadStrategyV2(
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
                 val body = response.body ?: throw IOException("Empty body")
-
-                val target = File(targetDir, fileName)
-                val bytes =
-                    target.sink().buffer().use { sink ->
-                        body.source().use { source ->
-                            sink.writeAll(source)
-                            target.length()
-                        }
+                val stored =
+                    body.byteStream().use { input ->
+                        storageManager.writeAsset(assetsRelativeDir, fileName, input)
                     }
-                Triple(null, bytes, target)
+                stored.localPath to stored.bytes
             }
+        }
+
+    private fun toHtmlUri(localPath: String): String =
+        if (localPath.startsWith("content://") || localPath.startsWith("file://")) {
+            localPath
+        } else {
+            Uri.fromFile(java.io.File(localPath)).toString()
         }
 
     private fun hashName(input: String): String {
         val md = MessageDigest.getInstance("MD5")
         val bytes = md.digest(input.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }
-    }
-
-    private fun isPathPresent(path: String?): Boolean {
-        if (path.isNullOrBlank()) return false
-        return if (path.startsWith("content://")) {
-            true
-        } else {
-            val normalized = path.removePrefix("file://")
-            File(normalized).exists()
-        }
     }
 
     companion object {

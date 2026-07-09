@@ -4,7 +4,9 @@ import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
+import net.dom53.inkita.core.downloadv2.DownloadStorageManager
 import net.dom53.inkita.core.downloadv2.DownloadStrategyV2
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkLoggingInterceptor
@@ -16,10 +18,6 @@ import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.domain.model.Format
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okio.buffer
-import okio.sink
-import okio.source
-import java.io.File
 
 class DownloadApiStrategyV2(
     private val appContext: Context,
@@ -33,6 +31,7 @@ class DownloadApiStrategyV2(
             .Builder()
             .addInterceptor(NetworkLoggingInterceptor)
             .build()
+    private val storageManager = DownloadStorageManager(appContext, appPreferences)
 
     override suspend fun enqueue(request: DownloadRequestV2): Long {
         val now = System.currentTimeMillis()
@@ -46,7 +45,7 @@ class DownloadApiStrategyV2(
                 else ->
                     chapterId?.let { downloadDao.getDownloadedFileForChapter(it) }
             }
-        if (existing != null && existing.localPath?.let { File(it).exists() } == true) {
+        if (existing != null && storageManager.exists(existing.localPath)) {
             if (LoggingManager.isDebugEnabled()) {
                 LoggingManager.d("DownloadApiV2", "Skip enqueue; already downloaded ${request.type}=$endpoint")
             }
@@ -124,11 +123,7 @@ class DownloadApiStrategyV2(
                 DownloadJobV2Entity.TYPE_VOLUME -> "volume_${volumeId ?: job.id}.zip"
                 else -> "chapter_${chapterId ?: job.id}.zip"
             }
-        val baseDir =
-            appContext.getExternalFilesDir("Inkita/downloads/archives")
-                ?: File(appContext.filesDir, "Inkita/downloads/archives").apply { mkdirs() }
-        if (!baseDir.exists()) baseDir.mkdirs()
-        val target = File(baseDir, fileName)
+        val relativePath = DownloadPaths.archiveDownloadRelativePath(seriesId, volumeId, chapterId, fileName)
         val url =
             buildString {
                 val base = if (config.serverUrl.endsWith("/")) config.serverUrl.dropLast(1) else config.serverUrl
@@ -154,26 +149,26 @@ class DownloadApiStrategyV2(
                         failJob(job, "Empty body")
                         return
                     }
-                withContext(Dispatchers.IO) {
-                    body.byteStream().use { input ->
-                        target.sink().buffer().use { sink -> sink.writeAll(input.source()) }
+                val stored =
+                    withContext(Dispatchers.IO) {
+                        body.byteStream().use { input ->
+                            storageManager.write(relativePath, input)
+                        }
                     }
+                val item =
+                    downloadDao
+                        .getItemsForJob(jobId)
+                        .firstOrNull()
+                        ?.copy(
+                            status = DownloadedItemV2Entity.STATUS_COMPLETED,
+                            localPath = stored.localPath,
+                            bytes = stored.bytes,
+                            updatedAt = System.currentTimeMillis(),
+                            error = null,
+                        )
+                if (item != null) {
+                    downloadDao.upsertItems(listOf(item))
                 }
-            }
-            val bytes = target.length()
-            val item =
-                downloadDao
-                    .getItemsForJob(jobId)
-                    .firstOrNull()
-                    ?.copy(
-                        status = DownloadedItemV2Entity.STATUS_COMPLETED,
-                        localPath = target.absolutePath,
-                        bytes = bytes,
-                        updatedAt = System.currentTimeMillis(),
-                        error = null,
-                    )
-            if (item != null) {
-                downloadDao.upsertItems(listOf(item))
             }
             downloadDao.updateJob(
                 job.copy(
@@ -184,7 +179,7 @@ class DownloadApiStrategyV2(
                 ),
             )
             if (LoggingManager.isDebugEnabled()) {
-                LoggingManager.d("DownloadApiV2", "Completed job=$jobId path=${target.absolutePath} bytes=$bytes")
+                LoggingManager.d("DownloadApiV2", "Completed job=$jobId path=$relativePath")
             }
         } catch (e: Exception) {
             failJob(job, e.message ?: "Download failed")
