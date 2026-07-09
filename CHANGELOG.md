@@ -6,6 +6,7 @@ All notable changes to this project will be documented here.
 
 ### Added
 - Settings: Added Korean and Chinese language options.
+- Settings: Added a Download Location option for choosing a custom downloads folder through the Android folder picker.
 - Reader: Added OpenDyslexic as a selectable reader font.
 - Reader: Image reader now preloads adjacent pages and reveals the previous/next page while dragging horizontally.
 
