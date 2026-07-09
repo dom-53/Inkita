@@ -92,7 +92,7 @@ object ImageReader : BaseReader {
                 Modifier
                     .fillMaxSize()
                     .onSizeChanged { viewportSize = it }
-                    .pointerInput(params.uiState.pageIndex) {
+                    .pointerInput(params.uiState.pageIndex, params.imageReaderMode) {
                         var totalDrag = 0f
                         if (isVertical) {
                             detectVerticalDragGestures(
@@ -110,15 +110,24 @@ object ImageReader : BaseReader {
                                     val dragAtRelease = totalDrag
                                     val height = viewportSize.height.toFloat().coerceAtLeast(1f)
                                     if (dragAtRelease != 0f) {
+                                        val next = dragAtRelease < 0
                                         val targetOffset = if (dragAtRelease < 0) -height else height
-                                        settleTo(
-                                            targetOffset = targetOffset,
-                                        ) {
-                                            if (dragAtRelease < 0) {
+                                        val targetImageUrl = if (next) nextImageUrl else previousImageUrl
+                                        val turnPage = {
+                                            if (next) {
                                                 callbacks.onSwipeNext()
                                             } else {
                                                 callbacks.onSwipePrev()
                                             }
+                                        }
+                                        if (targetImageUrl == null) {
+                                            dragOffsetPx = 0f
+                                            turnPage()
+                                        } else {
+                                            settleTo(
+                                                targetOffset = targetOffset,
+                                                onSettled = turnPage,
+                                            )
                                         }
                                     } else {
                                         dragOffsetPx = 0f
@@ -200,7 +209,29 @@ object ImageReader : BaseReader {
                             .fillMaxSize()
                             .clipToBounds(),
                 ) {
-                    if (!isVertical) {
+                    if (isVertical) {
+                        val height = viewportSize.height
+                        previousImageUrl?.let { url ->
+                            ImagePage(
+                                imageUrl = url,
+                                offset =
+                                    IntOffset(
+                                        x = 0,
+                                        y = dragOffsetPx.roundToInt() - height,
+                                    ),
+                            )
+                        }
+                        nextImageUrl?.let { url ->
+                            ImagePage(
+                                imageUrl = url,
+                                offset =
+                                    IntOffset(
+                                        x = 0,
+                                        y = dragOffsetPx.roundToInt() + height,
+                                    ),
+                            )
+                        }
+                    } else {
                         val width = viewportSize.width
                         val leftImageUrl = if (isRtl) nextImageUrl else previousImageUrl
                         val rightImageUrl = if (isRtl) previousImageUrl else nextImageUrl
