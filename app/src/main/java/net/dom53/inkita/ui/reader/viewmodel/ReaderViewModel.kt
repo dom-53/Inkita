@@ -229,15 +229,15 @@ abstract class BaseReaderViewModel(
                 libraryId = info?.libraryId,
                 lastModifiedUtcMillis = System.currentTimeMillis(),
             )
-        if (net.dom53.inkita.core.logging.LoggingManager.isDebugEnabled()) {
+        if (net.dom53.inkita.core.logging.LoggingManager
+                .isDebugEnabled()
+        ) {
             net.dom53.inkita.core.logging.LoggingManager.d(
                 "InkitaProgress",
                 "Save on exit chapter=${progress.chapterId} page=${progress.page} series=${progress.seriesId}",
             )
         }
-        reader.saveProgressLocally(
-            progress,
-        )
+        reader.saveProgressLocally(progress)
     }
 
     fun markChapterRead() {

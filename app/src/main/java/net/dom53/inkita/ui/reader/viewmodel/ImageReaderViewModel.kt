@@ -111,7 +111,10 @@ class ImageReaderViewModel(
 
         val currentState = _state.value
         val pageChanged = currentState.activeChapterId != chapterId || currentState.pageIndex != pageIndex
-        if (pageChanged && net.dom53.inkita.core.logging.LoggingManager.isDebugEnabled()) {
+        if (pageChanged &&
+            net.dom53.inkita.core.logging.LoggingManager
+                .isDebugEnabled()
+        ) {
             net.dom53.inkita.core.logging.LoggingManager.d(
                 "InkitaProgress",
                 "Webtoon visible chapter=$chapterId page=$pageIndex",
@@ -355,7 +358,10 @@ class ImageReaderViewModel(
                         )
                     }
                     updateProgress(pageIndex)
-                    val pageCount = _state.value.webtoonChapters.firstOrNull { it.chapterId == targetChapterId }?.pageCount ?: 0
+                    val pageCount =
+                        _state.value.webtoonChapters
+                            .firstOrNull { it.chapterId == targetChapterId }
+                            ?.pageCount ?: 0
                     preloadAdjacentPages(targetChapterId, pageIndex, pageCount)
                 }.onFailure { error ->
                     _state.update { it.copy(isLoading = false, error = error.message ?: "Error loading page") }

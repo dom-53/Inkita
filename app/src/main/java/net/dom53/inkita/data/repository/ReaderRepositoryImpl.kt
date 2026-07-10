@@ -591,7 +591,9 @@ class ReaderRepositoryImpl(
                 } else {
                     false
                 }
-            if (net.dom53.inkita.core.logging.LoggingManager.isDebugEnabled()) {
+            if (net.dom53.inkita.core.logging.LoggingManager
+                    .isDebugEnabled()
+            ) {
                 net.dom53.inkita.core.logging.LoggingManager.d(
                     "InkitaProgress",
                     "Sync chapter=${local.chapterId} page=${local.page} remotePage=${remote?.page} " +
