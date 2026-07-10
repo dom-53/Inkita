@@ -20,6 +20,7 @@ data class ReaderUiState(
     val content: String? = null,
     val fromOffline: Boolean = false,
     val imageUrl: String? = null,
+    val imageUrls: Map<Int, String> = emptyMap(),
     val previousImageUrl: String? = null,
     val nextImageUrl: String? = null,
     val pageIndex: Int = 0,
@@ -209,6 +210,10 @@ abstract class BaseReaderViewModel(
         pageIndex: Int,
     ) {
         _state.update {
+            val imageUrls =
+                result.imageUrl?.let { url ->
+                    it.imageUrls + (pageIndex to url)
+                } ?: it.imageUrls
             it.copy(
                 content = result.content ?: it.content,
                 fromOffline = result.fromOffline,
@@ -217,6 +222,7 @@ abstract class BaseReaderViewModel(
                 error = null,
                 pdfPath = result.pdfPath ?: it.pdfPath,
                 imageUrl = result.imageUrl ?: it.imageUrl,
+                imageUrls = imageUrls,
                 previousImageUrl = if (result.imageUrl != null) null else it.previousImageUrl,
                 nextImageUrl = if (result.imageUrl != null) null else it.nextImageUrl,
             )

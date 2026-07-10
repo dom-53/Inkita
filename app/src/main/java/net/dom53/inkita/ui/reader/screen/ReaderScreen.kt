@@ -103,6 +103,7 @@ import net.dom53.inkita.ui.reader.renderer.BaseReader
 import net.dom53.inkita.ui.reader.renderer.ReaderRenderCallbacks
 import net.dom53.inkita.ui.reader.renderer.ReaderRenderParams
 import net.dom53.inkita.ui.reader.viewmodel.BaseReaderViewModel
+import net.dom53.inkita.ui.reader.viewmodel.ImageReaderViewModel
 import net.dom53.inkita.ui.reader.viewmodel.PdfReaderViewModel
 import net.dom53.inkita.ui.reader.viewmodel.ReaderUiState
 import java.io.File
@@ -355,6 +356,7 @@ internal fun BaseReaderScreen(
                     pendingScrollY = pendingScrollY,
                     pendingScrollId = pendingScrollId,
                     imageReaderMode = readerPrefs.imageReaderMode,
+                    imagePrefetchPages = readerPrefs.imagePrefetchPages,
                 ),
             callbacks =
                 ReaderRenderCallbacks(
@@ -367,6 +369,9 @@ internal fun BaseReaderScreen(
                     },
                     onSwipeNext = { goNextPage() },
                     onSwipePrev = { goPrevPage() },
+                    onImagePageVisible = { pageIndex, prefetchPages ->
+                        (readerViewModel as? ImageReaderViewModel)?.onWebtoonPageVisible(pageIndex, prefetchPages)
+                    },
                     onConsumePendingScroll = { pendingScrollY = null },
                     onConsumeScrollId = { pendingScrollId = null },
                     onWebViewReady = { webViewRef.value = it },
@@ -587,16 +592,7 @@ internal fun BaseReaderScreen(
                             }
                         },
                         onImageReaderModeChange = { mode ->
-                            if (mode == ImageReaderMode.Webtoon) {
-                                Toast
-                                    .makeText(
-                                        context,
-                                        R.string.general_not_implemented,
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
-                            } else {
-                                scope.launch { appPreferences.updateReaderPrefs { copy(imageReaderMode = mode) } }
-                            }
+                            scope.launch { appPreferences.updateReaderPrefs { copy(imageReaderMode = mode) } }
                         },
                     )
                 if (settingsContent != null) {

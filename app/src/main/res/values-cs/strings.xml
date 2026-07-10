@@ -458,8 +458,10 @@
     <string name="series_detail_vol_short_plain">Sv.</string>
     <string name="browse_filter_applied_genre">Filtrováno podle žánru: %1$s</string>
     <string name="series_detail_continue_ch">Pokračovat: s. %1$d</string>
+    <string name="series_detail_continue_ch_page">Pokračovat kap. %1$s str. %2$d</string>
     <string name="series_detail_start_reading">Začít číst</string>
     <string name="series_detail_continue_vol_ch">Pokračovat sv. %1$s str. %2$d</string>
+    <string name="series_detail_continue_vol_ch_page">Pokračovat sv. %1$s kap. %2$s str. %3$d</string>
     <string name="series_detail_chapter_fallback">Kapitola %1$d</string>
     <string name="series_detail_download_volume_confirm">Stáhnout</string>
     <string name="series_detail_resume_volume_title">Pokračovat ve stahování</string>

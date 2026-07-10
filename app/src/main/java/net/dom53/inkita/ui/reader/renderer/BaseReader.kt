@@ -32,12 +32,14 @@ data class ReaderRenderParams(
     val pendingScrollY: Int?,
     val pendingScrollId: String?,
     val imageReaderMode: ImageReaderMode,
+    val imagePrefetchPages: Int,
 )
 
 data class ReaderRenderCallbacks(
     val onToggleOverlay: () -> Unit,
     val onSwipeNext: () -> Unit,
     val onSwipePrev: () -> Unit,
+    val onImagePageVisible: (Int, Int) -> Unit,
     val onConsumePendingScroll: () -> Unit,
     val onConsumeScrollId: () -> Unit,
     val onWebViewReady: (WebView) -> Unit,

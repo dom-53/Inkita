@@ -428,6 +428,8 @@
     <string name="series_detail_vol_short_plain">권</string>
     <string name="series_detail_continue_vol_ch">%1$s권 %2$d페이지에서 계속</string>
     <string name="series_detail_continue_ch">%1$d페이지에서 계속</string>
+    <string name="series_detail_continue_vol_ch_page">%1$s권 챕터 %2$s %3$d페이지에서 계속</string>
+    <string name="series_detail_continue_ch_page">챕터 %1$s %2$d페이지에서 계속</string>
     <string name="series_detail_start_reading">읽기 시작</string>
     <string name="series_detail_chapter_fallback">%1$d 챕터</string>
     <string name="series_detail_pages_unavailable">페이지를 사용할 수 없습니다.</string>

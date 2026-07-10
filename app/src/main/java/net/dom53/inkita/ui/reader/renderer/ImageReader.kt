@@ -8,8 +8,13 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,9 +22,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +38,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import net.dom53.inkita.R
 import net.dom53.inkita.core.storage.ImageReaderMode
@@ -50,6 +61,13 @@ object ImageReader : BaseReader {
         val nextImageUrl = params.uiState.nextImageUrl
         val isRtl = params.imageReaderMode == ImageReaderMode.RightToLeft
         val isVertical = params.imageReaderMode == ImageReaderMode.Vertical
+        val isWebtoon = params.imageReaderMode == ImageReaderMode.Webtoon
+
+        if (isWebtoon) {
+            WebtoonContent(params = params, callbacks = callbacks)
+            return
+        }
+
         val scope = rememberCoroutineScope()
         var viewportSize by remember { mutableStateOf(IntSize.Zero) }
         var dragOffsetPx by remember { mutableFloatStateOf(0f) }
@@ -293,6 +311,125 @@ object ImageReader : BaseReader {
         }
     }
 }
+
+@Composable
+private fun WebtoonContent(
+    params: ReaderRenderParams,
+    callbacks: ReaderRenderCallbacks,
+) {
+    val uiState = params.uiState
+    val imageUrls =
+        remember(
+            uiState.imageUrls,
+            uiState.pageIndex,
+            uiState.imageUrl,
+        ) {
+            buildMap {
+                putAll(uiState.imageUrls)
+                uiState.imageUrl?.let { put(uiState.pageIndex, it) }
+            }
+        }
+    val lastKnownPage = imageUrls.keys.maxOrNull() ?: uiState.pageIndex
+    val pageCount = uiState.pageCount.coerceAtLeast(lastKnownPage + 1).coerceAtLeast(1)
+    val initialPage = uiState.pageIndex.coerceIn(0, pageCount - 1)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialPage)
+    var reportedPageIndex by remember { mutableIntStateOf(initialPage) }
+    var programmaticScrollTarget by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(listState, pageCount, params.imagePrefetchPages) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .collect { pageIndex ->
+                reportedPageIndex = pageIndex
+                if (programmaticScrollTarget == null) {
+                    callbacks.onImagePageVisible(pageIndex, params.imagePrefetchPages)
+                }
+            }
+    }
+    LaunchedEffect(uiState.pageIndex, pageCount) {
+        val targetPage = uiState.pageIndex.coerceIn(0, pageCount - 1)
+        if (targetPage != reportedPageIndex) {
+            programmaticScrollTarget = targetPage
+            try {
+                listState.animateScrollToItem(targetPage)
+            } finally {
+                programmaticScrollTarget = null
+                val visiblePage = listState.firstVisibleItemIndex
+                reportedPageIndex = visiblePage
+                callbacks.onImagePageVisible(visiblePage, params.imagePrefetchPages)
+            }
+        }
+    }
+
+    if (imageUrls.isEmpty() && uiState.error != null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = uiState.error,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        return
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures { callbacks.onToggleOverlay() }
+                },
+    ) {
+        items(
+            count = pageCount,
+            key = { it },
+        ) { pageIndex ->
+            val imageUrl = imageUrls[pageIndex]
+            if (imageUrl == null) {
+                WebtoonPlaceholder()
+            } else {
+                SubcomposeAsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentScale = ContentScale.FillWidth,
+                    alignment = Alignment.TopCenter,
+                ) {
+                    when (painter.state) {
+                        is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
+                        is AsyncImagePainter.State.Error -> WebtoonPlaceholder(showProgress = false)
+                        else -> WebtoonPlaceholder()
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WebtoonPlaceholder(showProgress: Boolean = true) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(WEBTOON_PLACEHOLDER_ASPECT_RATIO),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (showProgress) {
+            CircularProgressIndicator()
+        } else {
+            Text(
+                text = stringResource(R.string.general_error),
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+private const val WEBTOON_PLACEHOLDER_ASPECT_RATIO = 0.7f
 
 @Composable
 private fun BoxScope.ImagePage(

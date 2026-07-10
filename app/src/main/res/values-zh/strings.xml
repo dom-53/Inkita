@@ -428,6 +428,8 @@
     <string name="series_detail_vol_short_plain">卷</string>
     <string name="series_detail_continue_vol_ch">继续章节 %1$s 页 %2$d</string>
     <string name="series_detail_continue_ch">继续章节 %1$d</string>
+    <string name="series_detail_continue_vol_ch_page">继续阅读 卷 %1$s 章 %2$s 页 %3$d</string>
+    <string name="series_detail_continue_ch_page">继续阅读 章 %1$s 页 %2$d</string>
     <string name="series_detail_start_reading">开始阅读</string>
     <string name="series_detail_chapter_fallback">章节 %1$d</string>
     <string name="series_detail_pages_unavailable">页面不可用。</string>
