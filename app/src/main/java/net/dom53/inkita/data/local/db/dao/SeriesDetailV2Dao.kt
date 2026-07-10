@@ -49,11 +49,17 @@ interface SeriesDetailV2Dao {
     @Query("SELECT COUNT(*) FROM cached_series_volume_refs_v2")
     suspend fun getSeriesVolumeRefsCount(): Int
 
+    @Query("SELECT * FROM cached_volumes_v2 WHERE seriesId = :seriesId")
+    suspend fun getSeriesVolumes(seriesId: Int): List<CachedVolumeV2Entity>?
+
     @Query("SELECT COUNT(*) FROM cached_chapters_v2")
     suspend fun getChaptersCount(): Int
 
     @Query("SELECT COUNT(*) FROM cached_volume_chapter_refs_v2")
     suspend fun getVolumeChapterRefsCount(): Int
+
+    @Query("SELECT * FROM cached_chapters_v2 WHERE volumeId = :volumeId")
+    suspend fun getSeriesVolumeChapters(volumeId: Int): List<CachedChapterV2Entity>?
 
     @Query("DELETE FROM cached_series_detail_v2")
     suspend fun clearSeriesDetails()
