@@ -185,6 +185,12 @@
     <string name="reader_title">阅读器</string>
     <string name="reader_no_previous_chapter">无前一章</string>
     <string name="reader_no_next_chapter">此为最后一卷</string>
+    <string name="reader_webtoon_chapter_end">%1$s 结束</string>
+    <string name="reader_webtoon_chapter_start">%1$s 开始</string>
+    <string name="reader_webtoon_loading_next_chapter">正在加载下一章...</string>
+    <string name="reader_webtoon_no_next_chapter">没有下一章</string>
+    <string name="reader_webtoon_chapter_fallback">章节</string>
+    <string name="reader_webtoon_chapter_number">第 %1$s 章</string>
     <string name="reader_time_left">剩余时间</string>
     <string name="reader_prev_chapter">前一章</string>
     <string name="reader_jump_to_start">跳至初页</string>
@@ -428,6 +434,8 @@
     <string name="series_detail_vol_short_plain">卷</string>
     <string name="series_detail_continue_vol_ch">继续章节 %1$s 页 %2$d</string>
     <string name="series_detail_continue_ch">继续章节 %1$d</string>
+    <string name="series_detail_continue_vol_ch_page">继续阅读 卷 %1$s 章 %2$s 页 %3$d</string>
+    <string name="series_detail_continue_ch_page">继续阅读 章 %1$s 页 %2$d</string>
     <string name="series_detail_start_reading">开始阅读</string>
     <string name="series_detail_chapter_fallback">章节 %1$d</string>
     <string name="series_detail_pages_unavailable">页面不可用。</string>

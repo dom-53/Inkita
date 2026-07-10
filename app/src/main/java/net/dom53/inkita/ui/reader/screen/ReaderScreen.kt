@@ -103,6 +103,7 @@ import net.dom53.inkita.ui.reader.renderer.BaseReader
 import net.dom53.inkita.ui.reader.renderer.ReaderRenderCallbacks
 import net.dom53.inkita.ui.reader.renderer.ReaderRenderParams
 import net.dom53.inkita.ui.reader.viewmodel.BaseReaderViewModel
+import net.dom53.inkita.ui.reader.viewmodel.ImageReaderViewModel
 import net.dom53.inkita.ui.reader.viewmodel.PdfReaderViewModel
 import net.dom53.inkita.ui.reader.viewmodel.ReaderUiState
 import java.io.File
@@ -188,6 +189,24 @@ internal fun BaseReaderScreen(
     val uiState by readerViewModel.state.collectAsState()
     val context = LocalContext.current
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
+    val scope = rememberCoroutineScope()
+    var isLeavingReader by remember { mutableStateOf(false) }
+
+    val leaveReader: () -> Unit = {
+        if (!isLeavingReader) {
+            isLeavingReader = true
+            scope.launch {
+                runCatching { readerViewModel.saveCurrentProgress() }
+                val latestState = readerViewModel.state.value
+                onBack(
+                    latestState.activeChapterId ?: chapterId,
+                    latestState.pageIndex,
+                    latestState.bookInfo?.seriesId ?: seriesId,
+                    latestState.bookInfo?.volumeId ?: volumeId,
+                )
+            }
+        }
+    }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
@@ -197,9 +216,7 @@ internal fun BaseReaderScreen(
     }
 
     BackHandler {
-        val sid = uiState.bookInfo?.seriesId ?: seriesId
-        val vid = uiState.bookInfo?.volumeId ?: volumeId
-        onBack(chapterId, uiState.pageIndex, sid, vid)
+        leaveReader()
     }
     var pendingScrollY by remember { mutableStateOf<Int?>(null) }
     var pendingScrollId by remember { mutableStateOf<String?>(null) }
@@ -214,7 +231,6 @@ internal fun BaseReaderScreen(
     var themeMode by remember { mutableStateOf(ReaderThemeMode.Light) }
     var showNextChapterDialog by remember { mutableStateOf(false) }
     var pendingNextChapter by remember { mutableStateOf<net.dom53.inkita.domain.model.ReaderChapterNav?>(null) }
-    val scope = rememberCoroutineScope()
     val activity = LocalView.current.context as? Activity
     var showOverlay by remember { mutableStateOf(true) }
     var showSettingsPanel by remember { mutableStateOf(false) }
@@ -355,6 +371,7 @@ internal fun BaseReaderScreen(
                     pendingScrollY = pendingScrollY,
                     pendingScrollId = pendingScrollId,
                     imageReaderMode = readerPrefs.imageReaderMode,
+                    imagePrefetchPages = readerPrefs.imagePrefetchPages,
                 ),
             callbacks =
                 ReaderRenderCallbacks(
@@ -367,6 +384,19 @@ internal fun BaseReaderScreen(
                     },
                     onSwipeNext = { goNextPage() },
                     onSwipePrev = { goPrevPage() },
+                    onImagePageVisible = { visibleChapterId, pageIndex, prefetchPages ->
+                        (readerViewModel as? ImageReaderViewModel)?.onWebtoonPageVisible(
+                            chapterId = visibleChapterId,
+                            pageIndex = pageIndex,
+                            prefetchPages = prefetchPages,
+                        )
+                    },
+                    onWebtoonChapterBoundaryVisible = { currentChapterId, prefetchPages ->
+                        (readerViewModel as? ImageReaderViewModel)?.onWebtoonChapterBoundaryVisible(
+                            chapterId = currentChapterId,
+                            prefetchPages = prefetchPages,
+                        )
+                    },
                     onConsumePendingScroll = { pendingScrollY = null },
                     onConsumeScrollId = { pendingScrollId = null },
                     onWebViewReady = { webViewRef.value = it },
@@ -381,14 +411,12 @@ internal fun BaseReaderScreen(
             val barTitle = uiState.bookInfo?.title ?: stringResource(R.string.reader_title)
             val barPageText = pageText(uiState.pageIndex, uiState.pageCount, uiState.bookInfo?.pageTitle, context)
             if (topBarContent != null) {
-                topBarContent(barTitle, barPageText) {
-                    onBack(chapterId, uiState.pageIndex, seriesId, volumeId)
-                }
+                topBarContent(barTitle, barPageText, leaveReader)
             } else {
                 ReaderTopBar(
                     title = barTitle,
                     pageText = barPageText,
-                    onBack = { onBack(chapterId, uiState.pageIndex, seriesId, volumeId) },
+                    onBack = leaveReader,
                     modifier =
                         Modifier
                             .align(Alignment.TopStart)
@@ -587,16 +615,7 @@ internal fun BaseReaderScreen(
                             }
                         },
                         onImageReaderModeChange = { mode ->
-                            if (mode == ImageReaderMode.Webtoon) {
-                                Toast
-                                    .makeText(
-                                        context,
-                                        R.string.general_not_implemented,
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
-                            } else {
-                                scope.launch { appPreferences.updateReaderPrefs { copy(imageReaderMode = mode) } }
-                            }
+                            scope.launch { appPreferences.updateReaderPrefs { copy(imageReaderMode = mode) } }
                         },
                     )
                 if (settingsContent != null) {

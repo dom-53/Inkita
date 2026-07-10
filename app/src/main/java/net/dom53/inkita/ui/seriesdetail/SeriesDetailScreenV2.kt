@@ -636,13 +636,34 @@ fun SeriesDetailScreenV2(
                                 if (continuePoint != null && detail?.hasProgress == true) {
                                     val page = (continuePoint.pagesRead ?: 0) + 1
                                     val volId = readerProgress?.volumeId ?: continuePoint.volumeId
+                                    val chapterId = readerProgress?.chapterId ?: continuePoint.id
+                                    val chapterNumber =
+                                        chapterPositionText(
+                                            detail = detail?.detail,
+                                            chapterId = chapterId,
+                                            volumeId = volId,
+                                            fallbackChapter = continuePoint,
+                                        )
                                     val volumeNumber =
                                         detail
                                             ?.detail
                                             ?.volumes
                                             ?.firstOrNull { it.id == volId }
                                             ?.let { volumeNumberText(it) }
-                                    if (volumeNumber != null) {
+                                    if (volumeNumber != null && chapterNumber != null) {
+                                        stringResource(
+                                            id = net.dom53.inkita.R.string.series_detail_continue_vol_ch_page,
+                                            volumeNumber,
+                                            chapterNumber,
+                                            page,
+                                        )
+                                    } else if (chapterNumber != null) {
+                                        stringResource(
+                                            id = net.dom53.inkita.R.string.series_detail_continue_ch_page,
+                                            chapterNumber,
+                                            page,
+                                        )
+                                    } else if (volumeNumber != null) {
                                         stringResource(
                                             id = net.dom53.inkita.R.string.series_detail_continue_vol_ch,
                                             volumeNumber,

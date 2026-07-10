@@ -106,6 +106,8 @@
     <string name="series_detail_vol_short_plain">Vol.</string>
     <string name="series_detail_continue_vol_ch">Continue Vol. %1$s Pg. %2$d</string>
     <string name="series_detail_continue_ch">Continue Pg. %1$d</string>
+    <string name="series_detail_continue_vol_ch_page">Continue Vol. %1$s Ch. %2$s Pg. %3$d</string>
+    <string name="series_detail_continue_ch_page">Continue Ch. %1$s Pg. %2$d</string>
     <string name="series_detail_start_reading">Start reading</string>
     <string name="series_detail_chapter_fallback">Chapter %1$d</string>
     <string name="series_detail_pages_unavailable">Pages are not available.</string>
@@ -253,6 +255,12 @@
     <string name="reader_title">Reader</string>
     <string name="reader_no_previous_chapter">No previous chapter</string>
     <string name="reader_no_next_chapter">This is the last volume</string>
+    <string name="reader_webtoon_chapter_end">End of %1$s</string>
+    <string name="reader_webtoon_chapter_start">Beginning of %1$s</string>
+    <string name="reader_webtoon_loading_next_chapter">Loading next chapter...</string>
+    <string name="reader_webtoon_no_next_chapter">No next chapter</string>
+    <string name="reader_webtoon_chapter_fallback">Chapter</string>
+    <string name="reader_webtoon_chapter_number">Chapter %1$s</string>
     <string name="reader_time_left">Time left</string>
     <string name="reader_prev_chapter">Prev chapter</string>
     <string name="reader_jump_to_start">Jump to start</string>

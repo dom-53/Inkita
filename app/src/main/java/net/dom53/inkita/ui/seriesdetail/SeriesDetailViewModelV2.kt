@@ -276,6 +276,7 @@ class SeriesDetailViewModelV2(
             val shouldRefresh = forceRefresh || alwaysRefresh
             val policy = cacheManager.policy()
             val canCache = policy.globalEnabled && policy.libraryEnabled && policy.libraryDetailsEnabled
+            val localProgressSnapshot = readerRepository.getLatestLocalProgress(seriesId)
             if (LoggingManager.isDebugEnabled()) {
                 LoggingManager.d(
                     "SeriesDetailV2",
@@ -296,7 +297,7 @@ class SeriesDetailViewModelV2(
                         "Cache hit series=$seriesId stale=$isStale updatedAt=${cachedUpdatedAt ?: 0L}",
                     )
                 }
-                val localMerged = applyLocalProgress(cachedDetail, isOnline)
+                val localMerged = applyLocalProgress(cachedDetail, isOnline, localProgressSnapshot)
                 val membership =
                     localMerged.collections
                         ?.map { it.id }
@@ -418,7 +419,7 @@ class SeriesDetailViewModelV2(
                         rating = rating,
                         readerProgress = readerProgress,
                     )
-                val mergedDetail = applyLocalProgress(detail, isOnline)
+                val mergedDetail = applyLocalProgress(detail, isOnline, localProgressSnapshot)
                 val membership =
                     mergedDetail.collections
                         ?.map { it.id }
@@ -457,9 +458,11 @@ class SeriesDetailViewModelV2(
     private suspend fun applyLocalProgress(
         detail: InkitaDetailV2,
         isOnline: Boolean,
+        localProgressSnapshot: net.dom53.inkita.domain.model.ReaderProgress? = null,
     ): InkitaDetailV2 {
         val local =
-            readerRepository.getLatestLocalProgress(seriesId)
+            localProgressSnapshot
+                ?: readerRepository.getLatestLocalProgress(seriesId)
                 ?: run {
                     val chapterIds =
                         buildSet {
