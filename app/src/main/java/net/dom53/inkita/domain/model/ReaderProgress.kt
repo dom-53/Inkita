@@ -17,6 +17,7 @@ data class ReaderBookInfo(
     val libraryId: Int? = null,
     val title: String? = null,
     val pageTitle: String? = null,
+    val chapterNumber: String? = null,
 )
 
 data class ReaderTimeLeft(

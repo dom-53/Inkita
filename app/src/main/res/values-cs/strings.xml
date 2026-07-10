@@ -195,6 +195,12 @@
     <string name="reader_title">Čtečka</string>
     <string name="reader_no_previous_chapter">Žádná předchozí kapitola</string>
     <string name="reader_no_next_chapter">Toto je poslední volume</string>
+    <string name="reader_webtoon_chapter_end">Konec: %1$s</string>
+    <string name="reader_webtoon_chapter_start">Začátek: %1$s</string>
+    <string name="reader_webtoon_loading_next_chapter">Načítání další kapitoly...</string>
+    <string name="reader_webtoon_no_next_chapter">Žádná další kapitola</string>
+    <string name="reader_webtoon_chapter_fallback">Kapitola</string>
+    <string name="reader_webtoon_chapter_number">Kapitola %1$s</string>
     <string name="reader_time_left">Zbývající čas</string>
     <string name="reader_prev_chapter">Předchozí kapitola</string>
     <string name="reader_jump_to_start">Přejít na začátek</string>

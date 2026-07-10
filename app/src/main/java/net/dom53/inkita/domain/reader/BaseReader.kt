@@ -28,6 +28,8 @@ interface BaseReader {
         totalPages: Int? = null,
     )
 
+    suspend fun saveProgressLocally(progress: ReaderProgress)
+
     suspend fun getTimeLeft(
         seriesId: Int,
         chapterId: Int,

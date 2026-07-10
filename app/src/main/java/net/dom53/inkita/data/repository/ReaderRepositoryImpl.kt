@@ -233,6 +233,17 @@ class ReaderRepositoryImpl(
         maybeDeleteAfterSlidingWindow(progressWithTs)
     }
 
+    override suspend fun saveProgressLocally(progress: ReaderProgress) {
+        val progressWithTs =
+            if (progress.lastModifiedUtcMillis == 0L) {
+                progress.copy(lastModifiedUtcMillis = System.currentTimeMillis())
+            } else {
+                progress
+            }
+        readerDao.upsertLocalProgress(progressWithTs.toEntity())
+        ProgressSyncWorker.enqueue(context)
+    }
+
     override suspend fun getTimeLeft(
         seriesId: Int,
         chapterId: Int,
@@ -433,8 +444,55 @@ class ReaderRepositoryImpl(
             if (!isOnlineAllowed()) return@runCatching getOfflineBookInfo(chapterId)
             val api = apiOrThrow()
             val resp = api.getBookInfo(chapterId)
-            if (resp.isSuccessful) resp.body()?.toDomain() else null
+            if (!resp.isSuccessful) return@runCatching null
+            val info = resp.body()?.toDomain() ?: return@runCatching null
+            if (!info.pageTitle.isNullOrBlank()) {
+                info
+            } else {
+                info.copy(chapterNumber = resolveChapterNumber(api, info, chapterId))
+            }
         }.getOrNull() ?: getOfflineBookInfo(chapterId)
+
+    private suspend fun resolveChapterNumber(
+        api: net.dom53.inkita.data.api.KavitaApi,
+        info: ReaderBookInfo,
+        chapterId: Int,
+    ): String? {
+        val volume =
+            info.volumeId?.let { volumeId ->
+                runCatching { api.getVolumeById(volumeId) }
+                    .getOrNull()
+                    ?.takeIf { it.isSuccessful }
+                    ?.body()
+            }
+        chapterPosition(volume?.chapters, chapterId)?.let { return it }
+
+        val detail =
+            info.seriesId?.let { seriesId ->
+                runCatching { api.getSeriesDetail(seriesId) }
+                    .getOrNull()
+                    ?.takeIf { it.isSuccessful }
+                    ?.body()
+            }
+        chapterPosition(detail?.chapters, chapterId)?.let { return it }
+        val matchingChapter =
+            buildList {
+                addAll(detail?.chapters.orEmpty())
+                addAll(detail?.storylineChapters.orEmpty())
+                addAll(detail?.specials.orEmpty())
+                detail?.volumes.orEmpty().forEach { addAll(it.chapters.orEmpty()) }
+            }.firstOrNull { it.id == chapterId }
+        return matchingChapter?.number?.takeIf { it.isNotBlank() }
+            ?: matchingChapter?.range?.takeIf { it.isNotBlank() }
+    }
+
+    private fun chapterPosition(
+        chapters: List<net.dom53.inkita.data.api.dto.ChapterDto>?,
+        chapterId: Int,
+    ): String? {
+        val index = chapters?.indexOfFirst { it.id == chapterId } ?: -1
+        return index.takeIf { it >= 0 }?.let { (it + 1).toString() }
+    }
 
     override suspend fun markSeriesRead(seriesId: Int) {
         runCatching {
@@ -504,10 +562,43 @@ class ReaderRepositoryImpl(
                     local.lastModifiedUtcMillis > remote.lastModifiedUtcMillis -> local
                     else -> remote
                 }
+            val remoteAlreadyMatchesLocal =
+                remote != null &&
+                    remote.page == local.page &&
+                    (local.bookScrollId == null || remote.bookScrollId == local.bookScrollId)
             val resp =
                 runCatching { api.setReaderProgress(latest.toDto()) }
                     .getOrNull()
-            if (resp?.isSuccessful == true) {
+            val continuePointConfirmed =
+                if (resp?.isSuccessful == true && remoteAlreadyMatchesLocal && local.seriesId != null) {
+                    val continueResponse = runCatching { api.getContinuePoint(local.seriesId) }.getOrNull()
+                    val continuePoint = continueResponse?.takeIf { it.isSuccessful }?.body()
+                    val samePosition =
+                        continuePoint?.id == local.chapterId &&
+                            continuePoint.pagesRead == local.page
+                    if (samePosition) {
+                        true
+                    } else {
+                        val pageCount =
+                            runCatching { api.getBookInfo(local.chapterId) }
+                                .getOrNull()
+                                ?.takeIf { it.isSuccessful }
+                                ?.body()
+                                ?.pages
+                        val completed = pageCount != null && (local.page ?: 0) >= pageCount
+                        continueResponse?.isSuccessful == true && completed && continuePoint?.id != local.chapterId
+                    }
+                } else {
+                    false
+                }
+            if (net.dom53.inkita.core.logging.LoggingManager.isDebugEnabled()) {
+                net.dom53.inkita.core.logging.LoggingManager.d(
+                    "InkitaProgress",
+                    "Sync chapter=${local.chapterId} page=${local.page} remotePage=${remote?.page} " +
+                        "remoteMatches=$remoteAlreadyMatchesLocal continueConfirmed=$continuePointConfirmed",
+                )
+            }
+            if (resp?.isSuccessful == true && continuePointConfirmed) {
                 readerDao.clearLocalProgress(local.chapterId)
             } else {
                 readerDao.upsertLocalProgress(latest.toEntity())

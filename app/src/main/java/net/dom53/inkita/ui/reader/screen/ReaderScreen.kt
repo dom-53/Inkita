@@ -189,6 +189,24 @@ internal fun BaseReaderScreen(
     val uiState by readerViewModel.state.collectAsState()
     val context = LocalContext.current
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
+    val scope = rememberCoroutineScope()
+    var isLeavingReader by remember { mutableStateOf(false) }
+
+    val leaveReader: () -> Unit = {
+        if (!isLeavingReader) {
+            isLeavingReader = true
+            scope.launch {
+                runCatching { readerViewModel.saveCurrentProgress() }
+                val latestState = readerViewModel.state.value
+                onBack(
+                    latestState.activeChapterId ?: chapterId,
+                    latestState.pageIndex,
+                    latestState.bookInfo?.seriesId ?: seriesId,
+                    latestState.bookInfo?.volumeId ?: volumeId,
+                )
+            }
+        }
+    }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
@@ -198,9 +216,7 @@ internal fun BaseReaderScreen(
     }
 
     BackHandler {
-        val sid = uiState.bookInfo?.seriesId ?: seriesId
-        val vid = uiState.bookInfo?.volumeId ?: volumeId
-        onBack(chapterId, uiState.pageIndex, sid, vid)
+        leaveReader()
     }
     var pendingScrollY by remember { mutableStateOf<Int?>(null) }
     var pendingScrollId by remember { mutableStateOf<String?>(null) }
@@ -215,7 +231,6 @@ internal fun BaseReaderScreen(
     var themeMode by remember { mutableStateOf(ReaderThemeMode.Light) }
     var showNextChapterDialog by remember { mutableStateOf(false) }
     var pendingNextChapter by remember { mutableStateOf<net.dom53.inkita.domain.model.ReaderChapterNav?>(null) }
-    val scope = rememberCoroutineScope()
     val activity = LocalView.current.context as? Activity
     var showOverlay by remember { mutableStateOf(true) }
     var showSettingsPanel by remember { mutableStateOf(false) }
@@ -369,8 +384,18 @@ internal fun BaseReaderScreen(
                     },
                     onSwipeNext = { goNextPage() },
                     onSwipePrev = { goPrevPage() },
-                    onImagePageVisible = { pageIndex, prefetchPages ->
-                        (readerViewModel as? ImageReaderViewModel)?.onWebtoonPageVisible(pageIndex, prefetchPages)
+                    onImagePageVisible = { visibleChapterId, pageIndex, prefetchPages ->
+                        (readerViewModel as? ImageReaderViewModel)?.onWebtoonPageVisible(
+                            chapterId = visibleChapterId,
+                            pageIndex = pageIndex,
+                            prefetchPages = prefetchPages,
+                        )
+                    },
+                    onWebtoonChapterBoundaryVisible = { currentChapterId, prefetchPages ->
+                        (readerViewModel as? ImageReaderViewModel)?.onWebtoonChapterBoundaryVisible(
+                            chapterId = currentChapterId,
+                            prefetchPages = prefetchPages,
+                        )
                     },
                     onConsumePendingScroll = { pendingScrollY = null },
                     onConsumeScrollId = { pendingScrollId = null },
@@ -386,14 +411,12 @@ internal fun BaseReaderScreen(
             val barTitle = uiState.bookInfo?.title ?: stringResource(R.string.reader_title)
             val barPageText = pageText(uiState.pageIndex, uiState.pageCount, uiState.bookInfo?.pageTitle, context)
             if (topBarContent != null) {
-                topBarContent(barTitle, barPageText) {
-                    onBack(chapterId, uiState.pageIndex, seriesId, volumeId)
-                }
+                topBarContent(barTitle, barPageText, leaveReader)
             } else {
                 ReaderTopBar(
                     title = barTitle,
                     pageText = barPageText,
-                    onBack = { onBack(chapterId, uiState.pageIndex, seriesId, volumeId) },
+                    onBack = leaveReader,
                     modifier =
                         Modifier
                             .align(Alignment.TopStart)

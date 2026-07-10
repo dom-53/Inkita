@@ -185,6 +185,12 @@
     <string name="reader_title">리더</string>
     <string name="reader_no_previous_chapter">이전 챕터 없음</string>
     <string name="reader_no_next_chapter">마지막 권</string>
+    <string name="reader_webtoon_chapter_end">%1$s 끝</string>
+    <string name="reader_webtoon_chapter_start">%1$s 시작</string>
+    <string name="reader_webtoon_loading_next_chapter">다음 챕터 불러오는 중...</string>
+    <string name="reader_webtoon_no_next_chapter">다음 챕터가 없습니다</string>
+    <string name="reader_webtoon_chapter_fallback">챕터</string>
+    <string name="reader_webtoon_chapter_number">챕터 %1$s</string>
     <string name="reader_time_left">남은 시간</string>
     <string name="reader_prev_chapter">이전 챕터</string>
     <string name="reader_jump_to_start">처음으로</string>

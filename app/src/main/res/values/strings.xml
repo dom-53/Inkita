@@ -255,6 +255,12 @@
     <string name="reader_title">Reader</string>
     <string name="reader_no_previous_chapter">No previous chapter</string>
     <string name="reader_no_next_chapter">This is the last volume</string>
+    <string name="reader_webtoon_chapter_end">End of %1$s</string>
+    <string name="reader_webtoon_chapter_start">Beginning of %1$s</string>
+    <string name="reader_webtoon_loading_next_chapter">Loading next chapter...</string>
+    <string name="reader_webtoon_no_next_chapter">No next chapter</string>
+    <string name="reader_webtoon_chapter_fallback">Chapter</string>
+    <string name="reader_webtoon_chapter_number">Chapter %1$s</string>
     <string name="reader_time_left">Time left</string>
     <string name="reader_prev_chapter">Prev chapter</string>
     <string name="reader_jump_to_start">Jump to start</string>
