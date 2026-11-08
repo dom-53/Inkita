@@ -1,5 +1,6 @@
 package net.dom53.inkita.core.cache
 
+import android.database.sqlite.SQLiteBlobTooBigException
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.squareup.moshi.Moshi
@@ -33,6 +34,7 @@ import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedPersonV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
 import net.dom53.inkita.domain.model.Collection
@@ -44,6 +46,7 @@ import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okio.utf8Size
 import java.io.File
 import java.io.FileOutputStream
 
@@ -69,6 +72,9 @@ class CacheManagerImpl(
     companion object {
         const val MAX_DIM = 512
         const val THUMBNAIL_QUALITY = 85
+
+        // Leave room in Android's CursorWindow for the row's other columns and overhead.
+        private const val MAX_SERIES_DETAIL_TEXT_BYTES = 1024 * 1024
     }
 
     private val moshi: Moshi by lazy {
@@ -364,7 +370,7 @@ class CacheManagerImpl(
         val now = System.currentTimeMillis()
         val metadata = detail.metadata
         val entity =
-            net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity(
+            CachedSeriesDetailV2Entity(
                 seriesId = seriesId,
                 summary = metadata?.summary,
                 publicationStatus = metadata?.publicationStatus,
@@ -393,6 +399,10 @@ class CacheManagerImpl(
                 seriesDetailPlusJson = detail.seriesDetailPlus?.let { seriesDetailPlusAdapter.toJson(it) },
                 updatedAt = now,
             )
+        if (entity.textSizeBytes() > MAX_SERIES_DETAIL_TEXT_BYTES) {
+            LoggingManager.w("CacheV2", "Skipped caching oversized detail for series=$seriesId")
+            return
+        }
         dao.upsertSeriesDetail(entity)
         if (LoggingManager.isDebugEnabled()) {
             LoggingManager.d("CacheV2", "Store series detail series=$seriesId")
@@ -404,7 +414,13 @@ class CacheManagerImpl(
         val dao = seriesDetailV2Dao ?: return null
         val p = policy()
         if (!p.globalEnabled || !p.libraryEnabled || !p.libraryDetailsEnabled) return null
-        val entity = dao.getSeriesDetail(seriesId) ?: return null
+        val entity =
+            try {
+                dao.getSeriesDetail(seriesId)
+            } catch (_: SQLiteBlobTooBigException) {
+                LoggingManager.w("CacheV2", "Ignoring oversized cached detail for series=$seriesId")
+                null
+            } ?: return null
         if (LoggingManager.isDebugEnabled()) {
             LoggingManager.d("CacheV2", "Read series detail series=$seriesId")
         }
@@ -462,6 +478,27 @@ class CacheManagerImpl(
         val dao = seriesDetailV2Dao ?: return null
         return dao.getSeriesDetailUpdatedAt(seriesId)
     }
+
+    private fun CachedSeriesDetailV2Entity.textSizeBytes(): Long =
+        listOfNotNull(
+            summary,
+            genres,
+            tags,
+            writers,
+            seriesJson,
+            metadataJson,
+            detailJson,
+            relatedJson,
+            ratingJson,
+            continuePointJson,
+            readerProgressJson,
+            timeLeftJson,
+            collectionsJson,
+            readingListsJson,
+            bookmarksJson,
+            annotationsJson,
+            seriesDetailPlusJson,
+        ).sumOf { it.utf8Size() }
 
     /** Clear all cached data, including thumbnails and DB records. */
     override suspend fun clearAllCache() {
@@ -643,7 +680,7 @@ class CacheManagerImpl(
     private fun toJsonList(value: List<String>): String = stringListAdapter.toJson(value)
 
     /** Recreate minimal metadata when cached JSON payload is missing. */
-    private fun buildFallbackMetadata(entity: net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity): SeriesMetadataDto? {
+    private fun buildFallbackMetadata(entity: CachedSeriesDetailV2Entity): SeriesMetadataDto? {
         if (
             entity.summary == null &&
             entity.publicationStatus == null &&
