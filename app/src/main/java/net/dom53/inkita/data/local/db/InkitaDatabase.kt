@@ -20,6 +20,7 @@ import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedPersonV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailChunkEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailRelatedRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
@@ -41,6 +42,7 @@ import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
         CachedPersonV2Entity::class,
         CachedPersonRefEntity::class,
         CachedSeriesDetailV2Entity::class,
+        CachedSeriesDetailChunkEntity::class,
         CachedSeriesDetailRelatedRefEntity::class,
         CachedVolumeV2Entity::class,
         CachedSeriesVolumeRefEntity::class,
@@ -51,7 +53,7 @@ import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
         DownloadedItemV2Entity::class,
         net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity::class,
     ],
-    version = 21,
+    version = 22,
     exportSchema = false,
 )
 abstract class InkitaDatabase : RoomDatabase() {
@@ -565,6 +567,24 @@ abstract class InkitaDatabase : RoomDatabase() {
                 }
             }
 
+        private val MIGRATION_21_22 =
+            object : Migration(21, 22) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN chunkCount INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_series_detail_chunks(
+                            seriesId INTEGER NOT NULL,
+                            chunkIndex INTEGER NOT NULL,
+                            payload BLOB NOT NULL,
+                            PRIMARY KEY(seriesId, chunkIndex),
+                            FOREIGN KEY(seriesId) REFERENCES cached_series_detail_v2(seriesId) ON DELETE CASCADE
+                        )
+                        """.trimIndent(),
+                    )
+                }
+            }
+
         fun getInstance(context: Context): InkitaDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room
@@ -593,6 +613,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         MIGRATION_18_19,
                         MIGRATION_19_20,
                         MIGRATION_20_21,
+                        MIGRATION_21_22,
                     ).build()
                     .also { INSTANCE = it }
             }
