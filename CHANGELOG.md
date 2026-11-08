@@ -9,6 +9,7 @@ All notable changes to this project will be documented here.
 - Settings: Added a Download Location option for choosing a custom downloads folder through the Android folder picker.
 - Reader: Added OpenDyslexic as a selectable reader font.
 - Reader: Image reader now preloads adjacent pages and reveals the previous/next page while dragging horizontally.
+- Cache: Large series details can now be cached and opened offline after loading them online.
 
 ### Changed
 - Reader: Image reader page turns now follow the drag position and complete in the swipe direction.
@@ -17,6 +18,7 @@ All notable changes to this project will be documented here.
 - Reader: Removed the touch highlight animation from image pages while tapping or swiping.
 - Reader: Removed the conflicting image reader transition that could snap back and then swipe again after a drag turn.
 - Reader: Avoided the loading flash when turning to an already preloaded adjacent image page.
+- Cache: Fixed a crash when opening a series with an oversized cached detail ([#34](https://github.com/dom-53/Inkita/issues/34)).
 
 ## v0.3.1-beta
 

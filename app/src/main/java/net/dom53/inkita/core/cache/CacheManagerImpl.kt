@@ -34,6 +34,7 @@ import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedPersonV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailChunkEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
@@ -46,6 +47,7 @@ import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okio.Buffer
 import okio.utf8Size
 import java.io.File
 import java.io.FileOutputStream
@@ -75,6 +77,7 @@ class CacheManagerImpl(
 
         // Leave room in Android's CursorWindow for the row's other columns and overhead.
         private const val MAX_SERIES_DETAIL_TEXT_BYTES = 1024 * 1024
+        private const val SERIES_DETAIL_CHUNK_BYTES = 256L * 1024
     }
 
     private val moshi: Moshi by lazy {
@@ -87,6 +90,7 @@ class CacheManagerImpl(
     private val seriesAdapter = moshi.adapter(SeriesDto::class.java)
     private val metadataAdapter = moshi.adapter(SeriesMetadataDto::class.java)
     private val detailAdapter = moshi.adapter(SeriesDetailDto::class.java)
+    private val fullDetailAdapter by lazy { moshi.adapter(InkitaDetailV2::class.java) }
     private val relatedAdapter = moshi.adapter(RelatedSeriesDto::class.java)
     private val ratingAdapter = moshi.adapter(RatingDto::class.java)
     private val chapterAdapter = moshi.adapter(ChapterDto::class.java)
@@ -400,10 +404,11 @@ class CacheManagerImpl(
                 updatedAt = now,
             )
         if (entity.textSizeBytes() > MAX_SERIES_DETAIL_TEXT_BYTES) {
-            LoggingManager.w("CacheV2", "Skipped caching oversized detail for series=$seriesId")
-            return
+            val chunks = withContext(Dispatchers.Default) { encodeSeriesDetailChunks(seriesId, detail) }
+            dao.replaceChunkedSeriesDetail(seriesId, now, chunks)
+        } else {
+            dao.upsertSeriesDetail(entity)
         }
-        dao.upsertSeriesDetail(entity)
         if (LoggingManager.isDebugEnabled()) {
             LoggingManager.d("CacheV2", "Store series detail series=$seriesId")
         }
@@ -414,9 +419,9 @@ class CacheManagerImpl(
         val dao = seriesDetailV2Dao ?: return null
         val p = policy()
         if (!p.globalEnabled || !p.libraryEnabled || !p.libraryDetailsEnabled) return null
-        val entity =
+        val (entity, chunks) =
             try {
-                dao.getSeriesDetail(seriesId)
+                dao.getSeriesDetailWithChunks(seriesId)
             } catch (_: SQLiteBlobTooBigException) {
                 LoggingManager.w("CacheV2", "Ignoring oversized cached detail for series=$seriesId")
                 null
@@ -424,6 +429,10 @@ class CacheManagerImpl(
         if (LoggingManager.isDebugEnabled()) {
             LoggingManager.d("CacheV2", "Read series detail series=$seriesId")
         }
+        if (entity.chunkCount > 0) {
+            return withContext(Dispatchers.Default) { decodeSeriesDetailChunks(entity, chunks) }
+        }
+
         val series = entity.seriesJson?.let { fromJson(seriesAdapter, it) }
         val metadata = entity.metadataJson?.let { fromJson(metadataAdapter, it) }
         val detail = entity.detailJson?.let { fromJson(detailAdapter, it) }
@@ -477,6 +486,35 @@ class CacheManagerImpl(
     override suspend fun getSeriesDetailV2UpdatedAt(seriesId: Int): Long? {
         val dao = seriesDetailV2Dao ?: return null
         return dao.getSeriesDetailUpdatedAt(seriesId)
+    }
+
+    private fun encodeSeriesDetailChunks(
+        seriesId: Int,
+        detail: InkitaDetailV2,
+    ): List<CachedSeriesDetailChunkEntity> {
+        val payload = Buffer()
+        fullDetailAdapter.toJson(payload, detail)
+        return buildList {
+            while (payload.size > 0) {
+                val chunk = payload.readByteArray(minOf(payload.size, SERIES_DETAIL_CHUNK_BYTES))
+                add(CachedSeriesDetailChunkEntity(seriesId, size, chunk))
+            }
+        }
+    }
+
+    private fun decodeSeriesDetailChunks(
+        entity: CachedSeriesDetailV2Entity,
+        chunks: List<ByteArray>,
+    ): InkitaDetailV2? {
+        if (chunks.size != entity.chunkCount) {
+            LoggingManager.w("CacheV2", "Ignoring incomplete cached detail for series=${entity.seriesId}")
+            return null
+        }
+        val payload = Buffer()
+        chunks.forEach { payload.write(it) }
+        return runCatching { fullDetailAdapter.fromJson(payload) }
+            .onFailure { LoggingManager.w("CacheV2", "Ignoring invalid cached detail for series=${entity.seriesId}") }
+            .getOrNull()
     }
 
     private fun CachedSeriesDetailV2Entity.textSizeBytes(): Long =

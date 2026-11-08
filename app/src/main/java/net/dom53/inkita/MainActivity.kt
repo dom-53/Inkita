@@ -136,6 +136,7 @@ private const val IMPORTANT_INFO_HEADER =
 private val IMPORTANT_INFO_ADDED =
     listOf(
         "Settings: added Korean and Chinese language options",
+        "Cache: large series details can now be opened offline after loading them online",
     )
 
 private val IMPORTANT_INFO_CHANGED =
@@ -145,7 +146,7 @@ private val IMPORTANT_INFO_CHANGED =
 
 private val IMPORTANT_INFO_FIXED =
     listOf(
-        "",
+        "Cache: fixed a crash when opening a series with an oversized cached detail",
     )
 
 private const val FORCE_SHOW_IMPORTANT_INFO = false
