@@ -417,6 +417,9 @@
     <string name="settings_about_up_to_date">You are up to date</string>
     <string name="settings_about_update_failed">Unable to check for updates</string>
     <string name="settings_about_update_downloading">Downloading update…</string>
+    <string name="settings_about_update_download_failed">Could not download the update.</string>
+    <string name="settings_about_update_install_failed">Could not open the Android installer.</string>
+    <string name="settings_about_update_allow_install">Allow installation from Inkita, then return to finish the update.</string>
     <string name="settings_about_update_prompt">A new version is available. Do you want to download and install it now?</string>
     <string name="settings_about_update_confirm">Download</string>
     <!-- Others  -->

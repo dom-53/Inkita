@@ -443,6 +443,9 @@
     <string name="settings_about_up_to_date">Máte aktuální verzi</string>
     <string name="settings_about_update_failed">Nelze zkontrolovat aktualizace</string>
     <string name="settings_about_update_downloading">Stahuji aktualizaci…</string>
+    <string name="settings_about_update_download_failed">Aktualizaci se nepodařilo stáhnout.</string>
+    <string name="settings_about_update_install_failed">Nepodařilo se otevřít instalátor Androidu.</string>
+    <string name="settings_about_update_allow_install">Povol instalaci z Inkity a pak se vrať k dokončení aktualizace.</string>
     <string name="settings_about_update_prompt">Je dostupná nová verze. Chceš ji stáhnout a nainstalovat?</string>
     <string name="settings_about_update_confirm">Stáhnout</string>
     <!--  Others  -->
