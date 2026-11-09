@@ -12,6 +12,8 @@ import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkLoggingInterceptor
+import net.dom53.inkita.core.network.forKavita
+import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.api.dto.AnnotationDto
 import net.dom53.inkita.data.api.dto.AppUserCollectionDto
@@ -45,6 +47,7 @@ import net.dom53.inkita.domain.model.ReadState
 import net.dom53.inkita.domain.model.ReadingList
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okio.Buffer
@@ -150,12 +153,13 @@ class CacheManagerImpl(
         if (!p.globalEnabled) return series
         val config = appPreferences.configFlow.first()
         if (!config.isConfigured) return series
+        val calls = httpClient.forKavita(config)
 
         return series.map { item ->
             if (item.localThumbPath != null) {
                 item
             } else {
-                val thumb = downloadThumbnailIfNeeded(config.serverUrl, config.apiKey, item.id)
+                val thumb = downloadThumbnailIfNeeded(config, calls, item.id)
                 if (thumb != null) item.copy(localThumbPath = thumb) else item
             }
         }
@@ -809,8 +813,8 @@ class CacheManagerImpl(
 
     /** Download and store a local series thumbnail if missing. */
     private suspend fun downloadThumbnailIfNeeded(
-        serverUrl: String,
-        apiKey: String,
+        config: AppConfig,
+        calls: Call.Factory,
         seriesId: Int,
     ): String? {
         val dir = thumbnailsDir ?: return null
@@ -829,10 +833,10 @@ class CacheManagerImpl(
                 }
 
                 if (result == null) {
-                    val base = if (serverUrl.endsWith("/")) serverUrl.dropLast(1) else serverUrl
-                    val url = "$base/api/Image/series-cover?seriesId=$seriesId&apiKey=$apiKey"
+                    val base = config.serverUrl.trimEnd('/')
+                    val url = "$base/api/Image/series-cover?seriesId=$seriesId&apiKey=${config.apiKey}"
                     val request = Request.Builder().url(url).build()
-                    httpClient.newCall(request).execute().use { resp ->
+                    calls.newCall(request).execute().use { resp ->
                         if (resp.isSuccessful) {
                             val body = resp.body
                             if (body != null) {

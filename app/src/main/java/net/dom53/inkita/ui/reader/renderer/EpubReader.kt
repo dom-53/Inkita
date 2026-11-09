@@ -52,6 +52,7 @@ object EpubReader : BaseReader {
             themeMode = params.themeMode,
             serverUrl = params.serverUrl,
             apiKey = params.apiKey,
+            config = params.config,
             onToggleOverlay = callbacks.onToggleOverlay,
             pendingScrollY = params.pendingScrollY,
             onConsumePendingScroll = callbacks.onConsumePendingScroll,

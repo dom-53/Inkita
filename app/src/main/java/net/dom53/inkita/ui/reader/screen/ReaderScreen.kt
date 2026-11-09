@@ -10,6 +10,8 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -61,6 +63,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,6 +92,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
 import net.dom53.inkita.core.network.NetworkUtils
+import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.storage.ImageReaderMode
 import net.dom53.inkita.core.storage.ReaderPrefs
@@ -221,6 +225,7 @@ internal fun BaseReaderScreen(
     var pendingScrollY by remember { mutableStateOf<Int?>(null) }
     var pendingScrollId by remember { mutableStateOf<String?>(null) }
     val readerPrefs by appPreferences.readerPrefsFlow.collectAsState(initial = ReaderPrefs())
+    val config by appPreferences.configFlow.collectAsState(initial = null)
     val fontOptions = remember { readerFontOptions }
 
     var fontSize by remember { mutableStateOf(18f) }
@@ -362,6 +367,7 @@ internal fun BaseReaderScreen(
                     uiState = uiState,
                     serverUrl = serverUrl,
                     apiKey = apiKey,
+                    config = config,
                     fontSize = fontSize,
                     lineHeight = lineHeight,
                     padding = padding,
@@ -1196,6 +1202,7 @@ internal fun ReaderWebView(
     themeMode: ReaderThemeMode,
     serverUrl: String?,
     apiKey: String?,
+    config: AppConfig?,
     onToggleOverlay: () -> Unit,
     pendingScrollY: Int?,
     onConsumePendingScroll: () -> Unit = {},
@@ -1300,6 +1307,11 @@ internal fun ReaderWebView(
         """
         }
 
+    val kavitaResources by rememberUpdatedState(
+        remember(config?.serverUrl, config?.caCertificate) {
+            config?.takeIf { it.caCertificate != null }?.let(::KavitaWebResources)
+        },
+    )
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { context ->
@@ -1345,6 +1357,11 @@ internal fun ReaderWebView(
                 settings.allowUniversalAccessFromFileURLs = true
                 webViewClient =
                     object : WebViewClient() {
+                        override fun shouldInterceptRequest(
+                            view: WebView?,
+                            request: WebResourceRequest,
+                        ): WebResourceResponse? = kavitaResources?.intercept(request)
+
                         override fun onPageFinished(
                             view: WebView?,
                             url: String?,

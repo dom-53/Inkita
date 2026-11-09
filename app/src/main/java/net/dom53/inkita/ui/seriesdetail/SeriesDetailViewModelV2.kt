@@ -73,7 +73,7 @@ class SeriesDetailViewModelV2(
                 _state.update { it.copy(collectionError = "Offline mode") }
                 return@launch
             }
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(cfg)
             val result =
                 runCatching {
                     if (add) {
@@ -122,7 +122,7 @@ class SeriesDetailViewModelV2(
                 _state.update { it.copy(collectionError = "Offline mode") }
                 return@launch
             }
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(cfg)
             val response =
                 runCatching {
                     api.addSeriesToCollection(
@@ -155,7 +155,7 @@ class SeriesDetailViewModelV2(
                 _state.update { it.copy(collectionError = "Offline mode") }
                 return@launch
             }
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(cfg)
             runCatching {
                 api.getCollectionsForSeries(seriesId)
             }.onSuccess { resp ->
@@ -187,7 +187,7 @@ class SeriesDetailViewModelV2(
                 _state.update { it.copy(error = "Not configured") }
                 return@launch
             }
-            val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(config)
             val want = current.wantToRead == true
             val response =
                 if (want) {
@@ -233,7 +233,7 @@ class SeriesDetailViewModelV2(
                 _state.update { it.copy(error = "Not configured") }
                 return@launch
             }
-            val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(config)
             val response =
                 if (markRead) {
                     api.markSeriesRead(MarkSeriesDto(currentSeriesId))
@@ -350,7 +350,7 @@ class SeriesDetailViewModelV2(
             }
 
             try {
-                val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+                val api = KavitaApiFactory.createAuthenticated(config)
                 val errors = mutableListOf<String>()
 
                 val seriesDeferred = async { api.getSeriesById(seriesId) }

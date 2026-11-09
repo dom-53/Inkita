@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import net.dom53.inkita.core.network.KavitaApiFactory
+import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.data.api.KavitaApi
 import net.dom53.inkita.data.repository.fetchPdfForReading
 import okhttp3.mockwebserver.MockResponse
@@ -103,7 +104,7 @@ class OnlinePdfTest {
             try {
                 MockWebServer().use { server ->
                     server.start()
-                    val api = KavitaApiFactory.createAuthenticated(server.url("/").toString(), "test-key")
+                    val api = KavitaApiFactory.createAuthenticated(AppConfig(server.url("/").toString(), "test-key", "", 0))
                     block(server, api, directory.resolve("pdf-42.pdf"))
                 }
             } finally {

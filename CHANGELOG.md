@@ -10,6 +10,7 @@ All notable changes to this project will be documented here.
 - Reader: Added OpenDyslexic as a selectable reader font.
 - Reader: Image reader now preloads adjacent pages and reveals the previous/next page while dragging horizontally.
 - Cache: Large series details can now be cached and opened offline after loading them online.
+- Settings: Import a private HTTPS CA certificate for the configured Kavita server ([#50](https://github.com/dom-53/Inkita/issues/50)).
 
 ### Changed
 - Reader: Image reader page turns now follow the drag position and complete in the swipe direction.

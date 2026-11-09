@@ -1,6 +1,8 @@
 package net.dom53.inkita.ui.settings.screens
 
 import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,15 +43,20 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
+import net.dom53.inkita.core.network.isSameOrigin
+import net.dom53.inkita.core.network.readKavitaCaCertificate
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.domain.repository.AuthRepository
 import net.dom53.inkita.domain.repository.KavitaConnectionException
 import net.dom53.inkita.domain.repository.KavitaConnectionException.Problem
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 @Composable
 fun SettingsKavitaScreen(
@@ -90,12 +97,38 @@ internal fun SettingsKavitaScreen(
     var useHttps by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var caCertificate by remember { mutableStateOf<String?>(null) }
+    var importingCertificate by remember { mutableStateOf(false) }
+    val busy = isSaving || importingCertificate
+    val certificatePicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                importingCertificate = true
+                saveError = null
+                scope.launch {
+                    try {
+                        caCertificate =
+                            withContext(Dispatchers.IO) {
+                                val input = requireNotNull(context.contentResolver.openInputStream(uri))
+                                readKavitaCaCertificate(input)
+                            }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        saveError = context.getString(R.string.settings_kavita_ca_invalid)
+                    } finally {
+                        importingCertificate = false
+                    }
+                }
+            }
+        }
 
     fun applyConfig(config: AppConfig) {
         serverUrl = config.serverUrl.withoutHttpScheme()
         useHttps = !config.serverUrl.startsWith("http://", ignoreCase = true)
         storedApiKey = config.apiKey
         storedImageApiKey = config.imageApiKey
+        caCertificate = config.caCertificate
         isConfigured = config.isConfigured
         isEditingApiKey = false
         apiKeyInput = ""
@@ -109,8 +142,7 @@ internal fun SettingsKavitaScreen(
         isSaving = true
         scope.launch {
             try {
-                authRepository.configure(config.serverUrl, config.apiKey, config.imageApiKey)
-                applyConfig(config)
+                applyConfig(authRepository.configure(config))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -145,11 +177,18 @@ internal fun SettingsKavitaScreen(
         ) {
             OutlinedTextField(
                 value = serverUrl,
-                onValueChange = { serverUrl = it },
+                onValueChange = { new ->
+                    val oldOrigin = "https://${serverUrl.withoutHttpScheme()}".toHttpUrlOrNull()
+                    val newOrigin = "https://${new.withoutHttpScheme()}".toHttpUrlOrNull()
+                    if (oldOrigin == null || newOrigin == null || !oldOrigin.isSameOrigin(newOrigin)) {
+                        caCertificate = null
+                    }
+                    serverUrl = new
+                },
                 label = { Text(stringResource(R.string.settings_kavita_server)) },
                 placeholder = { Text("kavita.myserver.com") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isSaving,
+                enabled = !busy,
                 singleLine = true,
             )
             Row(
@@ -160,7 +199,7 @@ internal fun SettingsKavitaScreen(
                 Text(stringResource(R.string.settings_kavita_use_https))
                 Switch(
                     checked = useHttps,
-                    enabled = !isSaving,
+                    enabled = !busy,
                     onCheckedChange = { enabled ->
                         if (enabled) {
                             useHttps = true
@@ -190,7 +229,7 @@ internal fun SettingsKavitaScreen(
                         VisualTransformation.None
                     },
                 singleLine = true,
-                enabled = !isSaving,
+                enabled = !busy,
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -220,7 +259,7 @@ internal fun SettingsKavitaScreen(
                         VisualTransformation.None
                     },
                 singleLine = true,
-                enabled = !isSaving,
+                enabled = !busy,
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -249,7 +288,7 @@ internal fun SettingsKavitaScreen(
                 )
                 if (isConfigured) {
                     TextButton(
-                        enabled = !isSaving,
+                        enabled = !busy,
                         onClick = {
                             scope.launch {
                                 onLogout()
@@ -272,7 +311,7 @@ internal fun SettingsKavitaScreen(
                 )
             }
             Button(
-                enabled = !isSaving,
+                enabled = !busy,
                 onClick = {
                     focusManager.clearFocus()
                     snackbarHostState.currentSnackbarData?.dismiss()
@@ -285,7 +324,7 @@ internal fun SettingsKavitaScreen(
                     }
                     val imageKey = imageApiKeyInput.trim().ifBlank { storedImageApiKey.ifBlank { apiKey } }
                     val url = (if (useHttps) "https://" else "http://") + host
-                    val config = AppConfig(url, apiKey, imageKey, 0)
+                    val config = AppConfig(url, apiKey, imageKey, 0, caCertificate.takeIf { useHttps })
                     if (useHttps) {
                         saveConfig(config)
                     } else {
@@ -296,6 +335,27 @@ internal fun SettingsKavitaScreen(
                 modifier = Modifier.align(Alignment.End),
             ) {
                 Text(stringResource(if (isSaving) R.string.settings_kavita_checking_connection else R.string.settings_kavita_button_login))
+            }
+            if (useHttps) {
+                Text(
+                    stringResource(
+                        if (caCertificate == null) R.string.settings_kavita_ca_help else R.string.settings_kavita_ca_selected,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Row {
+                    TextButton(
+                        enabled = !busy && "https://${serverUrl.withoutHttpScheme()}".toHttpUrlOrNull() != null,
+                        onClick = { certificatePicker.launch(arrayOf("*/*")) },
+                    ) {
+                        Text(stringResource(R.string.settings_kavita_ca_import))
+                    }
+                    if (caCertificate != null) {
+                        TextButton(enabled = !busy, onClick = { caCertificate = null }) {
+                            Text(stringResource(R.string.settings_kavita_ca_remove))
+                        }
+                    }
+                }
             }
         }
         SnackbarHost(hostState = snackbarHostState)

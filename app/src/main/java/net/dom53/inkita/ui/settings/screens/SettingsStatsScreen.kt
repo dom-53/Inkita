@@ -60,7 +60,7 @@ fun SettingsStatsScreen(
     val wordsPerYear = remember { mutableStateOf<List<Int32StatCountDto>>(emptyList()) }
     val context = LocalContext.current
 
-    LaunchedEffect(config.serverUrl, config.apiKey) {
+    LaunchedEffect(config.serverUrl, config.apiKey, config.caCertificate) {
         if (!config.isConfigured) {
             isLoading.value = false
             error.value = context.resources.getString(R.string.general_server_or_api_key_not_set)
@@ -68,7 +68,7 @@ fun SettingsStatsScreen(
         }
         isLoading.value = true
         error.value = null
-        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val api = KavitaApiFactory.createAuthenticated(config)
         runCatching {
             val uid =
                 if (config.userId > 0) {

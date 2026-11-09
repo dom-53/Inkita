@@ -58,7 +58,7 @@ fun HistoryScreen(appPreferences: AppPreferences) {
     val history = remember { mutableStateOf<List<ReadHistoryEventDto>>(emptyList()) }
     val context = LocalContext.current
 
-    LaunchedEffect(config.serverUrl, config.apiKey) {
+    LaunchedEffect(config.serverUrl, config.apiKey, config.caCertificate) {
         if (!config.isConfigured) {
             isLoading.value = false
             error.value = context.resources.getString(R.string.general_server_or_api_key_not_set)
@@ -71,7 +71,7 @@ fun HistoryScreen(appPreferences: AppPreferences) {
         }
         isLoading.value = true
         error.value = null
-        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val api = KavitaApiFactory.createAuthenticated(config)
         val userIdToUse =
             if (config.userId > 0) {
                 config.userId

@@ -388,6 +388,11 @@
     <string name="settings_kavita_rejected_key">Kavita rejected the API key or denied access. Check your key and permissions.</string>
     <string name="settings_kavita_unreachable">Could not reach Kavita. Check the server address and your network connection.</string>
     <string name="settings_kavita_tls_failed">Could not establish a secure connection. Check the server’s HTTPS certificate.</string>
+    <string name="settings_kavita_ca_help">If your Kavita server uses a private certificate authority, import its root CA certificate (PEM or DER), then save the connection.</string>
+    <string name="settings_kavita_ca_selected">A custom CA is selected for this Kavita server.</string>
+    <string name="settings_kavita_ca_import">Import CA certificate</string>
+    <string name="settings_kavita_ca_remove">Remove</string>
+    <string name="settings_kavita_ca_invalid">Could not import the file. Choose a valid root CA certificate in PEM or DER format.</string>
     <string name="settings_kavita_http_error">The server returned HTTP %1$d. Check the Kavita address and try again.</string>
     <string name="settings_kavita_unexpected_response">The server returned an unexpected response. Check the Kavita address.</string>
     <!-- About Inkita  -->

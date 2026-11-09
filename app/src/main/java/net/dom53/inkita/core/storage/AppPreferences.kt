@@ -29,6 +29,7 @@ data class AppConfig(
     val apiKey: String,
     val imageApiKey: String,
     val userId: Int,
+    val caCertificate: String? = null,
 ) {
     val isConfigured: Boolean
         get() = serverUrl.isNotBlank() && apiKey.isNotBlank()
@@ -61,6 +62,7 @@ class AppPreferences(
 
     companion object {
         private val KEY_SERVER_URL = stringPreferencesKey("server_url")
+        private val KEY_KAVITA_CA = stringPreferencesKey("kavita_ca")
         private val KEY_API_KEY = stringPreferencesKey("api_key")
         private val LEGACY_KEY_TOKEN = stringPreferencesKey("token")
         private val LEGACY_KEY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
@@ -142,6 +144,7 @@ class AppPreferences(
                         }
                     },
                 userId = prefs[KEY_USER_ID]?.toIntOrNull() ?: 0,
+                caCertificate = prefs[KEY_KAVITA_CA],
             )
         }
 
@@ -285,25 +288,23 @@ class AppPreferences(
             collectionIds = prefetchCollectionIdsFlow.first(),
         )
 
-    suspend fun updateKavitaConfig(
-        serverUrl: String,
-        apiKey: String,
-        imageApiKey: String,
-        userId: Int = 0,
-    ) {
+    suspend fun updateKavitaConfig(config: AppConfig) {
         context.dataStore.edit { prefs ->
-            prefs[KEY_SERVER_URL] = serverUrl
+            prefs[KEY_SERVER_URL] = config.serverUrl
             prefs.remove(KEY_API_KEY)
-            prefs[KEY_USER_ID] = userId.toString()
+            prefs[KEY_USER_ID] = config.userId.toString()
+            val certificate = config.caCertificate
+            if (certificate == null) prefs.remove(KEY_KAVITA_CA) else prefs[KEY_KAVITA_CA] = certificate
         }
-        secureStorage.setApiKey(apiKey)
-        secureStorage.setImageApiKey(imageApiKey)
+        secureStorage.setApiKey(config.apiKey)
+        secureStorage.setImageApiKey(config.imageApiKey)
     }
 
     suspend fun clearAuth(clearServer: Boolean = false) {
         context.dataStore.edit { prefs ->
             if (clearServer) {
                 prefs[KEY_SERVER_URL] = ""
+                prefs.remove(KEY_KAVITA_CA)
             }
             prefs.remove(KEY_API_KEY)
             prefs[KEY_USER_ID] = "0"

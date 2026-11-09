@@ -26,7 +26,7 @@ class PersonRepositoryImpl(
 
         if (!NetworkUtils.isOnline(context)) throw IOException("Offline")
 
-        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val api = KavitaApiFactory.createAuthenticated(config)
         val filter =
             BrowsePersonFilterDto(
                 id = null,

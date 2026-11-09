@@ -498,7 +498,7 @@ class BrowseViewModel(
             val cfg = appPreferences.configFlow.first()
             if (!cfg.isConfigured) return@launch
             _state.update { it.copy(isMetadataLoading = true, metadataError = null) }
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(cfg)
             runCatching {
                 val languages = api.getLanguagesMeta().body().orEmpty()
                 val collections = api.getOwnedCollections(true).body().orEmpty()
@@ -531,7 +531,7 @@ class BrowseViewModel(
         if (!cfg.isConfigured || filterId == null) return null
         val def = _state.value.smartFilters.find { it.id == filterId } ?: return null
         return runCatching {
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(cfg)
             api.decodeFilter(DecodeFilterRequest(def.filter)).body()
         }.getOrNull()
     }
