@@ -130,10 +130,7 @@ class ReaderRepositoryImpl(
         if (!config.isConfigured) {
             throw IOException("Server or API key not configured")
         }
-        val base = if (config.serverUrl.endsWith("/")) config.serverUrl.dropLast(1) else config.serverUrl
-        val keyParam = config.apiKey.takeIf { it.isNotBlank() }?.let { "&apiKey=$it" } ?: ""
-        val url = "$base/api/reader/image?chapterId=$chapterId&page=$page$keyParam"
-        return ReaderImageResult(url, false)
+        return ReaderImageResult(config.comicPageUrl(chapterId, page), false)
     }
 
     override suspend fun getPage(
@@ -670,14 +667,7 @@ class ReaderRepositoryImpl(
         val entries =
             runCatching {
                 ZipFile(archiveFile).use { zip ->
-                    zip
-                        .entries()
-                        .asSequence()
-                        .filter { !it.isDirectory }
-                        .map { it.name }
-                        .filter { isImageFile(it) }
-                        .sortedWith { a, b -> naturalCompare(a, b) }
-                        .toList()
+                    zip.comicImageEntries().map { it.name }
                 }
             }.getOrDefault(emptyList())
         archiveEntryCache[path] = entries
@@ -688,40 +678,6 @@ class ReaderRepositoryImpl(
         path: String,
         chapterId: Int,
     ): File? = downloadStorageManager.fileForReading(path, "archive-reader", "chapter-$chapterId.cbz")
-
-    private fun isImageFile(name: String): Boolean {
-        val ext = name.substringAfterLast('.', "").lowercase(Locale.US)
-        return ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp")
-    }
-
-    private fun naturalCompare(
-        a: String,
-        b: String,
-    ): Int {
-        if (a == b) return 0
-        val partsA = splitNatural(a.lowercase(Locale.US))
-        val partsB = splitNatural(b.lowercase(Locale.US))
-        val max = maxOf(partsA.size, partsB.size)
-        for (i in 0 until max) {
-            val partA = partsA.getOrNull(i) ?: return -1
-            val partB = partsB.getOrNull(i) ?: return 1
-            val isNumA = partA.all { it.isDigit() }
-            val isNumB = partB.all { it.isDigit() }
-            val cmp =
-                if (isNumA && isNumB) {
-                    partA.toLong().compareTo(partB.toLong())
-                } else {
-                    partA.compareTo(partB)
-                }
-            if (cmp != 0) return cmp
-        }
-        return 0
-    }
-
-    private fun splitNatural(value: String): List<String> {
-        val regex = Regex("(\\d+)|(\\D+)")
-        return regex.findAll(value).map { it.value }.toList()
-    }
 
     private fun isOnlineAllowed(): Boolean =
         NetworkMonitor

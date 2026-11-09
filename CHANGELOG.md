@@ -21,6 +21,9 @@ All notable changes to this project will be documented here.
 - Reader: Avoided the loading flash when turning to an already preloaded adjacent image page.
 - Cache: Fixed a crash when opening a series with an oversized cached detail ([#34](https://github.com/dom-53/Inkita/issues/34)).
 - Reader: Open PDFs online when Kavita can serve the file through its download endpoint ([#52](https://github.com/dom-53/Inkita/issues/52)).
+- Reader: Read comic pages from the chapter archive if Kavita's page endpoint fails. Show a retry action if the page remains unavailable ([#26](https://github.com/dom-53/Inkita/issues/26)).
+- Reader: Open the last valid comic page when resuming a completed chapter.
+- Library: Fix a crash when Kavita returns library settings without the legacy `folderWatching` field.
 - Settings: Verify the Kavita connection before saving and display readable errors in dark mode ([#47](https://github.com/dom-53/Inkita/issues/47)).
 
 ## v0.3.1-beta
