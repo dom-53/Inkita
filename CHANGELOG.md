@@ -19,6 +19,7 @@ All notable changes to this project will be documented here.
 - Reader: Removed the conflicting image reader transition that could snap back and then swipe again after a drag turn.
 - Reader: Avoided the loading flash when turning to an already preloaded adjacent image page.
 - Cache: Fixed a crash when opening a series with an oversized cached detail ([#34](https://github.com/dom-53/Inkita/issues/34)).
+- Reader: Open PDFs online when Kavita can serve the file through its download endpoint ([#52](https://github.com/dom-53/Inkita/issues/52)).
 
 ## v0.3.1-beta
 

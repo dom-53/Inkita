@@ -147,6 +147,7 @@ private val IMPORTANT_INFO_CHANGED =
 private val IMPORTANT_INFO_FIXED =
     listOf(
         "Cache: fixed a crash when opening a series with an oversized cached detail",
+        "Reader: fixed opening PDFs online when Kavita can download the file",
     )
 
 private const val FORCE_SHOW_IMPORTANT_INFO = false

@@ -303,6 +303,12 @@ interface KavitaApi {
         @Query("extractPdf") extractPdf: Boolean = false,
     ): Response<ResponseBody>
 
+    @Streaming
+    @GET("api/Download/chapter")
+    suspend fun downloadChapterFile(
+        @Query("chapterId") chapterId: Int,
+    ): Response<ResponseBody>
+
     @GET("api/Reader/get-progress")
     suspend fun getReaderProgress(
         @Query("chapterId") chapterId: Int,
