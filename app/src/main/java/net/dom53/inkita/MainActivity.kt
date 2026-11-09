@@ -63,11 +63,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import net.dom53.inkita.core.cache.CacheManager
+import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.network.forKavita
 import net.dom53.inkita.core.startup.StartupManager
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.storage.AppTheme
+import net.dom53.inkita.data.repository.ComicPageFallback
 import net.dom53.inkita.domain.repository.AuthRepository
 import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
@@ -149,6 +151,9 @@ private val IMPORTANT_INFO_FIXED =
     listOf(
         "Cache: fixed a crash when opening a series with an oversized cached detail",
         "Reader: fixed opening PDFs online when Kavita can download the file",
+        "Reader: load comic pages from the chapter archive when Kavita's page endpoint fails",
+        "Reader: resume completed comics on the last valid page",
+        "Library: fix loading libraries on newer Kavita versions",
         "Settings: verify the Kavita connection before saving and show readable errors",
         "Settings: support a custom HTTPS CA certificate for the configured Kavita server",
     )
@@ -354,7 +359,7 @@ fun InkitaApp(
         }
 
         val imageLoader =
-            remember(maxThumbnailsParallel, config.serverUrl, config.caCertificate) {
+            remember(maxThumbnailsParallel, config) {
                 val dispatcher =
                     Dispatcher().apply {
                         maxRequestsPerHost = maxThumbnailsParallel
@@ -368,7 +373,15 @@ fun InkitaApp(
                 ImageLoader
                     .Builder(context)
                     .callFactory(okHttpClient.forKavita(config))
-                    .build()
+                    .components {
+                        add(
+                            ComicPageFallback(context, config) {
+                                NetworkMonitor
+                                    .getInstance(context, appPreferences)
+                                    .status.value.isOnlineAllowed
+                            },
+                        )
+                    }.build()
             }
 
         CompositionLocalProvider(LocalImageLoader provides imageLoader) {

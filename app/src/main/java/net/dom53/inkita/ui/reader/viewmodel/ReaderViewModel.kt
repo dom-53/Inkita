@@ -70,16 +70,21 @@ abstract class BaseReaderViewModel(
             val savedProgress = runCatching { reader.getProgress(chapterId) }.getOrNull()
             val info = runCatching { reader.getBookInfo(chapterId) }.getOrNull()
             val totalPages = info?.pages ?: 0
+            val pageToOpen =
+                if (reader.format == Format.Image && totalPages > 0) {
+                    initialPage.coerceIn(0, totalPages - 1)
+                } else {
+                    initialPage
+                }
             _state.update {
                 it.copy(
                     isPdf = reader.format == Format.Pdf,
                     bookInfo = info,
                     pageCount = totalPages,
                     bookScrollId = savedProgress?.bookScrollId ?: it.bookScrollId,
-                    pageIndex = it.pageIndex, // keep initialPage
                 )
             }
-            loadInitialContent()
+            loadInitialContent(pageToOpen)
             loadTimeLeft()
         }
     }
@@ -150,16 +155,16 @@ abstract class BaseReaderViewModel(
         }
     }
 
-    private fun loadInitialContent() {
+    private fun loadInitialContent(pageIndex: Int) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
-            runCatching { reader.loadInitial(chapterId, initialPage) }
+            runCatching { reader.loadInitial(chapterId, pageIndex) }
                 .onSuccess { result ->
-                    applyLoadResult(result, initialPage)
+                    applyLoadResult(result, pageIndex)
                     if (reader.format != Format.Pdf) {
-                        updateProgress(initialPage)
+                        updateProgress(pageIndex)
                     }
-                    onPageLoaded(initialPage)
+                    onPageLoaded(pageIndex)
                 }.onFailure { e ->
                     _state.update { it.copy(isLoading = false, error = e.message ?: "Error loading reader") }
                 }

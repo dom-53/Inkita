@@ -6,7 +6,6 @@ data class LibraryDto(
     val lastScanned: String? = null,
     val type: Int,
     val coverImage: String? = null,
-    val folderWatching: Boolean,
     val includeInDashboard: Boolean,
     val includeInRecommended: Boolean,
     val manageCollections: Boolean,
