@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -39,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -83,6 +85,8 @@ object ImageReader : BaseReader {
         }
 
         val scope = rememberCoroutineScope()
+        val zoom = remember(imageUrl, params.uiState.activeChapterId, params.uiState.pageIndex, params.imageReaderMode) { ComicPageZoom() }
+        val isZoomed = zoom.isZoomed
         var viewportSize by remember { mutableStateOf(IntSize.Zero) }
         var dragOffsetPx by remember { mutableFloatStateOf(0f) }
         var settleJob by remember { mutableStateOf<Job?>(null) }
@@ -117,8 +121,21 @@ object ImageReader : BaseReader {
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .onSizeChanged { viewportSize = it }
-                    .pointerInput(params.uiState.pageIndex, params.imageReaderMode) {
+                    .onSizeChanged {
+                        viewportSize = it
+                        zoom.reset()
+                    }.pointerInput(zoom) {
+                        detectComicPageTransform(
+                            canTransform = zoom::hasImage,
+                            shouldPan = { zoom.isZoomed },
+                            onTransformStart = {
+                                settleJob?.cancel()
+                                dragOffsetPx = 0f
+                            },
+                        ) { viewport, centroid, pan, factor ->
+                            zoom.transform(viewport, centroid, pan, factor)
+                        }
+                    }.pointerInput(params.uiState.pageIndex, params.imageReaderMode) {
                         var totalDrag = 0f
                         if (isVertical) {
                             detectVerticalDragGestures(
@@ -216,9 +233,9 @@ object ImageReader : BaseReader {
                                 },
                             )
                         }
-                    }.pointerInput(params.imageReaderMode, viewportSize) {
-                        detectTapGestures { offset ->
-                            if (isVertical) {
+                    }.pointerInput(zoom, isZoomed, viewportSize) {
+                        detectTapGestures(onDoubleTap = if (isZoomed) ({ zoom.reset() }) else null) { offset ->
+                            if (isVertical || isZoomed) {
                                 callbacks.onToggleOverlay()
                             } else {
                                 val width = viewportSize.width.toFloat().coerceAtLeast(1f)
@@ -309,6 +326,7 @@ object ImageReader : BaseReader {
                     }
                     ReaderPageImage(
                         imageUrl = imageUrl,
+                        zoom = zoom,
                         modifier =
                             Modifier
                                 .fillMaxSize()
@@ -422,9 +440,7 @@ private fun WebtoonContent(
         modifier =
             Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectTapGestures { callbacks.onToggleOverlay() }
-                },
+                .webtoonZoom(listState, callbacks.onToggleOverlay),
     ) {
         items(
             items = webtoonItems,
@@ -578,6 +594,7 @@ internal fun ReaderPageImage(
     imageUrl: String,
     modifier: Modifier = Modifier,
     isWebtoon: Boolean = false,
+    zoom: ComicPageZoom? = null,
 ) {
     var attempts by remember(imageUrl) { mutableIntStateOf(0) }
     key(imageUrl, attempts) {
@@ -589,7 +606,21 @@ internal fun ReaderPageImage(
             alignment = if (isWebtoon) Alignment.TopCenter else Alignment.Center,
         ) {
             when (val state = painter.state) {
-                is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
+                is AsyncImagePainter.State.Success -> {
+                    val transform =
+                        if (zoom == null) {
+                            Modifier
+                        } else {
+                            SideEffect { zoom.imageSize = state.painter.intrinsicSize }
+                            Modifier.graphicsLayer {
+                                scaleX = zoom.scale
+                                scaleY = zoom.scale
+                                translationX = zoom.translation.x
+                                translationY = zoom.translation.y
+                            }
+                        }
+                    SubcomposeAsyncImageContent(modifier = transform)
+                }
                 is AsyncImagePainter.State.Error ->
                     ReaderPageError(
                         statusCode = (state.result.throwable as? HttpException)?.response?.code,

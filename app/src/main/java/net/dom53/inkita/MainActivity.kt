@@ -138,6 +138,7 @@ private const val IMPORTANT_INFO_HEADER =
 
 private val IMPORTANT_INFO_ADDED =
     listOf(
+        "Reader: pinch to zoom and pan in comics and Webtoon mode, with double-tap to reset",
         "Settings: added Korean and Chinese language options",
         "Cache: large series details can now be opened offline after loading them online",
     )
