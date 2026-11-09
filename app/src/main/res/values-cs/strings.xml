@@ -380,6 +380,13 @@
     <string name="settings_kavita_http_warning_cancel">Zrušit</string>
     <string name="settings_kavita_saved_toast">Konfigurace uložena. Prosím restartujte aplikaci.</string>
     <string name="settings_kavita_save_failed">Uložení selhalo: %1$s</string>
+    <string name="settings_kavita_checking_connection">Ověřuji připojení…</string>
+    <string name="settings_kavita_invalid_url">Zadejte platnou adresu serveru Kavita.</string>
+    <string name="settings_kavita_rejected_key">Kavita odmítla API klíč nebo odepřela přístup. Zkontrolujte klíč a oprávnění.</string>
+    <string name="settings_kavita_unreachable">Ke Kavitě se nepodařilo připojit. Zkontrolujte adresu serveru a připojení k síti.</string>
+    <string name="settings_kavita_tls_failed">Zabezpečené připojení se nepodařilo navázat. Zkontrolujte HTTPS certifikát serveru.</string>
+    <string name="settings_kavita_http_error">Server vrátil HTTP %1$d. Zkontrolujte adresu Kavita serveru a zkuste to znovu.</string>
+    <string name="settings_kavita_unexpected_response">Server vrátil neočekávanou odpověď. Zkontrolujte adresu Kavita serveru.</string>
     <!-- Advanced -->
     <string name="advanced_clear_cache">Vyčistit mezipaměť</string>
     <string name="advanced_cache_clear_downloaded_pages">Stažené stránky</string>

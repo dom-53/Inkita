@@ -383,6 +383,13 @@
     <string name="settings_kavita_http_warning_cancel">Cancel</string>
     <string name="settings_kavita_saved_toast">Configuration saved. Please restart the app.</string>
     <string name="settings_kavita_save_failed">Save failed: %1$s</string>
+    <string name="settings_kavita_checking_connection">Checking connection…</string>
+    <string name="settings_kavita_invalid_url">Enter a valid Kavita server address.</string>
+    <string name="settings_kavita_rejected_key">Kavita rejected the API key or denied access. Check your key and permissions.</string>
+    <string name="settings_kavita_unreachable">Could not reach Kavita. Check the server address and your network connection.</string>
+    <string name="settings_kavita_tls_failed">Could not establish a secure connection. Check the server’s HTTPS certificate.</string>
+    <string name="settings_kavita_http_error">The server returned HTTP %1$d. Check the Kavita address and try again.</string>
+    <string name="settings_kavita_unexpected_response">The server returned an unexpected response. Check the Kavita address.</string>
     <!-- About Inkita  -->
     <string name="settings_about_version">Version</string>
     <string name="settings_about_build_time">Build time</string>

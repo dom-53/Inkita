@@ -50,6 +50,7 @@ object KavitaApiFactory {
     fun createAuthenticated(
         baseUrl: String,
         apiKey: String,
+        followRedirects: Boolean = true,
     ): KavitaApi {
         val apiKeyInterceptor =
             Interceptor { chain ->
@@ -67,6 +68,7 @@ object KavitaApiFactory {
                 .Builder()
                 .addInterceptor(apiKeyInterceptor)
                 .addInterceptor(NetworkLoggingInterceptor)
+                .followRedirects(followRedirects)
                 .callTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .connectTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .readTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
