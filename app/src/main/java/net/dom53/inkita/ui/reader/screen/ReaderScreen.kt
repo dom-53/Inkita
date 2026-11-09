@@ -22,6 +22,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -104,6 +105,7 @@ import net.dom53.inkita.ui.reader.model.fontFaceCss
 import net.dom53.inkita.ui.reader.model.readerFontOptions
 import net.dom53.inkita.ui.reader.model.readerThemeOptions
 import net.dom53.inkita.ui.reader.renderer.BaseReader
+import net.dom53.inkita.ui.reader.renderer.PdfReader
 import net.dom53.inkita.ui.reader.renderer.ReaderRenderCallbacks
 import net.dom53.inkita.ui.reader.renderer.ReaderRenderParams
 import net.dom53.inkita.ui.reader.viewmodel.BaseReaderViewModel
@@ -242,7 +244,8 @@ internal fun BaseReaderScreen(
     var selectedSettingsTab by remember { mutableStateOf(ReaderSettingsTab.Font) }
     val selectedFont = fontOptions.firstOrNull { it.id == fontFamilyId } ?: readerFontOptions.first()
     val isImageReader = renderer == net.dom53.inkita.ui.reader.renderer.ImageReader
-    val supportsReaderSettings = renderer.supportsTextSettings || isImageReader
+    val isPdfReader = renderer == PdfReader
+    val supportsReaderSettings = renderer.supportsTextSettings || isImageReader || isPdfReader
 
     LaunchedEffect(readerPrefs) {
         fontSize = readerPrefs.fontSize
@@ -378,6 +381,7 @@ internal fun BaseReaderScreen(
                     pendingScrollId = pendingScrollId,
                     imageReaderMode = readerPrefs.imageReaderMode,
                     imagePrefetchPages = readerPrefs.imagePrefetchPages,
+                    pdfRightToLeft = readerPrefs.pdfRightToLeft,
                 ),
             callbacks =
                 ReaderRenderCallbacks(
@@ -627,10 +631,21 @@ internal fun BaseReaderScreen(
                 if (settingsContent != null) {
                     settingsContent(settingsState, settingsCallbacks)
                 } else if (isImageReader) {
-                    ImageReaderSettingsPanel(
-                        mode = settingsState.imageReaderMode,
-                        onModeChange = settingsCallbacks.onImageReaderModeChange,
-                    )
+                    ReaderSettingsPanel {
+                        ImageReadingModeSettings(
+                            mode = settingsState.imageReaderMode,
+                            onModeChange = settingsCallbacks.onImageReaderModeChange,
+                        )
+                    }
+                } else if (isPdfReader) {
+                    ReaderSettingsPanel {
+                        PdfReadingDirectionSettings(
+                            rightToLeft = readerPrefs.pdfRightToLeft,
+                            onChange = { rightToLeft ->
+                                scope.launch { appPreferences.updateReaderPrefs { copy(pdfRightToLeft = rightToLeft) } }
+                            },
+                        )
+                    }
                 } else {
                     SettingsPanel(
                         selectedTab = settingsState.selectedTab,
@@ -1084,10 +1099,7 @@ private fun ThemeSettings(
 }
 
 @Composable
-private fun ImageReaderSettingsPanel(
-    mode: ImageReaderMode,
-    onModeChange: (ImageReaderMode) -> Unit,
-) {
+private fun ReaderSettingsPanel(content: @Composable () -> Unit) {
     Column(
         modifier =
             Modifier
@@ -1103,7 +1115,27 @@ private fun ImageReaderSettingsPanel(
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.align(Alignment.CenterHorizontally),
         )
-        ImageReadingModeSettings(mode = mode, onModeChange = onModeChange)
+        content()
+    }
+}
+
+@Composable
+private fun PdfReadingDirectionSettings(
+    rightToLeft: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Text(stringResource(R.string.reader_pdf_reading_direction), style = MaterialTheme.typography.titleSmall)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(
+            selected = !rightToLeft,
+            onClick = { onChange(false) },
+            label = { Text(stringResource(R.string.reader_image_mode_ltr)) },
+        )
+        FilterChip(
+            selected = rightToLeft,
+            onClick = { onChange(true) },
+            label = { Text(stringResource(R.string.reader_image_mode_rtl)) },
+        )
     }
 }
 
@@ -1482,6 +1514,8 @@ internal fun ReaderWebView(
 internal fun PdfPageViewer(
     pdfPath: String,
     currentPage: Int,
+    rightToLeft: Boolean,
+    onTap: () -> Unit,
     onPageChanged: (Int, Int) -> Unit,
 ) {
     val file = remember(pdfPath) { File(pdfPath) }
@@ -1489,6 +1523,7 @@ internal fun PdfPageViewer(
     val density = LocalDensity.current
     val targetWidthPx = remember(configuration.screenWidthDp) { with(density) { configuration.screenWidthDp.dp.roundToPx() } }
     val swipeThresholdPx = with(density) { 64.dp.toPx() }
+    val onTapLatest by rememberUpdatedState(onTap)
 
     var pageIndex by remember { mutableStateOf(currentPage.coerceAtLeast(0)) }
     var pageCount by remember { mutableStateOf(0) }
@@ -1556,18 +1591,17 @@ internal fun PdfPageViewer(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .pointerInput(pageIndex, pageCount) {
+                    .pointerInput(Unit) { detectTapGestures(onTap = { onTapLatest() }) }
+                    .pointerInput(pageCount, rightToLeft, swipeThresholdPx) {
                         var totalDrag = 0f
                         detectHorizontalDragGestures(
                             onDragStart = { totalDrag = 0f },
                             onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
                             onDragEnd = {
                                 if (abs(totalDrag) > swipeThresholdPx) {
-                                    if (totalDrag < 0 && pageIndex < pageCount - 1) {
-                                        pageIndex += 1
-                                    } else if (totalDrag > 0 && pageIndex > 0) {
-                                        pageIndex -= 1
-                                    }
+                                    val forward = (totalDrag > 0) == rightToLeft
+                                    val offset = if (forward) 1 else -1
+                                    pageIndex = (pageIndex + offset).coerceIn(0, (pageCount - 1).coerceAtLeast(0))
                                 }
                                 totalDrag = 0f
                             },
