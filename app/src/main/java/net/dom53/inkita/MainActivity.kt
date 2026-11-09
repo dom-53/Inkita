@@ -150,6 +150,7 @@ private val IMPORTANT_INFO_CHANGED =
 
 private val IMPORTANT_INFO_FIXED =
     listOf(
+        "Updates: open the Android installer after downloading an update",
         "Updates: fixed the automatic check for new versions on startup",
         "Reader: open PDF settings to change the reading direction",
         "Library: keep cached Home sections when a request fails and offer a retry",

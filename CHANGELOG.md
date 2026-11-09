@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Fixed
+- Updates: Open the Android installer after downloading an update and save the APK in Downloads on Android 10 and newer.
+
 ### Added
 
 ### Changed
