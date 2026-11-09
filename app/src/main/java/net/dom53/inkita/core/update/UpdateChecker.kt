@@ -111,7 +111,7 @@ object UpdateChecker {
         }
 
     private fun parseVersion(value: String): Version? {
-        val regex = Regex("""(\\d+)\\.(\\d+)\\.(\\d+)(?:-([A-Za-z0-9.-]+))?""")
+        val regex = Regex("""(\d+)\.(\d+)\.(\d+)(?:-([A-Za-z0-9.-]+))?""")
         val m = regex.matchEntire(value) ?: return null
         val (maj, min, patch, pre) = m.destructured
         return Version(maj.toInt(), min.toInt(), patch.toInt(), pre.ifBlank { null })
