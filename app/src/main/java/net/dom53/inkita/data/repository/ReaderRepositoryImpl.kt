@@ -8,6 +8,7 @@ import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.sync.ProgressSyncWorker
+import net.dom53.inkita.data.api.KavitaApi
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
 import net.dom53.inkita.data.local.db.entity.CachedPageEntity
@@ -292,20 +293,7 @@ class ReaderRepositoryImpl(
             } catch (_: IOException) {
                 return null
             }
-        val response =
-            api.getPdf(
-                chapterId,
-                apiKey = config.apiKey.takeIf { it.isNotBlank() },
-                extractPdf = false,
-            )
-        if (!response.isSuccessful) return null
-        val body = response.body() ?: return null
-        tempTarget.parentFile?.mkdirs()
-        tempTarget.outputStream().use { out ->
-            body.byteStream().use { input ->
-                input.copyTo(out)
-            }
-        }
+        val pdf = api.fetchPdfForReading(chapterId, config.apiKey, tempTarget)
         if (net.dom53.inkita.core.logging.LoggingManager
                 .isDebugEnabled()
         ) {
@@ -314,7 +302,7 @@ class ReaderRepositoryImpl(
                 "Saved temp PDF: ${tempTarget.absolutePath}",
             )
         }
-        return tempTarget
+        return pdf
     }
 
     private suspend fun recordPdfDownloadIfMissing(
@@ -627,7 +615,7 @@ class ReaderRepositoryImpl(
         return latest?.toDomain()
     }
 
-    private suspend fun apiOrThrow(): net.dom53.inkita.data.api.KavitaApi {
+    private suspend fun apiOrThrow(): KavitaApi {
         val config = appPreferences.configFlow.first()
         check(config.isConfigured) { "Not authenticated" }
         if (!isOnlineAllowed()) throw IOException("Offline")
