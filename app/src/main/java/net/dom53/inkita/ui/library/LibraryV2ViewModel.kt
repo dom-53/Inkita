@@ -5,7 +5,9 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -24,6 +26,7 @@ import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.domain.model.Collection
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.model.Library
+import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
 import net.dom53.inkita.domain.repository.PersonRepository
@@ -48,6 +51,7 @@ class LibraryV2ViewModel(
     private val downloadDao =
         InkitaDatabase.getInstance(appPreferences.appContext).downloadV2Dao()
     private var lastDownloadedItems: List<DownloadedItemV2Entity> = emptyList()
+    private var homeLoadJob: Job? = null
 
     init {
         loadLibraries()
@@ -208,72 +212,94 @@ class LibraryV2ViewModel(
         }
     }
 
-    private fun loadHome() {
-        viewModelScope.launch {
-            _state.update { it.copy(isHomeLoading = true, homeError = null) }
-            val alwaysRefresh = appPreferences.cacheAlwaysRefreshFlow.first()
-            val staleMinutes = appPreferences.cacheStaleMinutesFlow.first()
-            val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
-            val cachedOnDeck =
-                cacheManager.getCachedLibraryV2SeriesList(
-                    LibraryV2CacheKeys.HOME_ON_DECK,
-                    "",
-                )
-            val cachedUpdated =
-                cacheManager.getCachedLibraryV2SeriesList(
-                    LibraryV2CacheKeys.HOME_RECENTLY_UPDATED,
-                    "",
-                )
-            val cachedAdded =
-                cacheManager.getCachedLibraryV2SeriesList(
-                    LibraryV2CacheKeys.HOME_RECENTLY_ADDED,
-                    "",
-                )
-            val cachedUpdatedAt =
-                cacheManager.getLibraryV2SeriesListUpdatedAt(
-                    LibraryV2CacheKeys.HOME_ON_DECK,
-                    "",
-                )
-            val cachedHasData =
-                cachedOnDeck.isNotEmpty() || cachedUpdated.isNotEmpty() || cachedAdded.isNotEmpty()
-            val isStale =
-                cachedUpdatedAt == null ||
-                    (System.currentTimeMillis() - cachedUpdatedAt) > staleMinutes * 60L * 1000L
-            logCacheDecision(
-                "home",
-                "online=$isOnline cache=$cachedHasData stale=$isStale refresh=$alwaysRefresh onDeck=${cachedOnDeck.size} updated=${cachedUpdated.size} added=${cachedAdded.size}",
-            )
-            val showDebugToast = appPreferences.debugToastsFlow.first()
-            if (cachedHasData) {
-                _state.update {
-                    it.copy(
-                        onDeck = cachedOnDeck.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
-                        recentlyUpdated = cachedUpdated.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
-                        recentlyAdded = cachedAdded.map { series -> HomeSeriesItem(series.id, series.name, series.localThumbPath) },
-                        isHomeLoading = true,
-                        homeError = null,
+    fun retryHome() = loadHome(forceRefresh = true)
+
+    private fun loadHome(forceRefresh: Boolean = false) {
+        if (homeLoadJob?.isActive == true) return
+        homeLoadJob =
+            viewModelScope.launch {
+                val previous = _state.value
+                _state.update { it.copy(isHomeLoading = true, homeLoadFailed = false) }
+                val refresh = forceRefresh || previous.homeLoadFailed || appPreferences.cacheAlwaysRefreshFlow.first()
+                val staleMinutes = appPreferences.cacheStaleMinutesFlow.first()
+                val isOnline = NetworkUtils.isOnline(appPreferences.appContext)
+                val cachedOnDeck =
+                    cacheManager.getCachedLibraryV2SeriesList(
+                        LibraryV2CacheKeys.HOME_ON_DECK,
+                        "",
                     )
-                }
-                updateDownloadStates(lastDownloadedItems)
-                if (!isOnline || (!alwaysRefresh && !isStale)) {
-                    logCacheDecision("home", "using cached data only")
+                val cachedUpdated =
+                    cacheManager.getCachedLibraryV2SeriesList(
+                        LibraryV2CacheKeys.HOME_RECENTLY_UPDATED,
+                        "",
+                    )
+                val cachedAdded =
+                    cacheManager.getCachedLibraryV2SeriesList(
+                        LibraryV2CacheKeys.HOME_RECENTLY_ADDED,
+                        "",
+                    )
+                val cachedUpdatedAt =
+                    cacheManager.getLibraryV2SeriesListUpdatedAt(
+                        LibraryV2CacheKeys.HOME_ON_DECK,
+                        "",
+                    )
+                val cachedHasData =
+                    cachedOnDeck.isNotEmpty() || cachedUpdated.isNotEmpty() || cachedAdded.isNotEmpty()
+                val availableOnDeck = cachedOnDeck.toHomeItems().ifEmpty { previous.onDeck }
+                val availableUpdated = cachedUpdated.toHomeItems().ifEmpty { previous.recentlyUpdated }
+                val availableAdded = cachedAdded.toHomeItems().ifEmpty { previous.recentlyAdded }
+                val isStale =
+                    cachedUpdatedAt == null ||
+                        (System.currentTimeMillis() - cachedUpdatedAt) > staleMinutes * 60L * 1000L
+                logCacheDecision(
+                    "home",
+                    "online=$isOnline cache=$cachedHasData stale=$isStale refresh=$refresh onDeck=${cachedOnDeck.size} updated=${cachedUpdated.size} added=${cachedAdded.size}",
+                )
+                val showDebugToast = appPreferences.debugToastsFlow.first()
+                if (cachedHasData) {
+                    _state.update {
+                        it.copy(
+                            onDeck = availableOnDeck,
+                            recentlyUpdated = availableUpdated,
+                            recentlyAdded = availableAdded,
+                            isHomeLoading = true,
+                        )
+                    }
+                    updateDownloadStates(lastDownloadedItems)
+                    if (!isOnline || (!refresh && !isStale)) {
+                        logCacheDecision("home", "using cached data only")
+                        if (showDebugToast) {
+                            android.widget.Toast
+                                .makeText(
+                                    appPreferences.appContext,
+                                    appPreferences.appContext.getString(R.string.debug_cache_use),
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                        }
+                        _state.update { it.copy(isHomeLoading = false) }
+                        return@launch
+                    }
                     if (showDebugToast) {
+                        val message =
+                            if (refresh) {
+                                R.string.debug_cache_force_online
+                            } else {
+                                R.string.debug_cache_stale_reload
+                            }
                         android.widget.Toast
                             .makeText(
                                 appPreferences.appContext,
-                                appPreferences.appContext.getString(R.string.debug_cache_use),
+                                appPreferences.appContext.getString(message),
                                 android.widget.Toast.LENGTH_SHORT,
                             ).show()
                     }
-                    _state.update { it.copy(isHomeLoading = false) }
-                    return@launch
-                }
-                if (showDebugToast) {
+                } else if (showDebugToast) {
+                    logCacheDecision("home", if (isOnline) "cache miss; fetch fresh" else "cache miss; offline")
                     val message =
-                        if (alwaysRefresh) {
-                            R.string.debug_cache_force_online
+                        if (isOnline) {
+                            R.string.debug_cache_use_fresh
                         } else {
-                            R.string.debug_cache_stale_reload
+                            R.string.debug_cache_no_cache
                         }
                     android.widget.Toast
                         .makeText(
@@ -282,101 +308,72 @@ class LibraryV2ViewModel(
                             android.widget.Toast.LENGTH_SHORT,
                         ).show()
                 }
-            } else if (showDebugToast) {
-                logCacheDecision("home", if (isOnline) "cache miss; fetch fresh" else "cache miss; offline")
-                val message =
-                    if (isOnline) {
-                        R.string.debug_cache_use_fresh
-                    } else {
-                        R.string.debug_cache_no_cache
+                if (!isOnline) {
+                    val hasContent = availableOnDeck.isNotEmpty() || availableUpdated.isNotEmpty() || availableAdded.isNotEmpty()
+                    _state.update { it.copy(isHomeLoading = false, homeLoadFailed = !hasContent) }
+                    return@launch
+                }
+                val onDeck =
+                    refreshHomeSection(LibraryV2CacheKeys.HOME_ON_DECK, availableOnDeck) {
+                        seriesRepository.getOnDeckSeries(1, 20, 0)
                     }
-                android.widget.Toast
-                    .makeText(
-                        appPreferences.appContext,
-                        appPreferences.appContext.getString(message),
-                        android.widget.Toast.LENGTH_SHORT,
-                    ).show()
-            }
-            val onDeckResult = runCatching { seriesRepository.getOnDeckSeries(1, 20, 0) }
-            val updatedResult = runCatching { seriesRepository.getRecentlyUpdatedSeries(1, 20) }
-            val addedResult = runCatching { seriesRepository.getRecentlyAddedSeries(1, 20) }
-            logCacheDecision(
-                "home",
-                "fetched onDeck=${onDeckResult.getOrDefault(
-                    emptyList(),
-                ).size} updated=${updatedResult.getOrDefault(emptyList()).size} added=${addedResult.getOrDefault(emptyList()).size}",
-            )
-
-            val onDeck =
-                onDeckResult.getOrDefault(emptyList()).map { series ->
-                    val title = series.name.ifBlank { "Series ${series.id}" }
-                    HomeSeriesItem(id = series.id, title = title, localThumbPath = series.localThumbPath)
-                }
-            val recentlyUpdated =
-                updatedResult.getOrDefault(emptyList()).mapNotNull { item ->
-                    val id = item.seriesId ?: return@mapNotNull null
-                    val title =
-                        item.seriesName?.ifBlank { null }
-                            ?: item.title?.ifBlank { null }
-                            ?: "Series $id"
-                    HomeSeriesItem(id = id, title = title, localThumbPath = null)
-                }
-            val recentlyAdded =
-                addedResult.getOrDefault(emptyList()).map { series ->
-                    val title = series.name.ifBlank { "Series ${series.id}" }
-                    HomeSeriesItem(id = series.id, title = title, localThumbPath = series.localThumbPath)
-                }
-            cacheManager.cacheLibraryV2SeriesList(
-                LibraryV2CacheKeys.HOME_ON_DECK,
-                "",
-                onDeckResult.getOrDefault(emptyList()),
-            )
-            cacheManager.cacheLibraryV2SeriesList(
-                LibraryV2CacheKeys.HOME_RECENTLY_ADDED,
-                "",
-                addedResult.getOrDefault(emptyList()),
-            )
-            val updatedSeries =
-                updatedResult.getOrDefault(emptyList()).mapNotNull { item ->
-                    val id = item.seriesId ?: return@mapNotNull null
-                    val title =
-                        item.seriesName?.ifBlank { null }
-                            ?: item.title?.ifBlank { null }
-                            ?: "Series $id"
-                    net.dom53.inkita.domain.model.Series(
-                        id = id,
-                        name = title,
-                        summary = null,
-                        libraryId = null,
-                        format = null,
-                        pages = null,
-                        pagesRead = null,
-                        readState = null,
+                val recentlyUpdated =
+                    refreshHomeSection(LibraryV2CacheKeys.HOME_RECENTLY_UPDATED, availableUpdated) {
+                        seriesRepository.getRecentlyUpdatedSeries(1, 20).mapNotNull { item ->
+                            val id = item.seriesId ?: return@mapNotNull null
+                            Series(
+                                id = id,
+                                name = item.seriesName?.ifBlank { null } ?: item.title?.ifBlank { null } ?: "Series $id",
+                                summary = null,
+                                libraryId = null,
+                                format = null,
+                                pages = null,
+                                pagesRead = null,
+                                readState = null,
+                            )
+                        }
+                    }
+                val recentlyAdded =
+                    refreshHomeSection(LibraryV2CacheKeys.HOME_RECENTLY_ADDED, availableAdded) {
+                        seriesRepository.getRecentlyAddedSeries(1, 20)
+                    }
+                _state.update {
+                    it.copy(
+                        onDeck = onDeck.items,
+                        recentlyUpdated = recentlyUpdated.items,
+                        recentlyAdded = recentlyAdded.items,
+                        isHomeLoading = false,
+                        homeLoadFailed = onDeck.failed || recentlyUpdated.failed || recentlyAdded.failed,
                     )
                 }
-            cacheManager.cacheLibraryV2SeriesList(
-                LibraryV2CacheKeys.HOME_RECENTLY_UPDATED,
-                "",
-                updatedSeries,
-            )
-            logCacheDecision("home", "cached lists stored")
-
-            val error =
-                onDeckResult.exceptionOrNull()
-                    ?: updatedResult.exceptionOrNull()
-                    ?: addedResult.exceptionOrNull()
-            _state.update {
-                it.copy(
-                    onDeck = onDeck,
-                    recentlyUpdated = recentlyUpdated,
-                    recentlyAdded = recentlyAdded,
-                    isHomeLoading = false,
-                    homeError = error?.message,
-                )
+                updateDownloadStates(lastDownloadedItems)
             }
-            updateDownloadStates(lastDownloadedItems)
-        }
     }
+
+    private suspend fun refreshHomeSection(
+        listType: String,
+        available: List<HomeSeriesItem>,
+        fetch: suspend () -> List<Series>,
+    ): HomeSectionResult {
+        val series =
+            try {
+                fetch()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                LoggingManager.w("LibraryHome", "Could not refresh $listType (${e.javaClass.simpleName})")
+                return HomeSectionResult(available, failed = true)
+            }
+        cacheManager.cacheLibraryV2SeriesList(listType, "", series)
+        return HomeSectionResult(series.toHomeItems(), failed = false)
+    }
+
+    private fun List<Series>.toHomeItems(): List<HomeSeriesItem> = map { series -> HomeSeriesItem(series.id, series.name.ifBlank { "Series ${series.id}" }, series.localThumbPath) }
+
+    private data class HomeSectionResult(
+        val items: List<HomeSeriesItem>,
+        val failed: Boolean,
+    )
 
     private fun ensureWantToRead() {
         val current = _state.value

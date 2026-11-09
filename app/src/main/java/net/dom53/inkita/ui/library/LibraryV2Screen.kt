@@ -42,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -309,55 +310,53 @@ fun LibraryV2Screen(
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        when {
-                            uiState.isHomeLoading &&
-                                uiState.onDeck.isEmpty() &&
-                                uiState.recentlyUpdated.isEmpty() &&
-                                uiState.recentlyAdded.isEmpty() -> {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    CircularProgressIndicator()
-                                }
+                        val hasContent =
+                            uiState.onDeck.isNotEmpty() || uiState.recentlyUpdated.isNotEmpty() || uiState.recentlyAdded.isNotEmpty()
+                        if (uiState.isHomeLoading && !hasContent) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator()
                             }
+                        }
 
-                            uiState.homeError != null &&
-                                uiState.onDeck.isEmpty() &&
-                                uiState.recentlyUpdated.isEmpty() &&
-                                uiState.recentlyAdded.isEmpty() -> {
-                                Text(
-                                    text = uiState.homeError ?: "",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
+                        if (uiState.homeLoadFailed) {
+                            Text(
+                                text = stringResource(R.string.library_home_load_failed),
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            TextButton(onClick = viewModel::retryHome) {
+                                Text(stringResource(R.string.download_action_retry))
                             }
+                        }
 
-                            else -> {
-                                HomeSection(
-                                    title = "On Deck",
-                                    items = uiState.onDeck,
-                                    config = config,
-                                    downloadStates = downloadStates,
-                                    showDownloadBadges = showDownloadBadges,
-                                    onOpenSeries = onOpenSeries,
-                                )
-                                HomeSection(
-                                    title = "Recently Updated Series",
-                                    items = uiState.recentlyUpdated,
-                                    config = config,
-                                    downloadStates = downloadStates,
-                                    showDownloadBadges = showDownloadBadges,
-                                    onOpenSeries = onOpenSeries,
-                                )
-                                HomeSection(
-                                    title = "Newly Added Series",
-                                    items = uiState.recentlyAdded,
-                                    config = config,
-                                    downloadStates = downloadStates,
-                                    showDownloadBadges = showDownloadBadges,
-                                    onOpenSeries = onOpenSeries,
-                                )
-                            }
+                        if (hasContent || (!uiState.isHomeLoading && !uiState.homeLoadFailed)) {
+                            HomeSection(
+                                title = "On Deck",
+                                items = uiState.onDeck,
+                                config = config,
+                                downloadStates = downloadStates,
+                                showDownloadBadges = showDownloadBadges,
+                                onOpenSeries = onOpenSeries,
+                            )
+                            HomeSection(
+                                title = "Recently Updated Series",
+                                items = uiState.recentlyUpdated,
+                                config = config,
+                                downloadStates = downloadStates,
+                                showDownloadBadges = showDownloadBadges,
+                                onOpenSeries = onOpenSeries,
+                            )
+                            HomeSection(
+                                title = "Newly Added Series",
+                                items = uiState.recentlyAdded,
+                                config = config,
+                                downloadStates = downloadStates,
+                                showDownloadBadges = showDownloadBadges,
+                                onOpenSeries = onOpenSeries,
+                            )
                         }
                     }
                 }
