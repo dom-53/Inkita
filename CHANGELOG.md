@@ -7,11 +7,6 @@ All notable changes to this project will be documented here.
 ### Fixed
 - Updates: Open the Android installer after downloading an update and save the APK in Downloads on Android 10 and newer.
 
-### Added
-
-### Changed
-
-### Fixed
 
 ## v0.3.2-beta
 
