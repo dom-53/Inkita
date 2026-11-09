@@ -15,7 +15,7 @@
 <br>
 
 [//]: # ([![Inkita Stable]&#40;https://img.shields.io/github/release/dom-53/Inkita.svg?maxAge=3600&label=Stable&labelColor=06599d&color=043b69&#41;]&#40;https://github.com/dom-53/Inkita/releases&#41;)
-[![Inkita Preview](https://img.shields.io/github/v/release/dom-53/Inkita.svg?maxAge=3600&label=Preview&labelColor=2c2c47&color=1c1c39&include_prereleases)](https://github.com/dom-53/Inkita/releases)
+[![Inkita Preview](https://img.shields.io/github/v/release/dom-53/Inkita?include_prereleases&sort=date&filter=*-*&label=Preview&labelColor=2c2c47&color=1c1c39)](https://github.com/dom-53/Inkita/releases)
 
 
 </div>
