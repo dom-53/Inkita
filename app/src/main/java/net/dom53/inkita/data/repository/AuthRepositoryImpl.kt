@@ -13,55 +13,44 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import retrofit2.Response
 import java.io.EOFException
 import java.io.IOException
+import java.security.GeneralSecurityException
 import javax.net.ssl.SSLException
 
 class AuthRepositoryImpl internal constructor(
     private val saveConfig: suspend (AppConfig) -> Unit,
 ) : AuthRepository {
-    constructor(appPreferences: AppPreferences) : this({ config ->
-        appPreferences.updateKavitaConfig(config.serverUrl, config.apiKey, config.imageApiKey, config.userId)
-    })
+    constructor(appPreferences: AppPreferences) : this(appPreferences::updateKavitaConfig)
 
-    override suspend fun configure(
-        serverUrl: String,
-        apiKey: String,
-        imageApiKey: String,
-        userId: Int,
-    ) {
-        val accountId = verifyConnection(serverUrl, apiKey)
-        saveConfig(AppConfig(serverUrl, apiKey, imageApiKey, userId.takeIf { it > 0 } ?: accountId))
+    override suspend fun configure(config: AppConfig): AppConfig {
+        val accountId = verifyConnection(config)
+        val verified = config.copy(userId = config.userId.takeIf { it > 0 } ?: accountId)
+        saveConfig(verified)
+        return verified
     }
 
-    private suspend fun verifyConnection(
-        serverUrl: String,
-        apiKey: String,
-    ): Int {
+    private suspend fun verifyConnection(config: AppConfig): Int {
         val url =
-            serverUrl.toHttpUrlOrNull()?.takeIf {
-                it.username.isEmpty() && it.password.isEmpty() && it.query == null && it.fragment == null
+            config.serverUrl.toHttpUrlOrNull()?.takeIf {
+                it.username.isEmpty() && it.password.isEmpty() && it.query == null && it.fragment == null &&
+                    (config.caCertificate == null || it.isHttps)
             } ?: throw KavitaConnectionException(Problem.InvalidUrl)
-        if (apiKey.isBlank() || apiKey.any { it !in ' '..'~' }) {
+        if (config.apiKey.isBlank() || config.apiKey.any { it !in ' '..'~' }) {
             throw KavitaConnectionException(Problem.RejectedKey)
         }
-        return requireAccountId(requestAccount(url.toString(), apiKey))
+        return requireAccountId(requestAccount(config.copy(serverUrl = url.toString())))
     }
 
-    private suspend fun requestAccount(
-        serverUrl: String,
-        apiKey: String,
-    ): Response<UserDto> {
+    private suspend fun requestAccount(config: AppConfig): Response<UserDto> {
         // Validate the address entered by the user without forwarding its API key to a redirect target.
-        val api = KavitaApiFactory.createAuthenticated(serverUrl, apiKey, followRedirects = false)
         return try {
-            api.getAccount()
-        } catch (_: JsonDataException) {
-            throw KavitaConnectionException(Problem.UnexpectedResponse)
-        } catch (e: IOException) {
+            KavitaApiFactory.createAuthenticated(config, followRedirects = false).getAccount()
+        } catch (e: Exception) {
             val problem =
                 when (e) {
-                    is SSLException -> Problem.Tls
-                    is JsonEncodingException, is EOFException -> Problem.UnexpectedResponse
-                    else -> Problem.Unreachable
+                    is SSLException, is GeneralSecurityException -> Problem.Tls
+                    is JsonDataException, is JsonEncodingException, is EOFException -> Problem.UnexpectedResponse
+                    is IOException -> Problem.Unreachable
+                    else -> throw e
                 }
             throw KavitaConnectionException(problem)
         }

@@ -620,10 +620,7 @@ class ReaderRepositoryImpl(
         check(config.isConfigured) { "Not authenticated" }
         if (!isOnlineAllowed()) throw IOException("Offline")
 
-        return KavitaApiFactory.createAuthenticated(
-            baseUrl = config.serverUrl,
-            apiKey = config.apiKey,
-        )
+        return KavitaApiFactory.createAuthenticated(config)
     }
 
     private suspend fun readDownloadedHtml(path: String): String? = downloadStorageManager.readText(path)

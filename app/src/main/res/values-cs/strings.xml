@@ -385,6 +385,11 @@
     <string name="settings_kavita_rejected_key">Kavita odmítla API klíč nebo odepřela přístup. Zkontrolujte klíč a oprávnění.</string>
     <string name="settings_kavita_unreachable">Ke Kavitě se nepodařilo připojit. Zkontrolujte adresu serveru a připojení k síti.</string>
     <string name="settings_kavita_tls_failed">Zabezpečené připojení se nepodařilo navázat. Zkontrolujte HTTPS certifikát serveru.</string>
+    <string name="settings_kavita_ca_help">Pokud server Kavita používá soukromou certifikační autoritu, importujte její kořenový certifikát (PEM nebo DER) a uložte připojení.</string>
+    <string name="settings_kavita_ca_selected">Pro tento server Kavita je vybraný vlastní certifikát CA.</string>
+    <string name="settings_kavita_ca_import">Importovat certifikát CA</string>
+    <string name="settings_kavita_ca_remove">Odebrat</string>
+    <string name="settings_kavita_ca_invalid">Soubor se nepodařilo importovat. Vyberte platný kořenový certifikát CA ve formátu PEM nebo DER.</string>
     <string name="settings_kavita_http_error">Server vrátil HTTP %1$d. Zkontrolujte adresu Kavita serveru a zkuste to znovu.</string>
     <string name="settings_kavita_unexpected_response">Server vrátil neočekávanou odpověď. Zkontrolujte adresu Kavita serveru.</string>
     <!-- Advanced -->

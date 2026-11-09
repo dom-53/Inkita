@@ -63,6 +63,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import net.dom53.inkita.core.cache.CacheManager
+import net.dom53.inkita.core.network.forKavita
 import net.dom53.inkita.core.startup.StartupManager
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
@@ -149,6 +150,7 @@ private val IMPORTANT_INFO_FIXED =
         "Cache: fixed a crash when opening a series with an oversized cached detail",
         "Reader: fixed opening PDFs online when Kavita can download the file",
         "Settings: verify the Kavita connection before saving and show readable errors",
+        "Settings: support a custom HTTPS CA certificate for the configured Kavita server",
     )
 
 private const val FORCE_SHOW_IMPORTANT_INFO = false
@@ -352,7 +354,7 @@ fun InkitaApp(
         }
 
         val imageLoader =
-            remember(maxThumbnailsParallel) {
+            remember(maxThumbnailsParallel, config.serverUrl, config.caCertificate) {
                 val dispatcher =
                     Dispatcher().apply {
                         maxRequestsPerHost = maxThumbnailsParallel
@@ -365,7 +367,7 @@ fun InkitaApp(
                         .build()
                 ImageLoader
                     .Builder(context)
-                    .okHttpClient(okHttpClient)
+                    .callFactory(okHttpClient.forKavita(config))
                     .build()
             }
 

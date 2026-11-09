@@ -12,6 +12,7 @@ import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.network.NetworkMonitor
+import net.dom53.inkita.core.network.forKavita
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
@@ -107,7 +108,7 @@ class PdfDownloadStrategyV2(
         var seriesId = job.seriesId
         var volumeId = job.volumeId
         if (seriesId == null || volumeId == null) {
-            val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(config)
             val info = api.getBookInfo(chapterId).body()
             if (seriesId == null) seriesId = info?.seriesId
             if (volumeId == null) volumeId = info?.volumeId
@@ -131,7 +132,7 @@ class PdfDownloadStrategyV2(
                     .addHeader("x-api-key", config.apiKey)
                     .get()
                     .build()
-            httpClient.newCall(request).execute().use { response ->
+            httpClient.forKavita(config).newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     failJob(job, "HTTP ${response.code}")
                     return

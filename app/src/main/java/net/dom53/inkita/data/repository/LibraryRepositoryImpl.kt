@@ -26,10 +26,7 @@ class LibraryRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val response = api.getLibrariesFilter()
 
@@ -53,10 +50,7 @@ class LibraryRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val response = api.hasLibraryAccess(libraryId)
 

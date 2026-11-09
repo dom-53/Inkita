@@ -13,11 +13,14 @@ import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.network.NetworkMonitor
+import net.dom53.inkita.core.network.forKavita
+import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.domain.model.Format
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import retrofit2.HttpException
@@ -175,7 +178,7 @@ class EpubDownloadStrategyV2(
             )
         }
 
-        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val api = KavitaApiFactory.createAuthenticated(config)
         val items =
             downloadDao
                 .getItemsForJob(jobId)
@@ -187,7 +190,7 @@ class EpubDownloadStrategyV2(
                 val htmlResp = api.getBookPage(chapterId, page)
                 if (!htmlResp.isSuccessful) throw HttpException(htmlResp)
                 val htmlRaw = htmlResp.body() ?: ""
-                val (rewrittenHtml, assetsBytes) = rewriteAndDownloadImages(htmlRaw, assetsRelativeDir, config.serverUrl, config.apiKey)
+                val (rewrittenHtml, assetsBytes) = rewriteAndDownloadImages(htmlRaw, assetsRelativeDir, config)
                 val htmlPath = DownloadPaths.epubPageRelativePath(seriesId, volumeId, chapterId, page)
                 val storedHtml = storageManager.writeText(htmlPath, rewrittenHtml)
                 val size = storedHtml.bytes + assetsBytes
@@ -264,14 +267,14 @@ class EpubDownloadStrategyV2(
     private suspend fun rewriteAndDownloadImages(
         html: String,
         assetsRelativeDir: String,
-        baseUrl: String,
-        apiKey: String,
+        config: AppConfig,
     ): Pair<String, Long> =
         withContext(Dispatchers.IO) {
             var result = html
             val matcher = SRC_PATTERN.matcher(html)
             val replacements = mutableMapOf<String, String>()
             var totalBytes = 0L
+            val calls = httpClient.forKavita(config)
 
             while (matcher.find()) {
                 val src = matcher.group(1) ?: continue
@@ -281,7 +284,7 @@ class EpubDownloadStrategyV2(
                     when {
                         src.startsWith("//") -> "https:$src"
                         src.startsWith("http://") || src.startsWith("https://") -> src
-                        src.startsWith("/") -> baseUrl.trimEnd('/') + src
+                        src.startsWith("/") -> config.serverUrl.trimEnd('/') + src
                         else -> null
                     } ?: continue
 
@@ -293,7 +296,7 @@ class EpubDownloadStrategyV2(
                         .orEmpty()
                 val fileName = hashName(absoluteUrl) + ext
                 try {
-                    val (localPath, bytes) = downloadBinary(absoluteUrl, fileName, assetsRelativeDir, apiKey)
+                    val (localPath, bytes) = downloadBinary(absoluteUrl, fileName, assetsRelativeDir, config.apiKey, calls)
                     totalBytes += bytes
                     replacements[src] = toHtmlUri(localPath)
                 } catch (_: IOException) {
@@ -315,6 +318,7 @@ class EpubDownloadStrategyV2(
         fileName: String,
         assetsRelativeDir: String,
         apiKey: String,
+        calls: Call.Factory,
     ): Pair<String, Long> =
         withContext(Dispatchers.IO) {
             val request =
@@ -323,7 +327,7 @@ class EpubDownloadStrategyV2(
                     .url(url)
                     .addHeader("x-api-key", apiKey)
                     .build()
-            httpClient.newCall(request).execute().use { response ->
+            calls.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
                 val body = response.body ?: throw IOException("Empty body")
                 val stored =

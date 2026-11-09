@@ -11,6 +11,7 @@ import net.dom53.inkita.core.downloadv2.DownloadStrategyV2
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.network.NetworkMonitor
+import net.dom53.inkita.core.network.forKavita
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
@@ -139,7 +140,7 @@ class DownloadApiStrategyV2(
                     .addHeader("x-api-key", config.apiKey)
                     .get()
                     .build()
-            httpClient.newCall(request).execute().use { response ->
+            httpClient.forKavita(config).newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     failJob(job, "HTTP ${response.code}")
                     return

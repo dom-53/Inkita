@@ -189,7 +189,7 @@ fun VolumeDetailScreenV2(
             }
             val cfg = appPreferences.configFlow.first()
             if (cfg.isConfigured) {
-                val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+                val api = KavitaApiFactory.createAuthenticated(cfg)
                 val resp = api.getVolumeById(volumeId)
                 if (resp.isSuccessful) {
                     resp.body()?.let { updated ->
@@ -220,7 +220,7 @@ fun VolumeDetailScreenV2(
             }
         }
     }
-    LaunchedEffect(selectedChapterId, offlineMode, config.serverUrl, config.apiKey) {
+    LaunchedEffect(selectedChapterId, offlineMode, config.serverUrl, config.apiKey, config.caCertificate) {
         val chapter = selectedChapter ?: return@LaunchedEffect
         if (offlineMode) return@LaunchedEffect
         if (!isEpub) return@LaunchedEffect
@@ -228,7 +228,7 @@ fun VolumeDetailScreenV2(
         if (!config.isConfigured) return@LaunchedEffect
         val pages = chapter.pages ?: 0
         if (pages <= 0) return@LaunchedEffect
-        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val api = KavitaApiFactory.createAuthenticated(config)
         val tocResponse = api.getBookChapters(chapter.id)
         if (!tocResponse.isSuccessful) return@LaunchedEffect
         val tocItems = tocResponse.body().orEmpty().flatMap { flattenToc(it) }
@@ -515,7 +515,7 @@ fun VolumeDetailScreenV2(
                             }
                             val markRead = pageNum > (chapter.pagesRead ?: 0)
                             scope.launch {
-                                val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+                                val api = KavitaApiFactory.createAuthenticated(config)
                                 val resp =
                                     api.setReaderProgress(
                                         ReaderProgressDto(
@@ -851,7 +851,7 @@ fun VolumeDetailScreenV2(
                                         return@OutlinedButton
                                     }
                                     scope.launch {
-                                        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+                                        val api = KavitaApiFactory.createAuthenticated(config)
                                         val resp =
                                             api.setReaderProgress(
                                                 ReaderProgressDto(
@@ -931,7 +931,7 @@ fun VolumeDetailScreenV2(
                                         return@OutlinedButton
                                     }
                                     scope.launch {
-                                        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+                                        val api = KavitaApiFactory.createAuthenticated(config)
                                         val resp =
                                             api.setReaderProgress(
                                                 ReaderProgressDto(

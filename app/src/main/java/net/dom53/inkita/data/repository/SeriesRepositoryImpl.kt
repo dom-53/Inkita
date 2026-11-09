@@ -40,10 +40,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val filterDto = query.toFilterV2Dto()
         val response =
@@ -85,10 +82,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val response =
             api.getOnDeckSeries(
@@ -121,10 +115,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val response =
             api.getRecentlyUpdatedSeries(
@@ -154,10 +145,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val filter =
             FilterV2Dto(
@@ -204,10 +192,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val filter =
             FilterV2Dto(
@@ -255,10 +240,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val filter =
             FilterV2Dto(
@@ -314,10 +296,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val filter =
             FilterV2Dto(
