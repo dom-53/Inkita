@@ -23,10 +23,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -40,6 +43,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -47,6 +51,7 @@ import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
+import coil.network.HttpException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -302,14 +307,18 @@ object ImageReader : BaseReader {
                             )
                         }
                     }
-                    ImagePage(
+                    ReaderPageImage(
                         imageUrl = imageUrl,
-                        offset =
-                            if (isVertical) {
-                                IntOffset(0, dragOffsetPx.roundToInt())
-                            } else {
-                                IntOffset(dragOffsetPx.roundToInt(), 0)
-                            },
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .offset {
+                                    if (isVertical) {
+                                        IntOffset(0, dragOffsetPx.roundToInt())
+                                    } else {
+                                        IntOffset(dragOffsetPx.roundToInt(), 0)
+                                    }
+                                },
                     )
                 }
 
@@ -427,19 +436,11 @@ private fun WebtoonContent(
                     if (imageUrl == null) {
                         WebtoonPlaceholder()
                     } else {
-                        SubcomposeAsyncImage(
-                            model = imageUrl,
-                            contentDescription = null,
+                        ReaderPageImage(
+                            imageUrl = imageUrl,
                             modifier = Modifier.fillMaxWidth(),
-                            contentScale = ContentScale.FillWidth,
-                            alignment = Alignment.TopCenter,
-                        ) {
-                            when (painter.state) {
-                                is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
-                                is AsyncImagePainter.State.Error -> WebtoonPlaceholder(showProgress = false)
-                                else -> WebtoonPlaceholder()
-                            }
-                        }
+                            isWebtoon = true,
+                        )
                     }
                 }
                 is WebtoonListItem.Boundary -> {
@@ -560,7 +561,7 @@ private fun WebtoonChapterUiState.displayTitle(): String =
         ?: stringResource(R.string.reader_webtoon_chapter_fallback)
 
 @Composable
-private fun WebtoonPlaceholder(showProgress: Boolean = true) {
+private fun WebtoonPlaceholder() {
     Box(
         modifier =
             Modifier
@@ -568,13 +569,63 @@ private fun WebtoonPlaceholder(showProgress: Boolean = true) {
                 .aspectRatio(WEBTOON_PLACEHOLDER_ASPECT_RATIO),
         contentAlignment = Alignment.Center,
     ) {
-        if (showProgress) {
-            CircularProgressIndicator()
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+internal fun ReaderPageImage(
+    imageUrl: String,
+    modifier: Modifier = Modifier,
+    isWebtoon: Boolean = false,
+) {
+    var attempts by remember(imageUrl) { mutableIntStateOf(0) }
+    key(imageUrl, attempts) {
+        SubcomposeAsyncImage(
+            model = imageUrl,
+            contentDescription = null,
+            modifier = modifier,
+            contentScale = if (isWebtoon) ContentScale.FillWidth else ContentScale.Fit,
+            alignment = if (isWebtoon) Alignment.TopCenter else Alignment.Center,
+        ) {
+            when (val state = painter.state) {
+                is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
+                is AsyncImagePainter.State.Error ->
+                    ReaderPageError(
+                        statusCode = (state.result.throwable as? HttpException)?.response?.code,
+                        isWebtoon = isWebtoon,
+                        onRetry = { attempts++ },
+                    )
+                else -> if (isWebtoon) WebtoonPlaceholder() else SubcomposeAsyncImageContent()
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReaderPageError(
+    statusCode: Int?,
+    isWebtoon: Boolean,
+    onRetry: () -> Unit,
+) {
+    val message =
+        if (statusCode == null) {
+            stringResource(R.string.reader_image_load_failed)
         } else {
+            stringResource(R.string.reader_image_http_error, statusCode)
+        }
+    val modifier = if (isWebtoon) Modifier.fillMaxWidth().aspectRatio(WEBTOON_PLACEHOLDER_ASPECT_RATIO) else Modifier.fillMaxSize()
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             Text(
-                text = stringResource(R.string.general_error),
+                text = message,
                 color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
             )
+            TextButton(onClick = onRetry) { Text(stringResource(R.string.download_action_retry)) }
         }
     }
 }

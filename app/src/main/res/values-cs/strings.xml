@@ -150,6 +150,8 @@
     <string name="settings_cache_stats_title">Statistika mezipaměti</string>
     <string name="reader_offline_indicator">Offline čtení</string>
     <string name="reader_page_not_downloaded">Tato stránka není stažená</string>
+    <string name="reader_image_load_failed">Stránku se nepodařilo načíst.</string>
+    <string name="reader_image_http_error">Kavita nemohla načíst tuto stránku (HTTP %1$d).</string>
     <string name="settings_browse_thumbnails_off_subtitle">Při procházení zobrazovat pouze text pro úsporu dat.</string>
     <string name="settings_prefetch_allow_metered_title">Povolit na mobilních datech</string>
     <string name="settings_prefetch_allow_metered_subtitle">Povolit přednačítání na měřených sítích (mobilní data).</string>

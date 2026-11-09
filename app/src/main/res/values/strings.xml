@@ -217,6 +217,8 @@
     <string name="settings_cache_stats_title">Cache statistics</string>
     <string name="reader_offline_indicator">Reading offline</string>
     <string name="reader_page_not_downloaded">This page is not downloaded</string>
+    <string name="reader_image_load_failed">Could not load this page.</string>
+    <string name="reader_image_http_error">Kavita could not load this page (HTTP %1$d).</string>
     <string name="series_detail_specials">Specials</string>
     <string name="series_detail_no_specials">No specials available.</string>
     <!-- Browse-->
