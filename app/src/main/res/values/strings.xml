@@ -343,6 +343,7 @@
     <string name="settings_advanced_section_cache_maintenance">Cache maintenance</string>
     <string name="settings_cache_library_sections_title">Library V2 sections</string>
     <string name="settings_cache_library_home_title">Home</string>
+    <string name="library_home_load_failed">Could not load all Home sections from Kavita.</string>
     <string name="settings_cache_library_home_subtitle">Cache Home streams for offline use.</string>
     <string name="settings_cache_library_want_title">Want to read</string>
     <string name="settings_cache_library_want_subtitle">Cache want-to-read list for offline use.</string>

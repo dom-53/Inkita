@@ -547,6 +547,7 @@
     <string name="settings_advanced_section_cache_maintenance">Údržba mezipaměti</string>
     <string name="settings_cache_library_sections_title">Sekce knihovny V2</string>
     <string name="settings_cache_library_home_title">Domů</string>
+    <string name="library_home_load_failed">Nepodařilo se načíst všechny sekce domovské obrazovky z Kavita.</string>
     <string name="settings_cache_library_home_subtitle">Uložit kanály z Domovské stránky do mezipaměti pro offline použití.</string>
     <string name="settings_cache_library_want_title">Chci si přečíst</string>
     <string name="settings_cache_library_want_subtitle">Uložit seznam „Chci si přečíst“ do mezipaměti pro offline použití.</string>

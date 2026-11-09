@@ -29,7 +29,7 @@ data class LibraryV2UiState(
     val recentlyUpdated: List<HomeSeriesItem> = emptyList(),
     val recentlyAdded: List<HomeSeriesItem> = emptyList(),
     val isHomeLoading: Boolean = true,
-    val homeError: String? = null,
+    val homeLoadFailed: Boolean = false,
     val wantToRead: List<net.dom53.inkita.domain.model.Series> = emptyList(),
     val isWantToReadLoading: Boolean = false,
     val wantToReadError: String? = null,

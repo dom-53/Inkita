@@ -149,6 +149,7 @@ private val IMPORTANT_INFO_CHANGED =
 
 private val IMPORTANT_INFO_FIXED =
     listOf(
+        "Library: keep cached Home sections when a request fails and offer a retry",
         "Cache: fixed a crash when opening a series with an oversized cached detail",
         "Reader: fixed opening PDFs online when Kavita can download the file",
         "Reader: load comic pages from the chapter archive when Kavita's page endpoint fails",
