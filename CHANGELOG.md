@@ -4,9 +4,12 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+## v0.3.2-beta.1
+
+If you're updating from v0.3.2-beta, use your browser to download the APK from [GitHub Releases](https://github.com/dom-53/Inkita/releases). Then open the downloaded file to install it.
+
 ### Fixed
 - Updates: Open the Android installer after downloading an update and save the APK in Downloads on Android 10 and newer.
-
 
 ## v0.3.2-beta
 
