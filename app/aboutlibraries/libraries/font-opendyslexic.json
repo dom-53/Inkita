@@ -1,0 +1,8 @@
+{
+  "uniqueId": "font-opendyslexic",
+  "name": "OpenDyslexic",
+  "website": "https://opendyslexic.org",
+  "licenses": ["ofl-1.1"],
+  "developers": [{ "name": "Abbie Gonzalez" }],
+  "description": "Bundled font files in assets/fonts/OpenDyslexic (regular/weights)."
+}

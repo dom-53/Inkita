@@ -1,11 +1,13 @@
 package net.dom53.inkita.data.repository
 
 import android.content.Context
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkUtils
+import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.api.dto.FilterV2Dto
 import net.dom53.inkita.data.api.dto.SortOptionDto
@@ -18,16 +20,19 @@ import net.dom53.inkita.domain.model.filter.SeriesQuery
 import net.dom53.inkita.domain.repository.SeriesRepository
 import java.io.IOException
 
-class SeriesRepositoryImpl(
+class SeriesRepositoryImpl internal constructor(
     private val context: Context,
-    private val appPreferences: AppPreferences,
+    private val configFlow: Flow<AppConfig>,
     private val cacheManager: CacheManager,
 ) : SeriesRepository {
+    constructor(context: Context, appPreferences: AppPreferences, cacheManager: CacheManager) :
+        this(context, appPreferences.configFlow, cacheManager)
+
     override suspend fun getSeries(
         query: SeriesQuery,
         prefetchThumbnails: Boolean,
     ): List<Series> {
-        val config = appPreferences.configFlow.first()
+        val config = configFlow.first()
 
         if (!config.isConfigured) {
             // No API key configured, skip network call.
@@ -40,10 +45,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val filterDto = query.toFilterV2Dto()
         val response =
@@ -74,7 +76,7 @@ class SeriesRepositoryImpl(
         pageSize: Int,
         libraryId: Int,
     ): List<Series> {
-        val config = appPreferences.configFlow.first()
+        val config = configFlow.first()
 
         if (!config.isConfigured) {
             return emptyList()
@@ -85,10 +87,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val response =
             api.getOnDeckSeries(
@@ -110,7 +109,7 @@ class SeriesRepositoryImpl(
         pageNumber: Int,
         pageSize: Int,
     ): List<RecentlyUpdatedSeriesItem> {
-        val config = appPreferences.configFlow.first()
+        val config = configFlow.first()
 
         if (!config.isConfigured) {
             return emptyList()
@@ -121,10 +120,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val response =
             api.getRecentlyUpdatedSeries(
@@ -143,7 +139,7 @@ class SeriesRepositoryImpl(
         pageNumber: Int,
         pageSize: Int,
     ): List<Series> {
-        val config = appPreferences.configFlow.first()
+        val config = configFlow.first()
 
         if (!config.isConfigured) {
             return emptyList()
@@ -154,10 +150,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val filter =
             FilterV2Dto(
@@ -193,7 +186,7 @@ class SeriesRepositoryImpl(
         pageNumber: Int,
         pageSize: Int,
     ): List<Series> {
-        val config = appPreferences.configFlow.first()
+        val config = configFlow.first()
 
         if (!config.isConfigured) {
             return emptyList()
@@ -204,10 +197,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val filter =
             FilterV2Dto(
@@ -244,7 +234,7 @@ class SeriesRepositoryImpl(
         pageNumber: Int,
         pageSize: Int,
     ): List<Series> {
-        val config = appPreferences.configFlow.first()
+        val config = configFlow.first()
 
         if (!config.isConfigured) {
             return emptyList()
@@ -255,10 +245,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val filter =
             FilterV2Dto(
@@ -303,7 +290,7 @@ class SeriesRepositoryImpl(
         pageNumber: Int,
         pageSize: Int,
     ): List<Series> {
-        val config = appPreferences.configFlow.first()
+        val config = configFlow.first()
 
         if (!config.isConfigured) {
             return emptyList()
@@ -314,10 +301,7 @@ class SeriesRepositoryImpl(
         }
 
         val api =
-            KavitaApiFactory.createAuthenticated(
-                baseUrl = config.serverUrl,
-                apiKey = config.apiKey,
-            )
+            KavitaApiFactory.createAuthenticated(config)
 
         val filter =
             FilterV2Dto(

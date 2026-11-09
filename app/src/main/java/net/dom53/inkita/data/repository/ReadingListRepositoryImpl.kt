@@ -25,7 +25,7 @@ class ReadingListRepositoryImpl(
 
         if (!NetworkUtils.isOnline(context)) throw IOException("Offline")
 
-        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val api = KavitaApiFactory.createAuthenticated(config)
         val response =
             api.getReadingLists(
                 includePromoted = includePromoted,

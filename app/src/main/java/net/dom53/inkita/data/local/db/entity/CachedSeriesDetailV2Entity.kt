@@ -1,5 +1,6 @@
 package net.dom53.inkita.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -32,4 +33,5 @@ data class CachedSeriesDetailV2Entity(
     val annotationsJson: String?,
     val seriesDetailPlusJson: String?,
     val updatedAt: Long,
+    @ColumnInfo(defaultValue = "0") val chunkCount: Int = 0,
 )

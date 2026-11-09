@@ -48,8 +48,10 @@ fun SettingsGeneralScreen(
     val languages =
         listOf(
             "system" to stringResource(R.string.general_language_system),
-            "en" to stringResource(R.string.general_language_en),
-            "cs" to stringResource(R.string.general_language_cs),
+            "en" to "English",
+            "cs" to "Čeština",
+            "ko" to "한국어",
+            "zh" to "中文",
         )
 
     LaunchedEffect(Unit) {

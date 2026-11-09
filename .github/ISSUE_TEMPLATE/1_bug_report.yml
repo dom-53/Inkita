@@ -57,6 +57,15 @@ body:
       required: true
 
   - type: input
+    id: kavita-version
+    attributes:
+      label: Kavita server version
+      description: Enter the installed Kavita version. For bugs that occur without a server, enter N/A.
+      placeholder: 'Example: 0.9.0.8'
+    validations:
+      required: true
+
+  - type: input
     id: android-version
     attributes:
       label: Android version

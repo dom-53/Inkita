@@ -22,7 +22,7 @@ class CollectionsRepositoryImpl(
 
         if (!NetworkUtils.isOnline(context)) throw IOException("Offline")
 
-        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val api = KavitaApiFactory.createAuthenticated(config)
         val response = api.getCollections()
 
         if (!response.isSuccessful) {
@@ -40,7 +40,7 @@ class CollectionsRepositoryImpl(
 
         if (!NetworkUtils.isOnline(context)) throw IOException("Offline")
 
-        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val api = KavitaApiFactory.createAuthenticated(config)
         val response = api.getCollectionsAll(ownedOnly = ownedOnly)
 
         if (!response.isSuccessful) {
@@ -62,7 +62,7 @@ class CollectionsRepositoryImpl(
 
         if (!NetworkUtils.isOnline(context)) throw IOException("Offline")
 
-        val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+        val api = KavitaApiFactory.createAuthenticated(config)
         val response =
             api.getSeriesByCollection(
                 collectionId = collectionId,

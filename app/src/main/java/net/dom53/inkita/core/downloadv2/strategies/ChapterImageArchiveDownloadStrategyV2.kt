@@ -6,21 +6,20 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
+import net.dom53.inkita.core.downloadv2.DownloadStorageManager
 import net.dom53.inkita.core.downloadv2.DownloadStrategyV2
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkLoggingInterceptor
 import net.dom53.inkita.core.network.NetworkMonitor
+import net.dom53.inkita.core.network.forKavita
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
+import net.dom53.inkita.domain.model.Format
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okio.buffer
-import okio.sink
-import okio.source
-import java.io.File
 
 class ChapterImageArchiveDownloadStrategyV2(
     private val appContext: Context,
@@ -33,6 +32,7 @@ class ChapterImageArchiveDownloadStrategyV2(
             .Builder()
             .addInterceptor(NetworkLoggingInterceptor)
             .build()
+    private val storageManager = DownloadStorageManager(appContext, appPreferences)
 
     override suspend fun enqueue(request: DownloadRequestV2): Long {
         if (request.type != DownloadJobV2Entity.TYPE_CHAPTER) return -1L
@@ -42,11 +42,11 @@ class ChapterImageArchiveDownloadStrategyV2(
                 chapterId = chapterId,
                 type = DownloadedItemV2Entity.TYPE_FILE,
             )
-        if (existing != null && existing.localPath?.let { File(it).exists() } == true) {
+        if (existing != null && storageManager.exists(existing.localPath)) {
             if (LoggingManager.isDebugEnabled()) {
                 LoggingManager.d("ArchiveDownloadV2", "Skip enqueue; already downloaded chapter=$chapterId")
             }
-            return existing.jobId ?: -1L
+            return existing.jobId
         }
         val now = System.currentTimeMillis()
         val job =
@@ -81,6 +81,7 @@ class ChapterImageArchiveDownloadStrategyV2(
                 status = DownloadedItemV2Entity.STATUS_PENDING,
                 createdAt = now,
                 updatedAt = now,
+                format = Format.Archive,
                 error = null,
             )
         downloadDao.upsertItems(listOf(item))
@@ -105,15 +106,14 @@ class ChapterImageArchiveDownloadStrategyV2(
         var seriesId = job.seriesId
         var volumeId = job.volumeId
         if (seriesId == null || volumeId == null) {
-            val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(config)
             val info = api.getBookInfo(chapterId).body()
             if (seriesId == null) seriesId = info?.seriesId
             if (volumeId == null) volumeId = info?.volumeId
         }
-        val target =
-            seriesId?.let { DownloadPaths.cbzFile(appContext, it, volumeId, chapterId) }
-                ?: fallbackPath(chapterId)
-        target.parentFile?.mkdirs()
+        val relativePath =
+            seriesId?.let { DownloadPaths.cbzRelativePath(it, volumeId, chapterId) }
+                ?: DownloadPaths.archiveDownloadRelativePath(null, null, chapterId, "chapter_$chapterId.cbz")
 
         try {
             val url =
@@ -130,7 +130,7 @@ class ChapterImageArchiveDownloadStrategyV2(
                     .addHeader("x-api-key", config.apiKey)
                     .get()
                     .build()
-            httpClient.newCall(request).execute().use { response ->
+            httpClient.forKavita(config).newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     failJob(job, "HTTP ${response.code}")
                     return
@@ -140,26 +140,26 @@ class ChapterImageArchiveDownloadStrategyV2(
                         failJob(job, "Empty body")
                         return
                     }
-                withContext(Dispatchers.IO) {
-                    body.byteStream().use { input ->
-                        target.sink().buffer().use { sink -> sink.writeAll(input.source()) }
+                val stored =
+                    withContext(Dispatchers.IO) {
+                        body.byteStream().use { input ->
+                            storageManager.write(relativePath, input)
+                        }
                     }
+                val item =
+                    downloadDao
+                        .getItemsForJob(jobId)
+                        .firstOrNull()
+                        ?.copy(
+                            status = DownloadedItemV2Entity.STATUS_COMPLETED,
+                            localPath = stored.localPath,
+                            bytes = stored.bytes,
+                            updatedAt = System.currentTimeMillis(),
+                            error = null,
+                        )
+                if (item != null) {
+                    downloadDao.upsertItems(listOf(item))
                 }
-            }
-            val bytes = target.length()
-            val item =
-                downloadDao
-                    .getItemsForJob(jobId)
-                    .firstOrNull()
-                    ?.copy(
-                        status = DownloadedItemV2Entity.STATUS_COMPLETED,
-                        localPath = target.absolutePath,
-                        bytes = bytes,
-                        updatedAt = System.currentTimeMillis(),
-                        error = null,
-                    )
-            if (item != null) {
-                downloadDao.upsertItems(listOf(item))
             }
             downloadDao.updateJob(
                 job.copy(
@@ -172,7 +172,7 @@ class ChapterImageArchiveDownloadStrategyV2(
             if (LoggingManager.isDebugEnabled()) {
                 LoggingManager.d(
                     "ArchiveDownloadV2",
-                    "Completed job=$jobId chapter=$chapterId path=${target.absolutePath}",
+                    "Completed job=$jobId chapter=$chapterId",
                 )
             }
         } catch (e: Exception) {
@@ -195,8 +195,6 @@ class ChapterImageArchiveDownloadStrategyV2(
             LoggingManager.e("ArchiveDownloadV2", "Job failed id=${job.id}: $message")
         }
     }
-
-    private fun fallbackPath(chapterId: Int): File = File(appContext.getExternalFilesDir("Inkita/downloads/archives"), "chapter_$chapterId.cbz")
 
     companion object {
         const val FORMAT_IMAGE = "image"

@@ -106,6 +106,8 @@
     <string name="series_detail_vol_short_plain">Vol.</string>
     <string name="series_detail_continue_vol_ch">Continue Vol. %1$s Pg. %2$d</string>
     <string name="series_detail_continue_ch">Continue Pg. %1$d</string>
+    <string name="series_detail_continue_vol_ch_page">Continue Vol. %1$s Ch. %2$s Pg. %3$d</string>
+    <string name="series_detail_continue_ch_page">Continue Ch. %1$s Pg. %2$d</string>
     <string name="series_detail_start_reading">Start reading</string>
     <string name="series_detail_chapter_fallback">Chapter %1$d</string>
     <string name="series_detail_pages_unavailable">Pages are not available.</string>
@@ -165,6 +167,8 @@
     <string name="general_language_label">Language</string>
     <string name="general_language_en">English</string>
     <string name="general_language_cs">Czech</string>
+    <string name="general_language_ko">Korean</string>
+    <string name="general_language_zh">Chinese</string>
     <string name="general_title">General</string>
     <string name="settings_cache_section_title">Cache</string>
     <string name="settings_cache_global_title">Enable cache</string>
@@ -213,6 +217,8 @@
     <string name="settings_cache_stats_title">Cache statistics</string>
     <string name="reader_offline_indicator">Reading offline</string>
     <string name="reader_page_not_downloaded">This page is not downloaded</string>
+    <string name="reader_image_load_failed">Could not load this page.</string>
+    <string name="reader_image_http_error">Kavita could not load this page (HTTP %1$d).</string>
     <string name="series_detail_specials">Specials</string>
     <string name="series_detail_no_specials">No specials available.</string>
     <!-- Browse-->
@@ -251,6 +257,12 @@
     <string name="reader_title">Reader</string>
     <string name="reader_no_previous_chapter">No previous chapter</string>
     <string name="reader_no_next_chapter">This is the last volume</string>
+    <string name="reader_webtoon_chapter_end">End of %1$s</string>
+    <string name="reader_webtoon_chapter_start">Beginning of %1$s</string>
+    <string name="reader_webtoon_loading_next_chapter">Loading next chapter...</string>
+    <string name="reader_webtoon_no_next_chapter">No next chapter</string>
+    <string name="reader_webtoon_chapter_fallback">Chapter</string>
+    <string name="reader_webtoon_chapter_number">Chapter %1$s</string>
     <string name="reader_time_left">Time left</string>
     <string name="reader_prev_chapter">Prev chapter</string>
     <string name="reader_jump_to_start">Jump to start</string>
@@ -331,6 +343,7 @@
     <string name="settings_advanced_section_cache_maintenance">Cache maintenance</string>
     <string name="settings_cache_library_sections_title">Library V2 sections</string>
     <string name="settings_cache_library_home_title">Home</string>
+    <string name="library_home_load_failed">Could not load all Home sections from Kavita.</string>
     <string name="settings_cache_library_home_subtitle">Cache Home streams for offline use.</string>
     <string name="settings_cache_library_want_title">Want to read</string>
     <string name="settings_cache_library_want_subtitle">Cache want-to-read list for offline use.</string>
@@ -373,6 +386,18 @@
     <string name="settings_kavita_http_warning_cancel">Cancel</string>
     <string name="settings_kavita_saved_toast">Configuration saved. Please restart the app.</string>
     <string name="settings_kavita_save_failed">Save failed: %1$s</string>
+    <string name="settings_kavita_checking_connection">Checking connection…</string>
+    <string name="settings_kavita_invalid_url">Enter a valid Kavita server address.</string>
+    <string name="settings_kavita_rejected_key">Kavita rejected the API key or denied access. Check your key and permissions.</string>
+    <string name="settings_kavita_unreachable">Could not reach Kavita. Check the server address and your network connection.</string>
+    <string name="settings_kavita_tls_failed">Could not establish a secure connection. Check the server’s HTTPS certificate.</string>
+    <string name="settings_kavita_ca_help">If your Kavita server uses a private certificate authority, import its root CA certificate (PEM or DER), then save the connection.</string>
+    <string name="settings_kavita_ca_selected">A custom CA is selected for this Kavita server.</string>
+    <string name="settings_kavita_ca_import">Import CA certificate</string>
+    <string name="settings_kavita_ca_remove">Remove</string>
+    <string name="settings_kavita_ca_invalid">Could not import the file. Choose a valid root CA certificate in PEM or DER format.</string>
+    <string name="settings_kavita_http_error">The server returned HTTP %1$d. Check the Kavita address and try again.</string>
+    <string name="settings_kavita_unexpected_response">The server returned an unexpected response. Check the Kavita address.</string>
     <!-- About Inkita  -->
     <string name="settings_about_version">Version</string>
     <string name="settings_about_build_time">Build time</string>
@@ -488,6 +513,8 @@
     <string name="download_completed_size">Size: %1$s</string>
     <string name="download_completed_open">Open</string>
     <string name="download_completed_delete">Delete</string>
+    <string name="download_complete_series_group">%1$s (%2$d)</string>
+    <string name="download_completed_toggle_description">Toggle list of downloaded items</string>
     <!-- Download settings -->
     <string name="settings_downloads_title">Downloads</string>
     <string name="settings_downloads_allow_metered_title">Allow metered data</string>
@@ -498,6 +525,18 @@
     <string name="settings_downloads_prefer_offline_subtitle">When available, reader will use downloaded pages even when online.</string>
     <string name="settings_downloads_show_badges_title">Show download badges</string>
     <string name="settings_downloads_show_badges_subtitle">Display download status badges on series covers.</string>
+    <string name="settings_downloads_location_title">Download location</string>
+    <string name="settings_downloads_location_default">Default app storage</string>
+    <string name="settings_downloads_location_choose">Choose folder</string>
+    <string name="settings_downloads_location_reset">Reset to default</string>
+    <string name="settings_downloads_location_confirm_title">Move downloads?</string>
+    <string name="settings_downloads_location_confirm_text">Existing downloads will be moved to the selected location. If anything fails, the current location will remain unchanged.</string>
+    <string name="settings_downloads_location_confirm_action">Move downloads</string>
+    <string name="settings_downloads_location_moving_title">Moving downloads</string>
+    <string name="settings_downloads_location_moving_text">Please keep Inkita open while downloaded files are moved.</string>
+    <string name="settings_downloads_location_changed">Download location updated</string>
+    <string name="settings_downloads_location_failed">Could not change download location: %1$s</string>
+    <string name="settings_downloads_location_queue_busy">Finish, pause, or clear the download queue before changing location.</string>
     <string name="settings_downloads_delete_after_section">Delete after reading</string>
     <string name="settings_downloads_delete_after_mark_title">Delete when marked as read</string>
     <string name="settings_downloads_delete_after_mark_subtitle">Automatically remove downloads after you mark items as read.</string>

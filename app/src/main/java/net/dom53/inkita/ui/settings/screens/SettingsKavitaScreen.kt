@@ -1,10 +1,15 @@
 package net.dom53.inkita.ui.settings.screens
 
+import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -29,16 +34,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
+import net.dom53.inkita.core.network.isSameOrigin
+import net.dom53.inkita.core.network.readKavitaCaCertificate
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.domain.repository.AuthRepository
+import net.dom53.inkita.domain.repository.KavitaConnectionException
+import net.dom53.inkita.domain.repository.KavitaConnectionException.Problem
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 @Composable
 fun SettingsKavitaScreen(
@@ -46,9 +64,25 @@ fun SettingsKavitaScreen(
     authRepository: AuthRepository,
     onBack: () -> Unit,
 ) {
+    SettingsKavitaScreen(
+        configFlow = appPreferences.configFlow,
+        authRepository = authRepository,
+        onBack = onBack,
+        onLogout = { appPreferences.clearAuth(clearServer = true) },
+    )
+}
+
+@Composable
+internal fun SettingsKavitaScreen(
+    configFlow: Flow<AppConfig>,
+    authRepository: AuthRepository,
+    onBack: () -> Unit,
+    onLogout: suspend () -> Unit,
+) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
 
     var serverUrl by remember { mutableStateOf("") }
     var apiKeyInput by remember { mutableStateOf("") }
@@ -59,42 +93,77 @@ fun SettingsKavitaScreen(
     var isEditingApiKey by remember { mutableStateOf(false) }
     var isEditingImageApiKey by remember { mutableStateOf(false) }
     var showHttpWarning by remember { mutableStateOf(false) }
-    var pendingUrl by remember { mutableStateOf("") }
-    var pendingApiKey by remember { mutableStateOf("") }
-    var pendingImageApiKey by remember { mutableStateOf("") }
-    var warningFromSave by remember { mutableStateOf(false) }
+    var pendingConfig by remember { mutableStateOf<AppConfig?>(null) }
     var useHttps by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-        appPreferences.configFlow.collectLatest { config: AppConfig ->
-            val rawUrl = config.serverUrl
-            val normalized =
-                when {
-                    rawUrl.startsWith("https://", ignoreCase = true) -> rawUrl.removePrefix("https://")
-                    rawUrl.startsWith("http://", ignoreCase = true) -> rawUrl.removePrefix("http://")
-                    else -> rawUrl
-                }.trimEnd('/')
-            serverUrl = normalized
-            useHttps = !config.serverUrl.startsWith("http://", ignoreCase = true)
-            storedApiKey = config.apiKey
-            storedImageApiKey = config.imageApiKey
-            isConfigured = config.isConfigured
-            isEditingApiKey = false
-            apiKeyInput = ""
-            isEditingImageApiKey = false
-            imageApiKeyInput = ""
-            showHttpWarning = false
-            pendingUrl = ""
-            pendingApiKey = ""
-            pendingImageApiKey = ""
-            warningFromSave = false
+    var isSaving by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<String?>(null) }
+    var caCertificate by remember { mutableStateOf<String?>(null) }
+    var importingCertificate by remember { mutableStateOf(false) }
+    val busy = isSaving || importingCertificate
+    val certificatePicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                importingCertificate = true
+                saveError = null
+                scope.launch {
+                    try {
+                        caCertificate =
+                            withContext(Dispatchers.IO) {
+                                val input = requireNotNull(context.contentResolver.openInputStream(uri))
+                                readKavitaCaCertificate(input)
+                            }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        saveError = context.getString(R.string.settings_kavita_ca_invalid)
+                    } finally {
+                        importingCertificate = false
+                    }
+                }
+            }
         }
+
+    fun applyConfig(config: AppConfig) {
+        serverUrl = config.serverUrl.withoutHttpScheme()
+        useHttps = !config.serverUrl.startsWith("http://", ignoreCase = true)
+        storedApiKey = config.apiKey
+        storedImageApiKey = config.imageApiKey
+        caCertificate = config.caCertificate
+        isConfigured = config.isConfigured
+        isEditingApiKey = false
+        apiKeyInput = ""
+        isEditingImageApiKey = false
+        imageApiKeyInput = ""
+        showHttpWarning = false
+        pendingConfig = null
+    }
+
+    fun saveConfig(config: AppConfig) {
+        isSaving = true
+        scope.launch {
+            try {
+                applyConfig(authRepository.configure(config))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                saveError = context.connectionErrorMessage(e)
+                return@launch
+            } finally {
+                isSaving = false
+            }
+            snackbarHostState.showSnackbar(context.getString(R.string.settings_kavita_saved_toast))
+        }
+    }
+
+    LaunchedEffect(configFlow) {
+        configFlow.collectLatest { applyConfig(it) }
     }
 
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -106,13 +175,21 @@ fun SettingsKavitaScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-//            Icon(Icons.Filled.Tune, contentDescription = null)
             OutlinedTextField(
                 value = serverUrl,
-                onValueChange = { serverUrl = it },
+                onValueChange = { new ->
+                    val oldOrigin = "https://${serverUrl.withoutHttpScheme()}".toHttpUrlOrNull()
+                    val newOrigin = "https://${new.withoutHttpScheme()}".toHttpUrlOrNull()
+                    if (oldOrigin == null || newOrigin == null || !oldOrigin.isSameOrigin(newOrigin)) {
+                        caCertificate = null
+                    }
+                    serverUrl = new
+                },
                 label = { Text(stringResource(R.string.settings_kavita_server)) },
                 placeholder = { Text("kavita.myserver.com") },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+                singleLine = true,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -122,11 +199,12 @@ fun SettingsKavitaScreen(
                 Text(stringResource(R.string.settings_kavita_use_https))
                 Switch(
                     checked = useHttps,
+                    enabled = !busy,
                     onCheckedChange = { enabled ->
                         if (enabled) {
                             useHttps = true
                         } else {
-                            warningFromSave = false
+                            pendingConfig = null
                             showHttpWarning = true
                         }
                     },
@@ -151,6 +229,7 @@ fun SettingsKavitaScreen(
                         VisualTransformation.None
                     },
                 singleLine = true,
+                enabled = !busy,
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -180,6 +259,7 @@ fun SettingsKavitaScreen(
                         VisualTransformation.None
                     },
                 singleLine = true,
+                enabled = !busy,
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -208,15 +288,12 @@ fun SettingsKavitaScreen(
                 )
                 if (isConfigured) {
                     TextButton(
+                        enabled = !busy,
                         onClick = {
                             scope.launch {
-                                appPreferences.clearAuth(clearServer = true)
-                                storedApiKey = ""
-                                apiKeyInput = ""
-                                serverUrl = ""
-                                useHttps = true
-                                isConfigured = false
-                                isEditingApiKey = false
+                                onLogout()
+                                applyConfig(AppConfig("", "", "", 0))
+                                saveError = null
                                 snackbarHostState.showSnackbar(context.getString(R.string.settings_kavita_logged_out))
                             }
                         },
@@ -225,71 +302,60 @@ fun SettingsKavitaScreen(
                     }
                 }
             }
+            saveError?.let { message ->
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
             Button(
+                enabled = !busy,
                 onClick = {
-                    scope.launch {
-                        try {
-                            val candidateKey =
-                                when {
-                                    apiKeyInput.isNotBlank() -> apiKeyInput.trim()
-                                    isConfigured && storedApiKey.isNotBlank() -> storedApiKey
-                                    else -> ""
-                                }
-                            val candidateImageKey =
-                                when {
-                                    imageApiKeyInput.isNotBlank() -> imageApiKeyInput.trim()
-                                    isConfigured && storedImageApiKey.isNotBlank() -> storedImageApiKey
-                                    candidateKey.isNotBlank() -> candidateKey
-                                    else -> ""
-                                }
-
-                            if (serverUrl.isBlank() || candidateKey.isBlank()) {
-                                snackbarHostState.showSnackbar(
-                                    context.getString(R.string.settings_kavita_login_toast),
-                                )
-                                return@launch
-                            }
-
-                            val host =
-                                serverUrl
-                                    .trim()
-                                    .removePrefix("https://")
-                                    .removePrefix("http://")
-                                    .trimEnd('/')
-                            val builtUrl = (if (useHttps) "https://" else "http://") + host
-                            if (!useHttps) {
-                                pendingUrl = builtUrl
-                                pendingApiKey = candidateKey
-                                pendingImageApiKey = candidateImageKey
-                                warningFromSave = true
-                                showHttpWarning = true
-                                return@launch
-                            }
-
-                            authRepository.configure(
-                                serverUrl = builtUrl,
-                                apiKey = candidateKey,
-                                imageApiKey = candidateImageKey,
-                            )
-
-                            storedApiKey = candidateKey
-                            storedImageApiKey = candidateImageKey
-                            serverUrl = host
-                            apiKeyInput = ""
-                            isEditingApiKey = false
-                            imageApiKeyInput = ""
-                            isEditingImageApiKey = false
-                            snackbarHostState.showSnackbar(context.getString(R.string.settings_kavita_saved_toast))
-                        } catch (e: Exception) {
-                            snackbarHostState.showSnackbar(
-                                context.getString(R.string.settings_kavita_save_failed, e.message ?: "unknown error"),
-                            )
-                        }
+                    focusManager.clearFocus()
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    saveError = null
+                    val host = serverUrl.withoutHttpScheme()
+                    val apiKey = apiKeyInput.trim().ifBlank { storedApiKey }
+                    if (host.isBlank() || apiKey.isBlank()) {
+                        saveError = context.getString(R.string.settings_kavita_login_toast)
+                        return@Button
+                    }
+                    val imageKey = imageApiKeyInput.trim().ifBlank { storedImageApiKey.ifBlank { apiKey } }
+                    val url = (if (useHttps) "https://" else "http://") + host
+                    val config = AppConfig(url, apiKey, imageKey, 0, caCertificate.takeIf { useHttps })
+                    if (useHttps) {
+                        saveConfig(config)
+                    } else {
+                        pendingConfig = config
+                        showHttpWarning = true
                     }
                 },
                 modifier = Modifier.align(Alignment.End),
             ) {
-                Text(stringResource(R.string.settings_kavita_button_login))
+                Text(stringResource(if (isSaving) R.string.settings_kavita_checking_connection else R.string.settings_kavita_button_login))
+            }
+            if (useHttps) {
+                Text(
+                    stringResource(
+                        if (caCertificate == null) R.string.settings_kavita_ca_help else R.string.settings_kavita_ca_selected,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Row {
+                    TextButton(
+                        enabled = !busy && "https://${serverUrl.withoutHttpScheme()}".toHttpUrlOrNull() != null,
+                        onClick = { certificatePicker.launch(arrayOf("*/*")) },
+                    ) {
+                        Text(stringResource(R.string.settings_kavita_ca_import))
+                    }
+                    if (caCertificate != null) {
+                        TextButton(enabled = !busy, onClick = { caCertificate = null }) {
+                            Text(stringResource(R.string.settings_kavita_ca_remove))
+                        }
+                    }
+                }
             }
         }
         SnackbarHost(hostState = snackbarHostState)
@@ -297,49 +363,20 @@ fun SettingsKavitaScreen(
 
     if (showHttpWarning) {
         AlertDialog(
-            onDismissRequest = { showHttpWarning = false },
+            onDismissRequest = {
+                showHttpWarning = false
+                pendingConfig = null
+            },
             title = { Text(stringResource(R.string.settings_kavita_http_warning_title)) },
             text = { Text(stringResource(R.string.settings_kavita_http_warning_body)) },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        scope.launch {
-                            if (warningFromSave) {
-                                try {
-                                    val host =
-                                        pendingUrl
-                                            .removePrefix("https://")
-                                            .removePrefix("http://")
-                                            .trimEnd('/')
-                                    useHttps = false
-                                    authRepository.configure(
-                                        serverUrl = pendingUrl,
-                                        apiKey = pendingApiKey,
-                                        imageApiKey = pendingImageApiKey.ifBlank { pendingApiKey },
-                                    )
-                                    storedApiKey = pendingApiKey
-                                    storedImageApiKey = pendingImageApiKey.ifBlank { pendingApiKey }
-                                    serverUrl = host
-                                    apiKeyInput = ""
-                                    isEditingApiKey = false
-                                    imageApiKeyInput = ""
-                                    isEditingImageApiKey = false
-                                    showHttpWarning = false
-                                    warningFromSave = false
-                                    snackbarHostState.showSnackbar(context.getString(R.string.settings_kavita_saved_toast))
-                                } catch (e: Exception) {
-                                    showHttpWarning = false
-                                    warningFromSave = false
-                                    snackbarHostState.showSnackbar(
-                                        context.getString(R.string.settings_kavita_save_failed, e.message ?: context.getString(R.string.general_unknown_error)),
-                                    )
-                                }
-                            } else {
-                                useHttps = false
-                                showHttpWarning = false
-                                warningFromSave = false
-                            }
-                        }
+                        val config = pendingConfig
+                        pendingConfig = null
+                        showHttpWarning = false
+                        useHttps = false
+                        config?.let { saveConfig(it) }
                     },
                 ) {
                     Text(stringResource(R.string.settings_kavita_http_warning_confirm))
@@ -349,12 +386,30 @@ fun SettingsKavitaScreen(
                 TextButton(
                     onClick = {
                         showHttpWarning = false
-                        warningFromSave = false
+                        pendingConfig = null
                     },
                 ) {
                     Text(stringResource(R.string.general_cancel))
                 }
             },
         )
+    }
+}
+
+private val httpScheme = Regex("^https?://", RegexOption.IGNORE_CASE)
+
+private fun String.withoutHttpScheme(): String = trim().replaceFirst(httpScheme, "").trimEnd('/')
+
+private fun Context.connectionErrorMessage(error: Exception): String {
+    val connectionError = error as? KavitaConnectionException
+    return when (connectionError?.problem) {
+        Problem.InvalidUrl -> getString(R.string.settings_kavita_invalid_url)
+        Problem.RejectedKey -> getString(R.string.settings_kavita_rejected_key)
+        Problem.Unreachable -> getString(R.string.settings_kavita_unreachable)
+        Problem.Tls -> getString(R.string.settings_kavita_tls_failed)
+        Problem.UnexpectedResponse ->
+            connectionError.statusCode?.let { getString(R.string.settings_kavita_http_error, it) }
+                ?: getString(R.string.settings_kavita_unexpected_response)
+        null -> getString(R.string.settings_kavita_save_failed, getString(R.string.general_unknown_error))
     }
 }

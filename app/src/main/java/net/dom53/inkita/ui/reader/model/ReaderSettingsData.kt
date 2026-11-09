@@ -4,13 +4,45 @@ import androidx.annotation.StringRes
 import net.dom53.inkita.R
 import net.dom53.inkita.core.storage.ReaderThemeMode
 
+data class ReaderFontFace(
+    val assetPath: String,
+    val weight: Int = 400,
+    val style: String = "normal",
+)
+
 data class ReaderFontOption(
     val id: String,
     val label: String,
     val cssFamily: String,
     val assetPath: String? = null,
+    val fontFaces: List<ReaderFontFace> = emptyList(),
     val isSerif: Boolean = true,
 )
+
+fun ReaderFontOption.fontFaceCss(): String {
+    if (fontFaces.isNotEmpty()) {
+        return fontFaces.joinToString("\n") { face ->
+            """
+            @font-face {
+                font-family: '$cssFamily';
+                src: url('${face.assetPath}');
+                font-weight: ${face.weight};
+                font-style: ${face.style};
+            }
+            """.trimIndent()
+        }
+    }
+    return assetPath?.let {
+        """
+        @font-face {
+            font-family: '$cssFamily';
+            src: url('$it');
+            font-weight: 100 900;
+            font-style: normal;
+        }
+        """
+    } ?: ""
+}
 
 @Suppress("ktlint:standard:max-line-length")
 val readerFontOptions =
@@ -28,6 +60,23 @@ val readerFontOptions =
         ),
         ReaderFontOption("roboto_mono", "Roboto Mono", "Roboto Mono", "file:///android_asset/fonts/Roboto_Mono/RobotoMono-VariableFont_wght.ttf", isSerif = false),
         ReaderFontOption("open_sans", "Open Sans", "Open Sans", "file:///android_asset/fonts/Open_Sans/OpenSans-VariableFont_wdth,wght.ttf", isSerif = false),
+        ReaderFontOption(
+            "open_dyslexic",
+            "OpenDyslexic",
+            "OpenDyslexic",
+            isSerif = false,
+            fontFaces =
+                listOf(
+                    ReaderFontFace("file:///android_asset/fonts/OpenDyslexic/OpenDyslexic-Regular.otf"),
+                    ReaderFontFace("file:///android_asset/fonts/OpenDyslexic/OpenDyslexic-Bold.otf", weight = 700),
+                    ReaderFontFace("file:///android_asset/fonts/OpenDyslexic/OpenDyslexic-Italic.otf", style = "italic"),
+                    ReaderFontFace(
+                        "file:///android_asset/fonts/OpenDyslexic/OpenDyslexic-BoldItalic.otf",
+                        weight = 700,
+                        style = "italic",
+                    ),
+                ),
+        ),
         ReaderFontOption("nunito", "Nunito", "Nunito", "file:///android_asset/fonts/Nunito/Nunito-VariableFont_wght.ttf", isSerif = false),
         ReaderFontOption("bitter", "Bitter", "Bitter", "file:///android_asset/fonts/Bitter/Bitter-VariableFont_wght.ttf", isSerif = true),
         ReaderFontOption("ubuntu", "Ubuntu", "Ubuntu", "file:///android_asset/fonts/Ubuntu/Ubuntu-Regular.ttf", isSerif = false),

@@ -29,6 +29,7 @@ data class AppConfig(
     val apiKey: String,
     val imageApiKey: String,
     val userId: Int,
+    val caCertificate: String? = null,
 ) {
     val isConfigured: Boolean
         get() = serverUrl.isNotBlank() && apiKey.isNotBlank()
@@ -61,6 +62,7 @@ class AppPreferences(
 
     companion object {
         private val KEY_SERVER_URL = stringPreferencesKey("server_url")
+        private val KEY_KAVITA_CA = stringPreferencesKey("kavita_ca")
         private val KEY_API_KEY = stringPreferencesKey("api_key")
         private val LEGACY_KEY_TOKEN = stringPreferencesKey("token")
         private val LEGACY_KEY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
@@ -107,6 +109,7 @@ class AppPreferences(
         private val KEY_DOWNLOAD_ALLOW_METERED = booleanPreferencesKey("download_allow_metered")
         private val KEY_DOWNLOAD_ALLOW_LOW_BATTERY = booleanPreferencesKey("download_allow_low_battery")
         private val KEY_DOWNLOAD_MAX_CONCURRENT = intPreferencesKey("download_max_concurrent")
+        private val KEY_DOWNLOAD_LOCATION_URI = stringPreferencesKey("download_location_uri")
         private val KEY_PREFER_OFFLINE_PAGES = booleanPreferencesKey("prefer_offline_pages")
         private val KEY_DOWNLOAD_RETRY_ENABLED = booleanPreferencesKey("download_retry_enabled")
         private val KEY_DOWNLOAD_RETRY_MAX = intPreferencesKey("download_retry_max")
@@ -141,6 +144,7 @@ class AppPreferences(
                         }
                     },
                 userId = prefs[KEY_USER_ID]?.toIntOrNull() ?: 0,
+                caCertificate = prefs[KEY_KAVITA_CA],
             )
         }
 
@@ -235,6 +239,8 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_ALLOW_LOW_BATTERY] ?: false }
     val downloadMaxConcurrentFlow: Flow<Int> =
         context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_MAX_CONCURRENT] ?: 2 }
+    val downloadLocationUriFlow: Flow<String?> =
+        context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_LOCATION_URI]?.takeIf { it.isNotBlank() } }
     val preferOfflinePagesFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFER_OFFLINE_PAGES] ?: true }
     val importantInfoVersionFlow: Flow<Int> =
@@ -282,25 +288,23 @@ class AppPreferences(
             collectionIds = prefetchCollectionIdsFlow.first(),
         )
 
-    suspend fun updateKavitaConfig(
-        serverUrl: String,
-        apiKey: String,
-        imageApiKey: String,
-        userId: Int = 0,
-    ) {
+    suspend fun updateKavitaConfig(config: AppConfig) {
         context.dataStore.edit { prefs ->
-            prefs[KEY_SERVER_URL] = serverUrl
+            prefs[KEY_SERVER_URL] = config.serverUrl
             prefs.remove(KEY_API_KEY)
-            prefs[KEY_USER_ID] = userId.toString()
+            prefs[KEY_USER_ID] = config.userId.toString()
+            val certificate = config.caCertificate
+            if (certificate == null) prefs.remove(KEY_KAVITA_CA) else prefs[KEY_KAVITA_CA] = certificate
         }
-        secureStorage.setApiKey(apiKey)
-        secureStorage.setImageApiKey(imageApiKey)
+        secureStorage.setApiKey(config.apiKey)
+        secureStorage.setImageApiKey(config.imageApiKey)
     }
 
     suspend fun clearAuth(clearServer: Boolean = false) {
         context.dataStore.edit { prefs ->
             if (clearServer) {
                 prefs[KEY_SERVER_URL] = ""
+                prefs.remove(KEY_KAVITA_CA)
             }
             prefs.remove(KEY_API_KEY)
             prefs[KEY_USER_ID] = "0"
@@ -552,6 +556,16 @@ class AppPreferences(
     suspend fun setDownloadMaxConcurrent(value: Int) {
         context.dataStore.edit { prefs ->
             prefs[KEY_DOWNLOAD_MAX_CONCURRENT] = value
+        }
+    }
+
+    suspend fun setDownloadLocationUri(uri: String?) {
+        context.dataStore.edit { prefs ->
+            if (uri.isNullOrBlank()) {
+                prefs.remove(KEY_DOWNLOAD_LOCATION_URI)
+            } else {
+                prefs[KEY_DOWNLOAD_LOCATION_URI] = uri
+            }
         }
     }
 

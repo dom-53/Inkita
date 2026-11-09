@@ -1,5 +1,6 @@
 package net.dom53.inkita.core.cache
 
+import android.database.sqlite.SQLiteBlobTooBigException
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.squareup.moshi.Moshi
@@ -11,6 +12,8 @@ import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.cache.LibraryV2CacheKeys
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkLoggingInterceptor
+import net.dom53.inkita.core.network.forKavita
+import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.api.dto.AnnotationDto
 import net.dom53.inkita.data.api.dto.AppUserCollectionDto
@@ -33,6 +36,8 @@ import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedPersonV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailChunkEntity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesV2Entity
 import net.dom53.inkita.domain.model.Collection
@@ -42,8 +47,11 @@ import net.dom53.inkita.domain.model.ReadState
 import net.dom53.inkita.domain.model.ReadingList
 import net.dom53.inkita.domain.model.Series
 import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okio.Buffer
+import okio.utf8Size
 import java.io.File
 import java.io.FileOutputStream
 
@@ -69,6 +77,10 @@ class CacheManagerImpl(
     companion object {
         const val MAX_DIM = 512
         const val THUMBNAIL_QUALITY = 85
+
+        // Leave room in Android's CursorWindow for the row's other columns and overhead.
+        private const val MAX_SERIES_DETAIL_TEXT_BYTES = 1024 * 1024
+        private const val SERIES_DETAIL_CHUNK_BYTES = 256L * 1024
     }
 
     private val moshi: Moshi by lazy {
@@ -81,6 +93,7 @@ class CacheManagerImpl(
     private val seriesAdapter = moshi.adapter(SeriesDto::class.java)
     private val metadataAdapter = moshi.adapter(SeriesMetadataDto::class.java)
     private val detailAdapter = moshi.adapter(SeriesDetailDto::class.java)
+    private val fullDetailAdapter by lazy { moshi.adapter(InkitaDetailV2::class.java) }
     private val relatedAdapter = moshi.adapter(RelatedSeriesDto::class.java)
     private val ratingAdapter = moshi.adapter(RatingDto::class.java)
     private val chapterAdapter = moshi.adapter(ChapterDto::class.java)
@@ -140,12 +153,13 @@ class CacheManagerImpl(
         if (!p.globalEnabled) return series
         val config = appPreferences.configFlow.first()
         if (!config.isConfigured) return series
+        val calls = httpClient.forKavita(config)
 
         return series.map { item ->
             if (item.localThumbPath != null) {
                 item
             } else {
-                val thumb = downloadThumbnailIfNeeded(config.serverUrl, config.apiKey, item.id)
+                val thumb = downloadThumbnailIfNeeded(config, calls, item.id)
                 if (thumb != null) item.copy(localThumbPath = thumb) else item
             }
         }
@@ -364,7 +378,7 @@ class CacheManagerImpl(
         val now = System.currentTimeMillis()
         val metadata = detail.metadata
         val entity =
-            net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity(
+            CachedSeriesDetailV2Entity(
                 seriesId = seriesId,
                 summary = metadata?.summary,
                 publicationStatus = metadata?.publicationStatus,
@@ -393,7 +407,12 @@ class CacheManagerImpl(
                 seriesDetailPlusJson = detail.seriesDetailPlus?.let { seriesDetailPlusAdapter.toJson(it) },
                 updatedAt = now,
             )
-        dao.upsertSeriesDetail(entity)
+        if (entity.textSizeBytes() > MAX_SERIES_DETAIL_TEXT_BYTES) {
+            val chunks = withContext(Dispatchers.Default) { encodeSeriesDetailChunks(seriesId, detail) }
+            dao.replaceChunkedSeriesDetail(seriesId, now, chunks)
+        } else {
+            dao.upsertSeriesDetail(entity)
+        }
         if (LoggingManager.isDebugEnabled()) {
             LoggingManager.d("CacheV2", "Store series detail series=$seriesId")
         }
@@ -404,10 +423,20 @@ class CacheManagerImpl(
         val dao = seriesDetailV2Dao ?: return null
         val p = policy()
         if (!p.globalEnabled || !p.libraryEnabled || !p.libraryDetailsEnabled) return null
-        val entity = dao.getSeriesDetail(seriesId) ?: return null
+        val (entity, chunks) =
+            try {
+                dao.getSeriesDetailWithChunks(seriesId)
+            } catch (_: SQLiteBlobTooBigException) {
+                LoggingManager.w("CacheV2", "Ignoring oversized cached detail for series=$seriesId")
+                null
+            } ?: return null
         if (LoggingManager.isDebugEnabled()) {
             LoggingManager.d("CacheV2", "Read series detail series=$seriesId")
         }
+        if (entity.chunkCount > 0) {
+            return withContext(Dispatchers.Default) { decodeSeriesDetailChunks(entity, chunks) }
+        }
+
         val series = entity.seriesJson?.let { fromJson(seriesAdapter, it) }
         val metadata = entity.metadataJson?.let { fromJson(metadataAdapter, it) }
         val detail = entity.detailJson?.let { fromJson(detailAdapter, it) }
@@ -462,6 +491,56 @@ class CacheManagerImpl(
         val dao = seriesDetailV2Dao ?: return null
         return dao.getSeriesDetailUpdatedAt(seriesId)
     }
+
+    private fun encodeSeriesDetailChunks(
+        seriesId: Int,
+        detail: InkitaDetailV2,
+    ): List<CachedSeriesDetailChunkEntity> {
+        val payload = Buffer()
+        fullDetailAdapter.toJson(payload, detail)
+        return buildList {
+            while (payload.size > 0) {
+                val chunk = payload.readByteArray(minOf(payload.size, SERIES_DETAIL_CHUNK_BYTES))
+                add(CachedSeriesDetailChunkEntity(seriesId, size, chunk))
+            }
+        }
+    }
+
+    private fun decodeSeriesDetailChunks(
+        entity: CachedSeriesDetailV2Entity,
+        chunks: List<ByteArray>,
+    ): InkitaDetailV2? {
+        if (chunks.size != entity.chunkCount) {
+            LoggingManager.w("CacheV2", "Ignoring incomplete cached detail for series=${entity.seriesId}")
+            return null
+        }
+        val payload = Buffer()
+        chunks.forEach { payload.write(it) }
+        return runCatching { fullDetailAdapter.fromJson(payload) }
+            .onFailure { LoggingManager.w("CacheV2", "Ignoring invalid cached detail for series=${entity.seriesId}") }
+            .getOrNull()
+    }
+
+    private fun CachedSeriesDetailV2Entity.textSizeBytes(): Long =
+        listOfNotNull(
+            summary,
+            genres,
+            tags,
+            writers,
+            seriesJson,
+            metadataJson,
+            detailJson,
+            relatedJson,
+            ratingJson,
+            continuePointJson,
+            readerProgressJson,
+            timeLeftJson,
+            collectionsJson,
+            readingListsJson,
+            bookmarksJson,
+            annotationsJson,
+            seriesDetailPlusJson,
+        ).sumOf { it.utf8Size() }
 
     /** Clear all cached data, including thumbnails and DB records. */
     override suspend fun clearAllCache() {
@@ -643,7 +722,7 @@ class CacheManagerImpl(
     private fun toJsonList(value: List<String>): String = stringListAdapter.toJson(value)
 
     /** Recreate minimal metadata when cached JSON payload is missing. */
-    private fun buildFallbackMetadata(entity: net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity): SeriesMetadataDto? {
+    private fun buildFallbackMetadata(entity: CachedSeriesDetailV2Entity): SeriesMetadataDto? {
         if (
             entity.summary == null &&
             entity.publicationStatus == null &&
@@ -734,8 +813,8 @@ class CacheManagerImpl(
 
     /** Download and store a local series thumbnail if missing. */
     private suspend fun downloadThumbnailIfNeeded(
-        serverUrl: String,
-        apiKey: String,
+        config: AppConfig,
+        calls: Call.Factory,
         seriesId: Int,
     ): String? {
         val dir = thumbnailsDir ?: return null
@@ -754,10 +833,10 @@ class CacheManagerImpl(
                 }
 
                 if (result == null) {
-                    val base = if (serverUrl.endsWith("/")) serverUrl.dropLast(1) else serverUrl
-                    val url = "$base/api/Image/series-cover?seriesId=$seriesId&apiKey=$apiKey"
+                    val base = config.serverUrl.trimEnd('/')
+                    val url = "$base/api/Image/series-cover?seriesId=$seriesId&apiKey=${config.apiKey}"
                     val request = Request.Builder().url(url).build()
-                    httpClient.newCall(request).execute().use { resp ->
+                    calls.newCall(request).execute().use { resp ->
                         if (resp.isSuccessful) {
                             val body = resp.body
                             if (body != null) {

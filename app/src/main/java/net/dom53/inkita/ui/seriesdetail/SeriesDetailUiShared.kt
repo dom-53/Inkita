@@ -746,6 +746,36 @@ internal fun volumeNumberText(volume: net.dom53.inkita.data.api.dto.VolumeDto): 
     return if (volNumber % 1f == 0f) volNumber.toInt().toString() else volNumber.toString()
 }
 
+internal fun chapterPositionText(
+    detail: net.dom53.inkita.data.api.dto.SeriesDetailDto?,
+    chapterId: Int,
+    volumeId: Int?,
+    fallbackChapter: net.dom53.inkita.data.api.dto.ChapterDto,
+): String? {
+    fun positionIn(chapters: List<net.dom53.inkita.data.api.dto.ChapterDto>?): String? {
+        val index = chapters?.indexOfFirst { it.id == chapterId } ?: -1
+        return index.takeIf { it >= 0 }?.let { (it + 1).toString() }
+    }
+
+    positionIn(detail?.chapters)?.let { return it }
+    val volume = detail?.volumes?.firstOrNull { it.id == volumeId }
+    positionIn(volume?.chapters)?.let { return it }
+
+    val matchingChapter =
+        buildList {
+            addAll(detail?.chapters.orEmpty())
+            addAll(detail?.storylineChapters.orEmpty())
+            addAll(detail?.specials.orEmpty())
+            detail?.volumes.orEmpty().forEach { addAll(it.chapters.orEmpty()) }
+        }.firstOrNull { it.id == chapterId }
+            ?: fallbackChapter
+    return matchingChapter.number?.takeIf { it.isNotBlank() }
+        ?: matchingChapter.range?.takeIf { it.isNotBlank() }
+        ?: (matchingChapter.minNumber ?: matchingChapter.maxNumber)?.let { number ->
+            if (number % 1f == 0f) number.toInt().toString() else number.toString()
+        }
+}
+
 @Composable
 internal fun CollectionDialogV2(
     collections: List<net.dom53.inkita.domain.model.Collection>,

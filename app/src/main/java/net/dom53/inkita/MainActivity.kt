@@ -63,10 +63,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import net.dom53.inkita.core.cache.CacheManager
+import net.dom53.inkita.core.network.NetworkMonitor
+import net.dom53.inkita.core.network.forKavita
 import net.dom53.inkita.core.startup.StartupManager
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.storage.AppTheme
+import net.dom53.inkita.data.repository.ComicPageFallback
 import net.dom53.inkita.domain.repository.AuthRepository
 import net.dom53.inkita.domain.repository.CollectionsRepository
 import net.dom53.inkita.domain.repository.LibraryRepository
@@ -135,45 +138,25 @@ private const val IMPORTANT_INFO_HEADER =
 
 private val IMPORTANT_INFO_ADDED =
     listOf(
-        "Downloads V2: default Download API strategy for series/volume/chapter archives",
-        "Downloads V2: fallback DownloadApiStrategyV2 for unsupported formats",
-        "Downloads V2: normalized on-disk layout for series/volumes/chapters/specials",
-        "Downloads V2: image/archive chapter downloads stored as CBZ",
-        "Downloads V2: PDF downloads now show in the queue",
-        "Downloads V2: centralized download state for series/volume/chapter badges",
-        "Downloads V2: queue items show series/volume/chapter labels",
-        "Library/Browse: download badges on series covers",
-        "Settings: toggle to show/hide download badges",
-        "Settings: download stats dialog",
-        "Series Detail V2: tree view of downloaded files",
-        "Reader: offline Image/Archive reading from downloaded CBZ",
-        "Reader: basic Image/Archive reader (image pages + swipe)",
-        "Reader: image reader modes (LTR/RTL/Vertical)",
-        "Reader: PDF temp files cleaned on exit/startup unless downloaded",
-        "Series Detail V2: chapters list swipe read/unread + download",
-        "Series Detail V2: tap genre/tag to open Browse with filter",
-        "Series Detail V2: collection click opens Library V2 collection",
+        "Settings: added Korean and Chinese language options",
+        "Cache: large series details can now be opened offline after loading them online",
     )
 
 private val IMPORTANT_INFO_CHANGED =
     listOf(
-        "Downloads V2: PDF items open with correct MIME type",
-        "Downloads V2: queue/completed rows wrap titles cleanly",
-        "Reader: EpubReaderViewModel/PdfReaderViewModel split into separate files",
-        "Reader: navigation jumps across chapters at edges",
-        "Reader: next chapter prompts to mark current as read when leaving early",
-        "Reader: image/archive routing preserves format id",
-        "UI: rounded corners aligned across Library/Series/Volume covers",
-        "Series Detail: legacy screen/viewmodel removed",
-        "Downloads: legacy V1 download manager/DB removed",
-        "Library: legacy screen/viewmodel and cache APIs removed",
+        "",
     )
 
 private val IMPORTANT_INFO_FIXED =
     listOf(
-        "Series Detail V2 cache defaults to enabled to prevent offline cache misses",
-        "History list no longer crashes due to duplicate LazyColumn keys",
-        "Bottom bar stays visible when opening Library/Browse via filters",
+        "Library: keep cached Home sections when a request fails and offer a retry",
+        "Cache: fixed a crash when opening a series with an oversized cached detail",
+        "Reader: fixed opening PDFs online when Kavita can download the file",
+        "Reader: load comic pages from the chapter archive when Kavita's page endpoint fails",
+        "Reader: resume completed comics on the last valid page",
+        "Library: fix loading libraries on newer Kavita versions",
+        "Settings: verify the Kavita connection before saving and show readable errors",
+        "Settings: support a custom HTTPS CA certificate for the configured Kavita server",
     )
 
 private const val FORCE_SHOW_IMPORTANT_INFO = false
@@ -377,7 +360,7 @@ fun InkitaApp(
         }
 
         val imageLoader =
-            remember(maxThumbnailsParallel) {
+            remember(maxThumbnailsParallel, config) {
                 val dispatcher =
                     Dispatcher().apply {
                         maxRequestsPerHost = maxThumbnailsParallel
@@ -390,8 +373,16 @@ fun InkitaApp(
                         .build()
                 ImageLoader
                     .Builder(context)
-                    .okHttpClient(okHttpClient)
-                    .build()
+                    .callFactory(okHttpClient.forKavita(config))
+                    .components {
+                        add(
+                            ComicPageFallback(context, config) {
+                                NetworkMonitor
+                                    .getInstance(context, appPreferences)
+                                    .status.value.isOnlineAllowed
+                            },
+                        )
+                    }.build()
             }
 
         CompositionLocalProvider(LocalImageLoader provides imageLoader) {
@@ -522,7 +513,12 @@ fun InkitaApp(
                     composable(MainScreen.Downloads.route) {
                         val ctx = LocalContext.current
                         val vm = remember { DownloadQueueViewModelFactory.create(ctx, cacheManager) }
-                        DownloadQueueScreen(viewModel = vm)
+                        DownloadQueueScreen(
+                            viewModel = vm,
+                            onOpenReader = { chapterId, page, sid, vid, fmt ->
+                                navController.navigate("reader/$chapterId?page=$page&sid=$sid&vid=$vid&fmt=${fmt ?: -1}")
+                            },
+                        )
                     }
                     composable(MainScreen.Settings.route) {
                         SettingsScreen(

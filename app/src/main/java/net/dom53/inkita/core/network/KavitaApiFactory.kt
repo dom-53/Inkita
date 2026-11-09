@@ -2,8 +2,9 @@ package net.dom53.inkita.core.network
 
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
-import net.dom53.inkita.core.network.NetworkLoggingInterceptor
+import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.data.api.KavitaApi
+import okhttp3.Call
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -16,7 +17,7 @@ object KavitaApiFactory {
 
     private fun baseRetrofitBuilder(
         baseUrl: String,
-        client: OkHttpClient,
+        client: Call.Factory,
     ): Retrofit.Builder {
         val moshi =
             Moshi
@@ -27,7 +28,7 @@ object KavitaApiFactory {
         return Retrofit
             .Builder()
             .baseUrl(if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/")
-            .client(client)
+            .callFactory(client)
             .addConverterFactory(ScalarsConverterFactory.create())
             .addConverterFactory(MoshiConverterFactory.create(moshi))
     }
@@ -48,8 +49,8 @@ object KavitaApiFactory {
     }
 
     fun createAuthenticated(
-        baseUrl: String,
-        apiKey: String,
+        config: AppConfig,
+        followRedirects: Boolean = true,
     ): KavitaApi {
         val apiKeyInterceptor =
             Interceptor { chain ->
@@ -57,7 +58,7 @@ object KavitaApiFactory {
                 val newRequest =
                     original
                         .newBuilder()
-                        .header("x-api-key", apiKey)
+                        .header("x-api-key", config.apiKey)
                         .build()
                 chain.proceed(newRequest)
             }
@@ -67,13 +68,14 @@ object KavitaApiFactory {
                 .Builder()
                 .addInterceptor(apiKeyInterceptor)
                 .addInterceptor(NetworkLoggingInterceptor)
+                .followRedirects(followRedirects)
                 .callTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .connectTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .readTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .writeTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .build()
 
-        val retrofit = baseRetrofitBuilder(baseUrl, client).build()
+        val retrofit = baseRetrofitBuilder(config.serverUrl, client.forKavita(config)).build()
         return retrofit.create(KavitaApi::class.java)
     }
 }

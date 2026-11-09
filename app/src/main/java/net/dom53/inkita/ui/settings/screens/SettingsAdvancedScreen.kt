@@ -45,7 +45,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
 import net.dom53.inkita.core.cache.CacheManager
-import net.dom53.inkita.core.downloadv2.DownloadPaths
+import net.dom53.inkita.core.downloadv2.DownloadStorageManager
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.local.db.InkitaDatabase
@@ -936,7 +936,7 @@ fun SettingsAdvancedScreen(
                                         ClearTarget.DownloadedPages -> {
                                             downloadV2Dao.clearAllItems()
                                             downloadV2Dao.clearAllJobs()
-                                            DownloadPaths.baseDir(context).deleteRecursively()
+                                            DownloadStorageManager(context, appPreferences).clearAll()
                                         }
                                     }
                                     appPreferences.setLastLibraryRefresh(0)

@@ -73,7 +73,7 @@ class SeriesDetailViewModelV2(
                 _state.update { it.copy(collectionError = "Offline mode") }
                 return@launch
             }
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(cfg)
             val result =
                 runCatching {
                     if (add) {
@@ -122,7 +122,7 @@ class SeriesDetailViewModelV2(
                 _state.update { it.copy(collectionError = "Offline mode") }
                 return@launch
             }
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(cfg)
             val response =
                 runCatching {
                     api.addSeriesToCollection(
@@ -155,7 +155,7 @@ class SeriesDetailViewModelV2(
                 _state.update { it.copy(collectionError = "Offline mode") }
                 return@launch
             }
-            val api = KavitaApiFactory.createAuthenticated(cfg.serverUrl, cfg.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(cfg)
             runCatching {
                 api.getCollectionsForSeries(seriesId)
             }.onSuccess { resp ->
@@ -187,7 +187,7 @@ class SeriesDetailViewModelV2(
                 _state.update { it.copy(error = "Not configured") }
                 return@launch
             }
-            val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(config)
             val want = current.wantToRead == true
             val response =
                 if (want) {
@@ -233,7 +233,7 @@ class SeriesDetailViewModelV2(
                 _state.update { it.copy(error = "Not configured") }
                 return@launch
             }
-            val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+            val api = KavitaApiFactory.createAuthenticated(config)
             val response =
                 if (markRead) {
                     api.markSeriesRead(MarkSeriesDto(currentSeriesId))
@@ -276,6 +276,7 @@ class SeriesDetailViewModelV2(
             val shouldRefresh = forceRefresh || alwaysRefresh
             val policy = cacheManager.policy()
             val canCache = policy.globalEnabled && policy.libraryEnabled && policy.libraryDetailsEnabled
+            val localProgressSnapshot = readerRepository.getLatestLocalProgress(seriesId)
             if (LoggingManager.isDebugEnabled()) {
                 LoggingManager.d(
                     "SeriesDetailV2",
@@ -296,7 +297,7 @@ class SeriesDetailViewModelV2(
                         "Cache hit series=$seriesId stale=$isStale updatedAt=${cachedUpdatedAt ?: 0L}",
                     )
                 }
-                val localMerged = applyLocalProgress(cachedDetail, isOnline)
+                val localMerged = applyLocalProgress(cachedDetail, isOnline, localProgressSnapshot)
                 val membership =
                     localMerged.collections
                         ?.map { it.id }
@@ -349,7 +350,7 @@ class SeriesDetailViewModelV2(
             }
 
             try {
-                val api = KavitaApiFactory.createAuthenticated(config.serverUrl, config.apiKey)
+                val api = KavitaApiFactory.createAuthenticated(config)
                 val errors = mutableListOf<String>()
 
                 val seriesDeferred = async { api.getSeriesById(seriesId) }
@@ -418,7 +419,7 @@ class SeriesDetailViewModelV2(
                         rating = rating,
                         readerProgress = readerProgress,
                     )
-                val mergedDetail = applyLocalProgress(detail, isOnline)
+                val mergedDetail = applyLocalProgress(detail, isOnline, localProgressSnapshot)
                 val membership =
                     mergedDetail.collections
                         ?.map { it.id }
@@ -457,9 +458,11 @@ class SeriesDetailViewModelV2(
     private suspend fun applyLocalProgress(
         detail: InkitaDetailV2,
         isOnline: Boolean,
+        localProgressSnapshot: net.dom53.inkita.domain.model.ReaderProgress? = null,
     ): InkitaDetailV2 {
         val local =
-            readerRepository.getLatestLocalProgress(seriesId)
+            localProgressSnapshot
+                ?: readerRepository.getLatestLocalProgress(seriesId)
                 ?: run {
                     val chapterIds =
                         buildSet {

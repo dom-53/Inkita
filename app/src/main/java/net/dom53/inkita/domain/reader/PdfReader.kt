@@ -36,6 +36,10 @@ class PdfReader(
         readerRepository.setProgress(progress, totalPages)
     }
 
+    override suspend fun saveProgressLocally(progress: ReaderProgress) {
+        readerRepository.saveProgressLocally(progress)
+    }
+
     override suspend fun getTimeLeft(
         seriesId: Int,
         chapterId: Int,

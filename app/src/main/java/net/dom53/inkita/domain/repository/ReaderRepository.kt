@@ -35,6 +35,8 @@ interface ReaderRepository {
         totalPages: Int? = null,
     )
 
+    suspend fun saveProgressLocally(progress: ReaderProgress)
+
     suspend fun getTimeLeft(
         seriesId: Int,
         chapterId: Int,

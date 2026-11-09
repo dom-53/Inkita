@@ -20,6 +20,11 @@ data class ReaderUiState(
     val content: String? = null,
     val fromOffline: Boolean = false,
     val imageUrl: String? = null,
+    val imageUrls: Map<Int, String> = emptyMap(),
+    val webtoonChapters: List<WebtoonChapterUiState> = emptyList(),
+    val activeChapterId: Int? = null,
+    val previousImageUrl: String? = null,
+    val nextImageUrl: String? = null,
     val pageIndex: Int = 0,
     val pageCount: Int = 0,
     val timeLeft: ReaderTimeLeft? = null,
@@ -27,6 +32,20 @@ data class ReaderUiState(
     val bookScrollId: String? = null,
     val isPdf: Boolean = false,
     val pdfPath: String? = null,
+)
+
+data class WebtoonChapterUiState(
+    val chapterId: Int,
+    val seriesId: Int?,
+    val volumeId: Int?,
+    val libraryId: Int?,
+    val title: String?,
+    val chapterNumber: String?,
+    val bookTitle: String?,
+    val pageCount: Int,
+    val imageUrls: Map<Int, String> = emptyMap(),
+    val isLoadingNextChapter: Boolean = false,
+    val hasNextChapter: Boolean? = null,
 )
 
 @Suppress("VariableNaming", "ktlint:standard:backing-property-naming")
@@ -51,16 +70,21 @@ abstract class BaseReaderViewModel(
             val savedProgress = runCatching { reader.getProgress(chapterId) }.getOrNull()
             val info = runCatching { reader.getBookInfo(chapterId) }.getOrNull()
             val totalPages = info?.pages ?: 0
+            val pageToOpen =
+                if (reader.format == Format.Image && totalPages > 0) {
+                    initialPage.coerceIn(0, totalPages - 1)
+                } else {
+                    initialPage
+                }
             _state.update {
                 it.copy(
                     isPdf = reader.format == Format.Pdf,
                     bookInfo = info,
                     pageCount = totalPages,
                     bookScrollId = savedProgress?.bookScrollId ?: it.bookScrollId,
-                    pageIndex = it.pageIndex, // keep initialPage
                 )
             }
-            loadInitialContent()
+            loadInitialContent(pageToOpen)
             loadTimeLeft()
         }
     }
@@ -79,6 +103,7 @@ abstract class BaseReaderViewModel(
                             _state.update { st -> st.copy(bookInfo = info, pageCount = info.pages ?: st.pageCount) }
                         }
                     }
+                    onPageLoaded(index)
                 }.onFailure { e ->
                     _state.update {
                         it.copy(
@@ -104,9 +129,10 @@ abstract class BaseReaderViewModel(
         if (anonymous) return
         viewModelScope.launch {
             val info = _state.value.bookInfo
+            val currentChapterId = _state.value.activeChapterId ?: chapterId
             val progress =
                 ReaderProgress(
-                    chapterId = chapterId,
+                    chapterId = currentChapterId,
                     page = pageIndex,
                     bookScrollId = bookScrollId,
                     seriesId = seriesId,
@@ -123,20 +149,22 @@ abstract class BaseReaderViewModel(
     private fun loadTimeLeft() {
         viewModelScope.launch {
             if (seriesId == null) return@launch
-            val tl = runCatching<ReaderTimeLeft?> { reader.getTimeLeft(seriesId, chapterId) }.getOrNull()
+            val currentChapterId = _state.value.activeChapterId ?: chapterId
+            val tl = runCatching<ReaderTimeLeft?> { reader.getTimeLeft(seriesId, currentChapterId) }.getOrNull()
             _state.update { it.copy(timeLeft = tl) }
         }
     }
 
-    private fun loadInitialContent() {
+    private fun loadInitialContent(pageIndex: Int) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
-            runCatching { reader.loadInitial(chapterId, initialPage) }
+            runCatching { reader.loadInitial(chapterId, pageIndex) }
                 .onSuccess { result ->
-                    applyLoadResult(result, initialPage)
+                    applyLoadResult(result, pageIndex)
                     if (reader.format != Format.Pdf) {
-                        updateProgress(initialPage)
+                        updateProgress(pageIndex)
                     }
+                    onPageLoaded(pageIndex)
                 }.onFailure { e ->
                     _state.update { it.copy(isLoading = false, error = e.message ?: "Error loading reader") }
                 }
@@ -147,7 +175,7 @@ abstract class BaseReaderViewModel(
         val info = _state.value.bookInfo
         val sid = info?.seriesId ?: seriesId ?: return null
         val vid = info?.volumeId ?: volumeId ?: return null
-        val currentChapter = chapterId
+        val currentChapter = _state.value.activeChapterId ?: chapterId
         val nextNav = runCatching { reader.getNextChapter(sid, vid, currentChapter) }.getOrNull() ?: return null
         val nextId = nextNav.chapterId ?: return null
         // fetch fresh book info for next chapter to capture correct volume
@@ -168,7 +196,7 @@ abstract class BaseReaderViewModel(
         val info = _state.value.bookInfo
         val sid = info?.seriesId ?: seriesId ?: return null
         val vid = info?.volumeId ?: volumeId ?: return null
-        val currentChapter = chapterId
+        val currentChapter = _state.value.activeChapterId ?: chapterId
         val prevNav = runCatching { reader.getPreviousChapter(sid, vid, currentChapter) }.getOrNull() ?: return null
         val prevId = prevNav.chapterId ?: return null
         val prevInfo = runCatching { reader.getBookInfo(prevId) }.getOrNull()
@@ -188,6 +216,35 @@ abstract class BaseReaderViewModel(
         updateProgress(_state.value.pageIndex, bookScrollId)
     }
 
+    open suspend fun saveCurrentProgress() {
+        persistCurrentProgressLocally(_state.value.pageIndex)
+    }
+
+    protected suspend fun persistCurrentProgressLocally(pageIndex: Int) {
+        if (anonymous) return
+        val state = _state.value
+        val info = state.bookInfo
+        val progress =
+            ReaderProgress(
+                chapterId = state.activeChapterId ?: chapterId,
+                page = pageIndex,
+                bookScrollId = state.bookScrollId,
+                seriesId = info?.seriesId ?: seriesId,
+                volumeId = info?.volumeId ?: volumeId,
+                libraryId = info?.libraryId,
+                lastModifiedUtcMillis = System.currentTimeMillis(),
+            )
+        if (net.dom53.inkita.core.logging.LoggingManager
+                .isDebugEnabled()
+        ) {
+            net.dom53.inkita.core.logging.LoggingManager.d(
+                "InkitaProgress",
+                "Save on exit chapter=${progress.chapterId} page=${progress.page} series=${progress.seriesId}",
+            )
+        }
+        reader.saveProgressLocally(progress)
+    }
+
     fun markChapterRead() {
         val total = _state.value.pageCount
         val lastIndex = if (total > 0) total - 1 else _state.value.pageIndex
@@ -196,13 +253,22 @@ abstract class BaseReaderViewModel(
 
     suspend fun getBookInfoFor(chapterId: Int): ReaderBookInfo? = runCatching { reader.getBookInfo(chapterId) }.getOrNull()
 
-    open suspend fun isPageDownloaded(pageIndex: Int): Boolean = runCatching { reader.isPageDownloaded(chapterId, pageIndex) }.getOrDefault(false)
+    open suspend fun isPageDownloaded(pageIndex: Int): Boolean {
+        val currentChapterId = _state.value.activeChapterId ?: chapterId
+        return runCatching { reader.isPageDownloaded(currentChapterId, pageIndex) }.getOrDefault(false)
+    }
+
+    protected open fun onPageLoaded(pageIndex: Int) = Unit
 
     protected fun applyLoadResult(
         result: ReaderLoadResult,
         pageIndex: Int,
     ) {
         _state.update {
+            val imageUrls =
+                result.imageUrl?.let { url ->
+                    it.imageUrls + (pageIndex to url)
+                } ?: it.imageUrls
             it.copy(
                 content = result.content ?: it.content,
                 fromOffline = result.fromOffline,
@@ -211,6 +277,9 @@ abstract class BaseReaderViewModel(
                 error = null,
                 pdfPath = result.pdfPath ?: it.pdfPath,
                 imageUrl = result.imageUrl ?: it.imageUrl,
+                imageUrls = imageUrls,
+                previousImageUrl = if (result.imageUrl != null) null else it.previousImageUrl,
+                nextImageUrl = if (result.imageUrl != null) null else it.nextImageUrl,
             )
         }
     }

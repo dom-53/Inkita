@@ -10,6 +10,8 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -61,6 +63,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,18 +92,22 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
 import net.dom53.inkita.core.network.NetworkUtils
+import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.core.storage.ImageReaderMode
 import net.dom53.inkita.core.storage.ReaderPrefs
 import net.dom53.inkita.core.storage.ReaderThemeMode
 import net.dom53.inkita.domain.model.Format
 import net.dom53.inkita.domain.repository.ReaderRepository
 import net.dom53.inkita.ui.reader.model.ReaderFontOption
+import net.dom53.inkita.ui.reader.model.fontFaceCss
 import net.dom53.inkita.ui.reader.model.readerFontOptions
 import net.dom53.inkita.ui.reader.model.readerThemeOptions
 import net.dom53.inkita.ui.reader.renderer.BaseReader
 import net.dom53.inkita.ui.reader.renderer.ReaderRenderCallbacks
 import net.dom53.inkita.ui.reader.renderer.ReaderRenderParams
 import net.dom53.inkita.ui.reader.viewmodel.BaseReaderViewModel
+import net.dom53.inkita.ui.reader.viewmodel.ImageReaderViewModel
 import net.dom53.inkita.ui.reader.viewmodel.PdfReaderViewModel
 import net.dom53.inkita.ui.reader.viewmodel.ReaderUiState
 import java.io.File
@@ -186,6 +193,24 @@ internal fun BaseReaderScreen(
     val uiState by readerViewModel.state.collectAsState()
     val context = LocalContext.current
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
+    val scope = rememberCoroutineScope()
+    var isLeavingReader by remember { mutableStateOf(false) }
+
+    val leaveReader: () -> Unit = {
+        if (!isLeavingReader) {
+            isLeavingReader = true
+            scope.launch {
+                runCatching { readerViewModel.saveCurrentProgress() }
+                val latestState = readerViewModel.state.value
+                onBack(
+                    latestState.activeChapterId ?: chapterId,
+                    latestState.pageIndex,
+                    latestState.bookInfo?.seriesId ?: seriesId,
+                    latestState.bookInfo?.volumeId ?: volumeId,
+                )
+            }
+        }
+    }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
@@ -195,13 +220,12 @@ internal fun BaseReaderScreen(
     }
 
     BackHandler {
-        val sid = uiState.bookInfo?.seriesId ?: seriesId
-        val vid = uiState.bookInfo?.volumeId ?: volumeId
-        onBack(chapterId, uiState.pageIndex, sid, vid)
+        leaveReader()
     }
     var pendingScrollY by remember { mutableStateOf<Int?>(null) }
     var pendingScrollId by remember { mutableStateOf<String?>(null) }
     val readerPrefs by appPreferences.readerPrefsFlow.collectAsState(initial = ReaderPrefs())
+    val config by appPreferences.configFlow.collectAsState(initial = null)
     val fontOptions = remember { readerFontOptions }
 
     var fontSize by remember { mutableStateOf(18f) }
@@ -212,12 +236,13 @@ internal fun BaseReaderScreen(
     var themeMode by remember { mutableStateOf(ReaderThemeMode.Light) }
     var showNextChapterDialog by remember { mutableStateOf(false) }
     var pendingNextChapter by remember { mutableStateOf<net.dom53.inkita.domain.model.ReaderChapterNav?>(null) }
-    val scope = rememberCoroutineScope()
     val activity = LocalView.current.context as? Activity
     var showOverlay by remember { mutableStateOf(true) }
     var showSettingsPanel by remember { mutableStateOf(false) }
     var selectedSettingsTab by remember { mutableStateOf(ReaderSettingsTab.Font) }
     val selectedFont = fontOptions.firstOrNull { it.id == fontFamilyId } ?: readerFontOptions.first()
+    val isImageReader = renderer == net.dom53.inkita.ui.reader.renderer.ImageReader
+    val supportsReaderSettings = renderer.supportsTextSettings || isImageReader
 
     LaunchedEffect(readerPrefs) {
         fontSize = readerPrefs.fontSize
@@ -342,6 +367,7 @@ internal fun BaseReaderScreen(
                     uiState = uiState,
                     serverUrl = serverUrl,
                     apiKey = apiKey,
+                    config = config,
                     fontSize = fontSize,
                     lineHeight = lineHeight,
                     padding = padding,
@@ -351,6 +377,7 @@ internal fun BaseReaderScreen(
                     pendingScrollY = pendingScrollY,
                     pendingScrollId = pendingScrollId,
                     imageReaderMode = readerPrefs.imageReaderMode,
+                    imagePrefetchPages = readerPrefs.imagePrefetchPages,
                 ),
             callbacks =
                 ReaderRenderCallbacks(
@@ -363,6 +390,19 @@ internal fun BaseReaderScreen(
                     },
                     onSwipeNext = { goNextPage() },
                     onSwipePrev = { goPrevPage() },
+                    onImagePageVisible = { visibleChapterId, pageIndex, prefetchPages ->
+                        (readerViewModel as? ImageReaderViewModel)?.onWebtoonPageVisible(
+                            chapterId = visibleChapterId,
+                            pageIndex = pageIndex,
+                            prefetchPages = prefetchPages,
+                        )
+                    },
+                    onWebtoonChapterBoundaryVisible = { currentChapterId, prefetchPages ->
+                        (readerViewModel as? ImageReaderViewModel)?.onWebtoonChapterBoundaryVisible(
+                            chapterId = currentChapterId,
+                            prefetchPages = prefetchPages,
+                        )
+                    },
                     onConsumePendingScroll = { pendingScrollY = null },
                     onConsumeScrollId = { pendingScrollId = null },
                     onWebViewReady = { webViewRef.value = it },
@@ -377,14 +417,12 @@ internal fun BaseReaderScreen(
             val barTitle = uiState.bookInfo?.title ?: stringResource(R.string.reader_title)
             val barPageText = pageText(uiState.pageIndex, uiState.pageCount, uiState.bookInfo?.pageTitle, context)
             if (topBarContent != null) {
-                topBarContent(barTitle, barPageText) {
-                    onBack(chapterId, uiState.pageIndex, seriesId, volumeId)
-                }
+                topBarContent(barTitle, barPageText, leaveReader)
             } else {
                 ReaderTopBar(
                     title = barTitle,
                     pageText = barPageText,
-                    onBack = { onBack(chapterId, uiState.pageIndex, seriesId, volumeId) },
+                    onBack = leaveReader,
                     modifier =
                         Modifier
                             .align(Alignment.TopStart)
@@ -399,7 +437,7 @@ internal fun BaseReaderScreen(
                     pageIndex = uiState.pageIndex,
                     pageCount = uiState.pageCount,
                     timeLeft = uiState.timeLeftText(context),
-                    enableSettings = renderer.supportsTextSettings,
+                    enableSettings = supportsReaderSettings,
                 )
             val bottomBarCallbacks =
                 ReaderBottomBarCallbacks(
@@ -440,7 +478,7 @@ internal fun BaseReaderScreen(
                     },
                     onPrevPage = { goPrevPage() },
                     onNextPage = { goNextPage() },
-                    onOpenSettings = { if (renderer.supportsTextSettings) showSettingsPanel = !showSettingsPanel },
+                    onOpenSettings = { if (supportsReaderSettings) showSettingsPanel = !showSettingsPanel },
                     onPrevChapter = {
                         scope.launch {
                             val nav = readerViewModel.getPreviousChapter()
@@ -522,7 +560,7 @@ internal fun BaseReaderScreen(
             }
 
             AnimatedVisibility(
-                visible = renderer.supportsTextSettings && showSettingsPanel,
+                visible = supportsReaderSettings && showSettingsPanel,
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
@@ -538,6 +576,7 @@ internal fun BaseReaderScreen(
                         textAlign = textAlign,
                         fontOptions = fontOptions,
                         fontFamilyId = selectedFont.id,
+                        imageReaderMode = readerPrefs.imageReaderMode,
                     )
                 val settingsCallbacks =
                     ReaderSettingsCallbacks(
@@ -581,9 +620,17 @@ internal fun BaseReaderScreen(
                                 }
                             }
                         },
+                        onImageReaderModeChange = { mode ->
+                            scope.launch { appPreferences.updateReaderPrefs { copy(imageReaderMode = mode) } }
+                        },
                     )
                 if (settingsContent != null) {
                     settingsContent(settingsState, settingsCallbacks)
+                } else if (isImageReader) {
+                    ImageReaderSettingsPanel(
+                        mode = settingsState.imageReaderMode,
+                        onModeChange = settingsCallbacks.onImageReaderModeChange,
+                    )
                 } else {
                     SettingsPanel(
                         selectedTab = settingsState.selectedTab,
@@ -801,6 +848,7 @@ data class ReaderSettingsState(
     val textAlign: TextAlign,
     val fontOptions: List<ReaderFontOption>,
     val fontFamilyId: String,
+    val imageReaderMode: ImageReaderMode,
 )
 
 data class ReaderSettingsCallbacks(
@@ -811,6 +859,7 @@ data class ReaderSettingsCallbacks(
     val onThemeChange: (ReaderThemeMode) -> Unit,
     val onTextAlignChange: (TextAlign) -> Unit,
     val onFontFamilyChange: (ReaderFontOption) -> Unit,
+    val onImageReaderModeChange: (ImageReaderMode) -> Unit,
 )
 
 @Composable
@@ -1034,6 +1083,68 @@ private fun ThemeSettings(
     }
 }
 
+@Composable
+private fun ImageReaderSettingsPanel(
+    mode: ImageReaderMode,
+    onModeChange: (ImageReaderMode) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(16.dp),
+                ).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            stringResource(R.string.reader_reader_settings),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+        ImageReadingModeSettings(mode = mode, onModeChange = onModeChange)
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun ImageReadingModeSettings(
+    mode: ImageReaderMode,
+    onModeChange: (ImageReaderMode) -> Unit,
+) {
+    val options =
+        listOf(
+            ImageReaderMode.LeftToRight to R.string.reader_image_mode_ltr,
+            ImageReaderMode.RightToLeft to R.string.reader_image_mode_rtl,
+            ImageReaderMode.Vertical to R.string.reader_image_mode_vertical,
+            ImageReaderMode.Webtoon to R.string.reader_image_mode_webtoon,
+        )
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(R.string.reader_image_default_mode), style = MaterialTheme.typography.titleSmall)
+        Text(
+            stringResource(R.string.reader_image_default_mode_subtitle),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (option, labelRes) ->
+                FilterChip(
+                    selected = mode == option,
+                    onClick = { onModeChange(option) },
+                    label = { Text(stringResource(labelRes)) },
+                    colors =
+                        FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            selectedLabelColor = MaterialTheme.colorScheme.primary,
+                            selectedLeadingIconColor = MaterialTheme.colorScheme.primary,
+                        ),
+                )
+            }
+        }
+    }
+}
+
 private fun themeColorsFor(mode: ReaderThemeMode): Pair<String, String> =
     when (mode) {
         ReaderThemeMode.Light -> "#FFFFFF" to "#111111"
@@ -1091,6 +1202,7 @@ internal fun ReaderWebView(
     themeMode: ReaderThemeMode,
     serverUrl: String?,
     apiKey: String?,
+    config: AppConfig?,
     onToggleOverlay: () -> Unit,
     pendingScrollY: Int?,
     onConsumePendingScroll: () -> Unit = {},
@@ -1114,17 +1226,7 @@ internal fun ReaderWebView(
             html
         }
     val paddingTopPx = paddingPx / 2f
-    val fontFaceCss =
-        fontOption.assetPath?.let {
-            """
-        @font-face {
-            font-family: '${fontOption.cssFamily}';
-            src: url('$it');
-            font-weight: 100 900;
-            font-style: normal;
-        }
-        """
-        } ?: ""
+    val fontFaceCss = fontOption.fontFaceCss()
     val (bgColor, textColor) = themeColorsFor(themeMode)
     val themeCss =
         """
@@ -1205,6 +1307,11 @@ internal fun ReaderWebView(
         """
         }
 
+    val kavitaResources by rememberUpdatedState(
+        remember(config?.serverUrl, config?.caCertificate) {
+            config?.takeIf { it.caCertificate != null }?.let(::KavitaWebResources)
+        },
+    )
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { context ->
@@ -1250,6 +1357,11 @@ internal fun ReaderWebView(
                 settings.allowUniversalAccessFromFileURLs = true
                 webViewClient =
                     object : WebViewClient() {
+                        override fun shouldInterceptRequest(
+                            view: WebView?,
+                            request: WebResourceRequest,
+                        ): WebResourceResponse? = kavitaResources?.intercept(request)
+
                         override fun onPageFinished(
                             view: WebView?,
                             url: String?,

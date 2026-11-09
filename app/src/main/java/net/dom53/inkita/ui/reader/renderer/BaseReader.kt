@@ -4,6 +4,7 @@ import android.webkit.WebView
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.ImageReaderMode
 import net.dom53.inkita.core.storage.ReaderThemeMode
 import net.dom53.inkita.ui.reader.model.ReaderFontOption
@@ -23,6 +24,7 @@ data class ReaderRenderParams(
     val uiState: ReaderUiState,
     val serverUrl: String?,
     val apiKey: String?,
+    val config: AppConfig?,
     val fontSize: Float,
     val lineHeight: Float,
     val padding: Dp,
@@ -32,12 +34,15 @@ data class ReaderRenderParams(
     val pendingScrollY: Int?,
     val pendingScrollId: String?,
     val imageReaderMode: ImageReaderMode,
+    val imagePrefetchPages: Int,
 )
 
 data class ReaderRenderCallbacks(
     val onToggleOverlay: () -> Unit,
     val onSwipeNext: () -> Unit,
     val onSwipePrev: () -> Unit,
+    val onImagePageVisible: (Int, Int, Int) -> Unit,
+    val onWebtoonChapterBoundaryVisible: (Int, Int) -> Unit,
     val onConsumePendingScroll: () -> Unit,
     val onConsumeScrollId: () -> Unit,
     val onWebViewReady: (WebView) -> Unit,

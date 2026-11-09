@@ -20,6 +20,7 @@ import net.dom53.inkita.data.local.db.entity.CachedPersonRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedPersonV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedReadingListV2Entity
+import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailChunkEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailRelatedRefEntity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesDetailV2Entity
 import net.dom53.inkita.data.local.db.entity.CachedSeriesListRefEntity
@@ -41,6 +42,7 @@ import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
         CachedPersonV2Entity::class,
         CachedPersonRefEntity::class,
         CachedSeriesDetailV2Entity::class,
+        CachedSeriesDetailChunkEntity::class,
         CachedSeriesDetailRelatedRefEntity::class,
         CachedVolumeV2Entity::class,
         CachedSeriesVolumeRefEntity::class,
@@ -51,7 +53,7 @@ import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
         DownloadedItemV2Entity::class,
         net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity::class,
     ],
-    version = 20,
+    version = 22,
     exportSchema = false,
 )
 abstract class InkitaDatabase : RoomDatabase() {
@@ -70,8 +72,8 @@ abstract class InkitaDatabase : RoomDatabase() {
 
         private val MIGRATION_1_2 =
             object : Migration(1, 2) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_series_refs(
                             tabType TEXT NOT NULL,
@@ -86,8 +88,8 @@ abstract class InkitaDatabase : RoomDatabase() {
             }
         private val MIGRATION_2_3 =
             object : Migration(2, 3) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_browse_refs(
                             queryKey TEXT NOT NULL,
@@ -102,8 +104,8 @@ abstract class InkitaDatabase : RoomDatabase() {
             }
         private val MIGRATION_3_4 =
             object : Migration(3, 4) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_series_detail(
                             seriesId INTEGER NOT NULL PRIMARY KEY,
@@ -117,7 +119,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_volumes(
                             id INTEGER NOT NULL PRIMARY KEY,
@@ -140,8 +142,8 @@ abstract class InkitaDatabase : RoomDatabase() {
             }
         private val MIGRATION_4_5 =
             object : Migration(4, 5) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_pages(
                             chapterId INTEGER NOT NULL,
@@ -156,17 +158,17 @@ abstract class InkitaDatabase : RoomDatabase() {
             }
         private val MIGRATION_5_6 =
             object : Migration(5, 6) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL("ALTER TABLE cached_series_detail ADD COLUMN metadataSummary TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail ADD COLUMN metadataWriters TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail ADD COLUMN metadataTags TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail ADD COLUMN metadataPublicationStatus INTEGER")
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE cached_series_detail ADD COLUMN metadataSummary TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail ADD COLUMN metadataWriters TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail ADD COLUMN metadataTags TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail ADD COLUMN metadataPublicationStatus INTEGER")
                 }
             }
         private val MIGRATION_6_7 =
             object : Migration(6, 7) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_chapters(
                             volumeId INTEGER NOT NULL,
@@ -182,8 +184,8 @@ abstract class InkitaDatabase : RoomDatabase() {
             }
         private val MIGRATION_7_8 =
             object : Migration(7, 8) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS download_tasks(
                             id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -201,7 +203,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS downloaded_pages(
                             seriesId INTEGER NOT NULL,
@@ -222,23 +224,23 @@ abstract class InkitaDatabase : RoomDatabase() {
             }
         private val MIGRATION_8_9 =
             object : Migration(8, 9) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL("ALTER TABLE download_tasks ADD COLUMN workId TEXT")
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE download_tasks ADD COLUMN workId TEXT")
                 }
             }
         private val MIGRATION_9_10 =
             object : Migration(9, 10) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL("ALTER TABLE download_tasks ADD COLUMN progress INTEGER NOT NULL DEFAULT 0")
-                    database.execSQL("ALTER TABLE download_tasks ADD COLUMN total INTEGER NOT NULL DEFAULT 0")
-                    database.execSQL("ALTER TABLE download_tasks ADD COLUMN bytes INTEGER NOT NULL DEFAULT 0")
-                    database.execSQL("ALTER TABLE download_tasks ADD COLUMN bytesTotal INTEGER NOT NULL DEFAULT 0")
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE download_tasks ADD COLUMN progress INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE download_tasks ADD COLUMN total INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE download_tasks ADD COLUMN bytes INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE download_tasks ADD COLUMN bytesTotal INTEGER NOT NULL DEFAULT 0")
                 }
             }
         private val MIGRATION_10_11 =
             object : Migration(10, 11) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS local_progress(
                             chapterId INTEGER NOT NULL PRIMARY KEY,
@@ -255,15 +257,15 @@ abstract class InkitaDatabase : RoomDatabase() {
             }
         private val MIGRATION_11_12 =
             object : Migration(11, 12) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL("ALTER TABLE cached_chapters ADD COLUMN isSpecial INTEGER NOT NULL DEFAULT 0")
-                    database.execSQL("ALTER TABLE cached_series_detail ADD COLUMN specialsVolumeIds TEXT")
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE cached_chapters ADD COLUMN isSpecial INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE cached_series_detail ADD COLUMN specialsVolumeIds TEXT")
                 }
             }
         private val MIGRATION_12_13 =
             object : Migration(12, 13) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_series_v2(
                             id INTEGER NOT NULL PRIMARY KEY,
@@ -282,7 +284,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_series_list_refs_v2(
                             listType TEXT NOT NULL,
@@ -294,7 +296,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_collections_v2(
                             id INTEGER NOT NULL PRIMARY KEY,
@@ -303,7 +305,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_collection_refs_v2(
                             listType TEXT NOT NULL,
@@ -314,7 +316,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_reading_lists_v2(
                             id INTEGER NOT NULL PRIMARY KEY,
@@ -324,7 +326,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_reading_list_refs_v2(
                             listType TEXT NOT NULL,
@@ -335,7 +337,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_people_v2(
                             id INTEGER NOT NULL PRIMARY KEY,
@@ -344,7 +346,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_person_refs_v2(
                             listType TEXT NOT NULL,
@@ -360,19 +362,19 @@ abstract class InkitaDatabase : RoomDatabase() {
             }
         private val MIGRATION_13_14 =
             object : Migration(13, 14) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL("DROP TABLE IF EXISTS cached_series")
-                    database.execSQL("DROP TABLE IF EXISTS cached_series_refs")
-                    database.execSQL("DROP TABLE IF EXISTS cached_browse_refs")
-                    database.execSQL("DROP TABLE IF EXISTS cached_series_detail")
-                    database.execSQL("DROP TABLE IF EXISTS cached_volumes")
-                    database.execSQL("DROP TABLE IF EXISTS cached_chapters")
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("DROP TABLE IF EXISTS cached_series")
+                    db.execSQL("DROP TABLE IF EXISTS cached_series_refs")
+                    db.execSQL("DROP TABLE IF EXISTS cached_browse_refs")
+                    db.execSQL("DROP TABLE IF EXISTS cached_series_detail")
+                    db.execSQL("DROP TABLE IF EXISTS cached_volumes")
+                    db.execSQL("DROP TABLE IF EXISTS cached_chapters")
                 }
             }
         private val MIGRATION_14_15 =
             object : Migration(14, 15) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_series_detail_v2(
                             seriesId INTEGER NOT NULL PRIMARY KEY,
@@ -392,7 +394,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_series_detail_related_refs_v2(
                             seriesId INTEGER NOT NULL,
@@ -405,7 +407,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_volumes_v2(
                             id INTEGER NOT NULL PRIMARY KEY,
@@ -424,7 +426,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_series_volume_refs_v2(
                             seriesId INTEGER NOT NULL,
@@ -435,7 +437,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_chapters_v2(
                             id INTEGER NOT NULL PRIMARY KEY,
@@ -449,7 +451,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS cached_volume_chapter_refs_v2(
                             volumeId INTEGER NOT NULL,
@@ -464,26 +466,26 @@ abstract class InkitaDatabase : RoomDatabase() {
             }
         private val MIGRATION_15_16 =
             object : Migration(15, 16) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN seriesJson TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN metadataJson TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN detailJson TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN relatedJson TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN ratingJson TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN continuePointJson TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN readerProgressJson TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN timeLeftJson TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN collectionsJson TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN readingListsJson TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN bookmarksJson TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN annotationsJson TEXT")
-                    database.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN seriesDetailPlusJson TEXT")
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN seriesJson TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN metadataJson TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN detailJson TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN relatedJson TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN ratingJson TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN continuePointJson TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN readerProgressJson TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN timeLeftJson TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN collectionsJson TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN readingListsJson TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN bookmarksJson TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN annotationsJson TEXT")
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN seriesDetailPlusJson TEXT")
                 }
             }
         private val MIGRATION_16_17 =
             object : Migration(16, 17) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS download_jobs_v2(
                             id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -504,7 +506,7 @@ abstract class InkitaDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS download_items_v2(
                             id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -527,22 +529,59 @@ abstract class InkitaDatabase : RoomDatabase() {
             }
         private val MIGRATION_17_18 =
             object : Migration(17, 18) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL("ALTER TABLE download_items_v2 ADD COLUMN seriesId INTEGER")
-                    database.execSQL("ALTER TABLE download_items_v2 ADD COLUMN volumeId INTEGER")
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE download_items_v2 ADD COLUMN seriesId INTEGER")
+                    db.execSQL("ALTER TABLE download_items_v2 ADD COLUMN volumeId INTEGER")
                 }
             }
         private val MIGRATION_18_19 =
             object : Migration(18, 19) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL("ALTER TABLE download_jobs_v2 ADD COLUMN retryCount INTEGER NOT NULL DEFAULT 0")
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE download_jobs_v2 ADD COLUMN retryCount INTEGER NOT NULL DEFAULT 0")
                 }
             }
         private val MIGRATION_19_20 =
             object : Migration(19, 20) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL("DROP TABLE IF EXISTS download_tasks")
-                    database.execSQL("DROP TABLE IF EXISTS downloaded_pages")
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("DROP TABLE IF EXISTS download_tasks")
+                    db.execSQL("DROP TABLE IF EXISTS downloaded_pages")
+                }
+            }
+
+        private val MIGRATION_20_21 =
+            object : Migration(20, 21) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE download_items_v2 ADD COLUMN format TEXT")
+                    db.execSQL(
+                        """
+                        UPDATE download_items_v2
+                        SET format = CASE
+                            WHEN localPath LIKE '%.epub' THEN 'Epub'
+                            WHEN localPath LIKE '%.pdf' THEN 'Pdf'
+                            WHEN localPath LIKE '%.cbz' OR localPath LIKE '%.zip' OR localPath LIKE '%.rar' OR localPath LIKE '%.cbr' OR localPath LIKE '%.tar.gz' OR localPath LIKE '%.7zip' OR localPath LIKE '%.7z' OR localPath LIKE '%.cb7' OR localPath LIKE '%.cbt' THEN 'Archive'
+                            WHEN localPath LIKE '%.png' OR localPath LIKE '%.jpeg' OR localPath LIKE '%.jpg' OR localPath LIKE '%.webp' OR localPath LIKE '%.gif' OR localPath LIKE '%.avif' THEN 'Image'
+                            ELSE 'Unknown'
+                        END
+                        """.trimIndent(),
+                    )
+                }
+            }
+
+        private val MIGRATION_21_22 =
+            object : Migration(21, 22) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE cached_series_detail_v2 ADD COLUMN chunkCount INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS cached_series_detail_chunks(
+                            seriesId INTEGER NOT NULL,
+                            chunkIndex INTEGER NOT NULL,
+                            payload BLOB NOT NULL,
+                            PRIMARY KEY(seriesId, chunkIndex),
+                            FOREIGN KEY(seriesId) REFERENCES cached_series_detail_v2(seriesId) ON DELETE CASCADE
+                        )
+                        """.trimIndent(),
+                    )
                 }
             }
 
@@ -573,6 +612,8 @@ abstract class InkitaDatabase : RoomDatabase() {
                         MIGRATION_17_18,
                         MIGRATION_18_19,
                         MIGRATION_19_20,
+                        MIGRATION_20_21,
+                        MIGRATION_21_22,
                     ).build()
                     .also { INSTANCE = it }
             }

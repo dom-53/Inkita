@@ -20,12 +20,12 @@ android {
         applicationId = "net.dom53.inkita"
         minSdk = 28
         targetSdk = 36
-        versionCode = 9
+        versionCode = 10
 
         // Allow CI to override version/channel (falls back to local defaults).
         val versionNameOverride = project.findProperty("versionNameOverride") as? String
         val releaseChannel = project.findProperty("releaseChannel") as? String ?: "preview"
-        versionName = versionNameOverride ?: "0.3.1-beta"
+        versionName = versionNameOverride ?: "0.3.2-beta"
         buildConfigField("String", "RELEASE_CHANNEL", "\"$releaseChannel\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -158,9 +158,13 @@ dependencies {
     implementation(libs.aboutLibraries.compose)
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.material.icons.core)
+    implementation(libs.androidx.documentfile)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    androidTestImplementation("com.squareup.okhttp3:okhttp-tls:4.12.0")
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
