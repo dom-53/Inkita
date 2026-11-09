@@ -8,3 +8,10 @@ interface AuthRepository {
         userId: Int = 0,
     )
 }
+
+class KavitaConnectionException(
+    val problem: Problem,
+    val statusCode: Int? = null,
+) : Exception() {
+    enum class Problem { InvalidUrl, RejectedKey, Unreachable, Tls, UnexpectedResponse }
+}

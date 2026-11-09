@@ -148,6 +148,7 @@ private val IMPORTANT_INFO_FIXED =
     listOf(
         "Cache: fixed a crash when opening a series with an oversized cached detail",
         "Reader: fixed opening PDFs online when Kavita can download the file",
+        "Settings: verify the Kavita connection before saving and show readable errors",
     )
 
 private const val FORCE_SHOW_IMPORTANT_INFO = false
