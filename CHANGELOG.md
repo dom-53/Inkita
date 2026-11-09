@@ -5,6 +5,14 @@ All notable changes to this project will be documented here.
 ## Unreleased
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## v0.3.2-beta
+
+### Added
 - Reader: Pinch to zoom and drag to pan in comics and Webtoon mode. Double-tap to reset zoom ([#36](https://github.com/dom-53/Inkita/issues/36)).
 - Settings: Added Simplified Chinese (translated by bjb and Steve42810) and Korean (translated by Daydreamrabbit90 and hastiness9565).
 - Settings: Added a Download Location option for choosing a custom downloads folder through the Android folder picker.
