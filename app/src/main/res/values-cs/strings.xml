@@ -219,6 +219,7 @@
     <string name="reader_settings_general_section">Obecné</string>
     <string name="reader_settings_image_section">Čtečka obrázků</string>
     <string name="reader_image_default_mode">Výchozí režim čtení</string>
+    <string name="reader_pdf_reading_direction">Směr čtení PDF</string>
     <string name="reader_image_default_mode_subtitle">Použije se pro kapitoly Image a Archive</string>
     <string name="reader_image_mode_ltr">Zleva doprava</string>
     <string name="reader_image_mode_rtl">Zprava doleva</string>

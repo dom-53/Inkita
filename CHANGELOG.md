@@ -17,6 +17,7 @@ All notable changes to this project will be documented here.
 - Reader: Image reader page turns now follow the drag position and complete in the swipe direction.
 
 ### Fixed
+- Reader: Open PDF reader settings and change the swipe direction while reading online or offline ([#42](https://github.com/dom-53/Inkita/issues/42)).
 - Library: Keep cached Home sections when Kavita returns an invalid response and offer a retry ([#41](https://github.com/dom-53/Inkita/issues/41)).
 - Reader: Removed the touch highlight animation from image pages while tapping or swiping.
 - Reader: Removed the conflicting image reader transition that could snap back and then swipe again after a drag turn.

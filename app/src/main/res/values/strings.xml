@@ -279,6 +279,7 @@
     <string name="reader_settings_general_section">General</string>
     <string name="reader_settings_image_section">Image reader</string>
     <string name="reader_image_default_mode">Default reading mode</string>
+    <string name="reader_pdf_reading_direction">PDF reading direction</string>
     <string name="reader_image_default_mode_subtitle">Used for Image and Archive chapters</string>
     <string name="reader_image_mode_ltr">Left to right</string>
     <string name="reader_image_mode_rtl">Right to left</string>

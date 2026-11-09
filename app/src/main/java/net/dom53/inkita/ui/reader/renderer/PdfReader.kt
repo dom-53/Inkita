@@ -34,6 +34,8 @@ object PdfReader : BaseReader {
                 PdfPageViewer(
                     pdfPath = params.uiState.pdfPath,
                     currentPage = params.uiState.pageIndex,
+                    rightToLeft = params.pdfRightToLeft,
+                    onTap = callbacks.onToggleOverlay,
                     onPageChanged = callbacks.onPdfPageChanged,
                 )
             }

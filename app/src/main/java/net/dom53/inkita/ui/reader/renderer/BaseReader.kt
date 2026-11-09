@@ -35,6 +35,7 @@ data class ReaderRenderParams(
     val pendingScrollId: String?,
     val imageReaderMode: ImageReaderMode,
     val imagePrefetchPages: Int,
+    val pdfRightToLeft: Boolean = false,
 )
 
 data class ReaderRenderCallbacks(
