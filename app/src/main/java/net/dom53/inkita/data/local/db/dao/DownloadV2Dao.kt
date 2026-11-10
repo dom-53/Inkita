@@ -11,6 +11,7 @@ import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 
 @Dao
+@Suppress("TooManyFunctions")
 interface DownloadV2Dao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertJob(job: DownloadJobV2Entity): Long
@@ -166,6 +167,34 @@ interface DownloadV2Dao {
 
     @Query("DELETE FROM download_items_v2 WHERE id = :itemId")
     suspend fun deleteItemById(itemId: Long)
+
+    @Query("SELECT * FROM download_items_v2 WHERE id = :itemId")
+    suspend fun getItemById(itemId: Long): DownloadedItemV2Entity?
+
+    @Query("SELECT EXISTS(SELECT 1 FROM download_items_v2 WHERE id != :itemId AND localPath IN (:paths))")
+    suspend fun isPathUsedByOtherItem(
+        itemId: Long,
+        paths: List<String>,
+    ): Boolean
+
+    @Query("SELECT DISTINCT localPath FROM download_items_v2 WHERE localPath IS NOT NULL")
+    suspend fun getStoredPaths(): List<String>
+
+    @Query(
+        """
+        SELECT EXISTS(
+            SELECT 1 FROM download_jobs_v2
+            WHERE status IN ('pending', 'running')
+              AND chapterId IS :chapterId
+              AND (:chapterId IS NOT NULL OR (volumeId IS :volumeId AND seriesId IS :seriesId))
+        )
+        """,
+    )
+    suspend fun hasUnfinishedJobFor(
+        chapterId: Int?,
+        volumeId: Int?,
+        seriesId: Int?,
+    ): Boolean
 
     @Query(
         """

@@ -3,6 +3,7 @@ package net.dom53.inkita.ui.download
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -14,10 +15,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
+import net.dom53.inkita.core.downloadv2.DownloadStorageManager
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.api.dto.SeriesDetailDto
 import net.dom53.inkita.data.api.dto.VolumeDto
+import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
@@ -26,6 +29,7 @@ import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 class DownloadQueueViewModel(
     private val downloadDao: DownloadV2Dao,
     private val cacheManager: CacheManager,
+    private val deleteDownload: suspend (Long) -> Boolean,
     private val enqueueWorker: suspend () -> Unit,
 ) : ViewModel() {
     val tasks =
@@ -99,7 +103,15 @@ class DownloadQueueViewModel(
     }
 
     fun deleteDownloaded(itemId: Long) {
-        viewModelScope.launch { downloadDao.deleteItemById(itemId) }
+        viewModelScope.launch {
+            try {
+                if (!deleteDownload(itemId)) LoggingManager.w("DownloadQueue", "Could not delete download item $itemId")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                LoggingManager.e("DownloadQueue", "Could not delete download item $itemId", e)
+            }
+        }
     }
 
     fun deleteTask(id: Long) {
@@ -235,12 +247,14 @@ object DownloadQueueViewModelFactory {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                val db =
-                    net.dom53.inkita.data.local.db.InkitaDatabase
-                        .getInstance(preferences.appContext, preferences.profile)
-                return DownloadQueueViewModel(db.downloadV2Dao(), cacheManager) {
-                    DownloadManagerV2.enqueueWorker(preferences)
-                } as T
+                val db = InkitaDatabase.getInstance(preferences.appContext, preferences.profile)
+                val storage = DownloadStorageManager(preferences.appContext, preferences)
+                return DownloadQueueViewModel(
+                    db.downloadV2Dao(),
+                    cacheManager,
+                    deleteDownload = { itemId -> storage.deleteDownload(db, itemId) },
+                    enqueueWorker = { DownloadManagerV2.enqueueWorker(preferences) },
+                ) as T
             }
         }
 }
