@@ -144,6 +144,16 @@ class AppPreferences(
         private const val DEFAULT_MAX_RETRY_ATTEMPT = 3
     }
 
+    private val cachedCollectionsKey = collectionProfileKey(KEY_CACHED_COLLECTIONS, ::stringPreferencesKey)
+    private val prefetchCollectionsKey = collectionProfileKey(KEY_PREFETCH_COLLECTIONS, ::booleanPreferencesKey)
+    private val prefetchCollectionsAllKey = collectionProfileKey(KEY_PREFETCH_COLLECTIONS_ALL, ::booleanPreferencesKey)
+    private val prefetchCollectionIdsKey = collectionProfileKey(KEY_PREFETCH_COLLECTION_IDS, ::stringPreferencesKey)
+
+    private fun <T> collectionProfileKey(
+        legacyKey: Preferences.Key<T>,
+        createKey: (String) -> Preferences.Key<T>,
+    ): Preferences.Key<T> = if (profile == KavitaProfile.Legacy) legacyKey else createKey("${legacyKey.name}_${profile.id}")
+
     val activeSessionFlow: Flow<KavitaSession> =
         context.dataStore.data
             .map { authMutex.withLock { readSession(context.dataStore.data.first()) } }
@@ -254,7 +264,7 @@ class AppPreferences(
     val prefetchWantFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_WANT] ?: false }
     val prefetchCollectionsFlow: Flow<Boolean> =
-        context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_COLLECTIONS] ?: false }
+        context.dataStore.data.map { prefs -> prefs[prefetchCollectionsKey] ?: false }
     val prefetchDetailsFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_DETAILS] ?: false }
     val prefetchAllowMeteredFlow: Flow<Boolean> =
@@ -296,11 +306,11 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_SHOW_DOWNLOAD_BADGES] ?: true }
 
     val prefetchCollectionsAllFlow: Flow<Boolean> =
-        context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_COLLECTIONS_ALL] ?: true }
+        context.dataStore.data.map { prefs -> prefs[prefetchCollectionsAllKey] ?: true }
 
     val prefetchCollectionIdsFlow: Flow<List<Int>> =
         context.dataStore.data.map { prefs ->
-            prefs[KEY_PREFETCH_COLLECTION_IDS]
+            prefs[prefetchCollectionIdsKey]
                 ?.split(',')
                 ?.mapNotNull { it.toIntOrNull() }
                 ?.filter { it > 0 }
@@ -553,7 +563,7 @@ class AppPreferences(
                 collections.joinToString("||") { c ->
                     "${c.id}|${c.name.replace("|", " ")}"
                 }
-            prefs[KEY_CACHED_COLLECTIONS] = encoded
+            prefs[cachedCollectionsKey] = encoded
         }
     }
 
@@ -571,7 +581,7 @@ class AppPreferences(
 
     suspend fun setPrefetchCollections(enabled: Boolean) {
         context.dataStore.edit { prefs ->
-            prefs[KEY_PREFETCH_COLLECTIONS] = enabled
+            prefs[prefetchCollectionsKey] = enabled
         }
     }
 
@@ -647,13 +657,13 @@ class AppPreferences(
 
     suspend fun setPrefetchCollectionsAll(enabled: Boolean) {
         context.dataStore.edit { prefs ->
-            prefs[KEY_PREFETCH_COLLECTIONS_ALL] = enabled
+            prefs[prefetchCollectionsAllKey] = enabled
         }
     }
 
     suspend fun setPrefetchCollectionIds(ids: List<Int>) {
         context.dataStore.edit { prefs ->
-            prefs[KEY_PREFETCH_COLLECTION_IDS] = ids.joinToString(",")
+            prefs[prefetchCollectionIdsKey] = ids.joinToString(",")
         }
     }
 
@@ -701,7 +711,7 @@ class AppPreferences(
 
     suspend fun loadCachedCollections(): List<Collection> {
         val prefs = context.dataStore.data.first()
-        val encoded = prefs[KEY_CACHED_COLLECTIONS] ?: return emptyList()
+        val encoded = prefs[cachedCollectionsKey] ?: return emptyList()
         return encoded
             .split("||")
             .filter { it.isNotBlank() }
