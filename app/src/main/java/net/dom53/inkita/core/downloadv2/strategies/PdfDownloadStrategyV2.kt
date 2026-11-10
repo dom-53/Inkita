@@ -1,6 +1,7 @@
 package net.dom53.inkita.core.downloadv2.strategies
 
 import android.content.Context
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -67,10 +68,9 @@ class PdfDownloadStrategyV2(
                 updatedAt = now,
                 error = null,
             )
-        val jobId = downloadDao.insertJob(job)
         val item =
             DownloadedItemV2Entity(
-                jobId = jobId,
+                jobId = 0,
                 type = DownloadedItemV2Entity.TYPE_FILE,
                 seriesId = request.seriesId,
                 volumeId = request.volumeId,
@@ -86,13 +86,12 @@ class PdfDownloadStrategyV2(
                 format = Format.Pdf,
                 error = null,
             )
-        downloadDao.upsertItems(listOf(item))
-        return jobId
+        return downloadDao.insertJobWithItems(job, listOf(item))
     }
 
     override suspend fun run(jobId: Long) {
         val job = downloadDao.getJob(jobId) ?: return
-        if (job.status == DownloadJobV2Entity.STATUS_COMPLETED) return
+        if (job.status != DownloadJobV2Entity.STATUS_RUNNING) return
         val chapterId = job.chapterId ?: return
         val offlineMode = appPreferences.offlineModeFlow.first()
         val networkStatus = NetworkMonitor.getInstance(appContext, appPreferences).status.value
@@ -142,6 +141,7 @@ class PdfDownloadStrategyV2(
                         failJob(job, "Empty body")
                         return
                     }
+                if (downloadDao.getJob(jobId)?.status != DownloadJobV2Entity.STATUS_RUNNING) return
                 val stored =
                     withContext(Dispatchers.IO) {
                         body.byteStream().use { input ->
@@ -159,21 +159,23 @@ class PdfDownloadStrategyV2(
                             updatedAt = System.currentTimeMillis(),
                             error = null,
                         )
-                if (item != null) {
-                    downloadDao.upsertItems(listOf(item))
-                }
+                val completed =
+                    downloadDao.updateRunningJob(
+                        job.copy(
+                            status = DownloadJobV2Entity.STATUS_COMPLETED,
+                            completedItems = 1,
+                            updatedAt = System.currentTimeMillis(),
+                            error = null,
+                        ),
+                        item,
+                    )
+                if (!completed) return
             }
-            downloadDao.updateJob(
-                job.copy(
-                    status = DownloadJobV2Entity.STATUS_COMPLETED,
-                    completedItems = 1,
-                    updatedAt = System.currentTimeMillis(),
-                    error = null,
-                ),
-            )
             if (LoggingManager.isDebugEnabled()) {
                 LoggingManager.d("PdfDownloadV2", "Completed job=$jobId chapter=$chapterId")
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             failJob(job, e.message ?: "Download failed")
         }
@@ -183,7 +185,7 @@ class PdfDownloadStrategyV2(
         job: DownloadJobV2Entity,
         message: String,
     ) {
-        downloadDao.updateJob(
+        downloadDao.updateRunningJob(
             job.copy(
                 status = DownloadJobV2Entity.STATUS_FAILED,
                 updatedAt = System.currentTimeMillis(),

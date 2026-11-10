@@ -2,6 +2,7 @@ package net.dom53.inkita.core.downloadv2.strategies
 
 import android.content.Context
 import android.net.Uri
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -107,17 +108,10 @@ class EpubDownloadStrategyV2(
                 updatedAt = now,
                 error = null,
             )
-        val jobId = downloadDao.insertJob(job)
-        if (LoggingManager.isDebugEnabled()) {
-            LoggingManager.d(
-                "EpubDownloadV2",
-                "Enqueue job=$jobId chapter=$chapterId pages=${missingPages.size} volume=$volumeId",
-            )
-        }
         val items =
             missingPages.map { page ->
                 DownloadedItemV2Entity(
-                    jobId = jobId,
+                    jobId = 0,
                     type = DownloadedItemV2Entity.TYPE_PAGE,
                     seriesId = seriesId,
                     volumeId = volumeId,
@@ -134,8 +128,7 @@ class EpubDownloadStrategyV2(
                     error = null,
                 )
             }
-        downloadDao.upsertItems(items)
-        return jobId
+        return downloadDao.insertJobWithItems(job, items)
     }
 
     /**
@@ -143,7 +136,7 @@ class EpubDownloadStrategyV2(
      */
     override suspend fun run(jobId: Long) {
         val job = downloadDao.getJob(jobId) ?: return
-        if (job.status == DownloadJobV2Entity.STATUS_COMPLETED) return
+        if (job.status != DownloadJobV2Entity.STATUS_RUNNING) return
         val offlineMode = appPreferences.offlineModeFlow.first()
         val networkStatus = NetworkMonitor.getInstance(appContext, appPreferences).status.value
         if (offlineMode || !networkStatus.isOnlineAllowed) {
@@ -170,7 +163,6 @@ class EpubDownloadStrategyV2(
         val volumeId = job.volumeId
         val assetsRelativeDir = DownloadPaths.epubAssetsRelativeDir(seriesId, volumeId, chapterId)
 
-        updateJob(job, DownloadJobV2Entity.STATUS_RUNNING, error = null)
         if (LoggingManager.isDebugEnabled()) {
             LoggingManager.d(
                 "EpubDownloadV2",
@@ -179,66 +171,65 @@ class EpubDownloadStrategyV2(
         }
 
         val api = KavitaApiFactory.createAuthenticated(config)
-        val items =
-            downloadDao
-                .getItemsForJob(jobId)
-                .filter { it.status != DownloadedItemV2Entity.STATUS_COMPLETED }
-        var completed = job.completedItems ?: 0
+        val (finishedItems, pendingItems) =
+            downloadDao.getItemsForJob(jobId).partition { it.status == DownloadedItemV2Entity.STATUS_COMPLETED }
+        var completed = finishedItems.size
+        var currentItem: DownloadedItemV2Entity? = null
         try {
-            for (item in items) {
-                val page = item.page ?: continue
+            for (item in pendingItems) {
+                if (downloadDao.getJob(jobId)?.status != DownloadJobV2Entity.STATUS_RUNNING) return
+                currentItem = item
+                val page = requireNotNull(item.page)
                 val htmlResp = api.getBookPage(chapterId, page)
                 if (!htmlResp.isSuccessful) throw HttpException(htmlResp)
+                if (downloadDao.getJob(jobId)?.status != DownloadJobV2Entity.STATUS_RUNNING) return
                 val htmlRaw = htmlResp.body() ?: ""
                 val (rewrittenHtml, assetsBytes) = rewriteAndDownloadImages(htmlRaw, assetsRelativeDir, config)
+                if (downloadDao.getJob(jobId)?.status != DownloadJobV2Entity.STATUS_RUNNING) return
                 val htmlPath = DownloadPaths.epubPageRelativePath(seriesId, volumeId, chapterId, page)
                 val storedHtml = storageManager.writeText(htmlPath, rewrittenHtml)
-                val size = storedHtml.bytes + assetsBytes
-                downloadDao.upsertItems(
-                    listOf(
+                val saved =
+                    downloadDao.updateRunningJob(
+                        job.copy(completedItems = completed + 1, updatedAt = System.currentTimeMillis()),
                         item.copy(
                             status = DownloadedItemV2Entity.STATUS_COMPLETED,
                             localPath = storedHtml.localPath,
-                            bytes = size,
+                            bytes = storedHtml.bytes + assetsBytes,
                             updatedAt = System.currentTimeMillis(),
                             error = null,
                         ),
+                    )
+                if (!saved) return
+                completed++
+                currentItem = null
+            }
+            val finished =
+                downloadDao.updateRunningJob(
+                    job.copy(
+                        completedItems = completed,
+                        status = DownloadJobV2Entity.STATUS_COMPLETED,
+                        updatedAt = System.currentTimeMillis(),
                     ),
                 )
-                completed++
-                updateJob(
-                    job.copy(completedItems = completed),
-                    status = DownloadJobV2Entity.STATUS_RUNNING,
-                    error = null,
-                )
-            }
-            updateJob(
-                job.copy(completedItems = completed),
-                status = DownloadJobV2Entity.STATUS_COMPLETED,
-                error = null,
-            )
-            if (LoggingManager.isDebugEnabled()) {
+            if (finished && LoggingManager.isDebugEnabled()) {
                 LoggingManager.d("EpubDownloadV2", "Completed job=${job.id} pages=$completed")
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             LoggingManager.e("EpubDownloadV2", "Download failed", e)
-            val failedItem =
-                items.firstOrNull { it.status != DownloadedItemV2Entity.STATUS_COMPLETED }
-            if (failedItem != null) {
-                downloadDao.upsertItems(
-                    listOf(
-                        failedItem.copy(
-                            status = DownloadedItemV2Entity.STATUS_FAILED,
-                            updatedAt = System.currentTimeMillis(),
-                            error = e.message,
-                        ),
-                    ),
-                )
-            }
-            updateJob(
-                job.copy(completedItems = completed),
-                status = DownloadJobV2Entity.STATUS_FAILED,
-                error = e.message,
+            downloadDao.updateRunningJob(
+                job.copy(
+                    completedItems = completed,
+                    status = DownloadJobV2Entity.STATUS_FAILED,
+                    updatedAt = System.currentTimeMillis(),
+                    error = e.message,
+                ),
+                currentItem?.copy(
+                    status = DownloadedItemV2Entity.STATUS_FAILED,
+                    updatedAt = System.currentTimeMillis(),
+                    error = e.message,
+                ),
             )
         }
     }
@@ -257,7 +248,7 @@ class EpubDownloadStrategyV2(
                 updatedAt = System.currentTimeMillis(),
                 error = error,
             )
-        downloadDao.updateJob(updated)
+        downloadDao.updateRunningJob(updated)
     }
 
     @Suppress("LoopWithTooManyJumpStatements", "MagicNumber")

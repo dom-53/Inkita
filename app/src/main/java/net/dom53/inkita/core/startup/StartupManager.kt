@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.cache.CacheManagerImpl
+import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkMonitor
@@ -123,6 +124,7 @@ object StartupManager {
                 }
                 if (status.isOnlineAllowed) {
                     ProgressSyncWorker.enqueue(appContext)
+                    if (database.downloadV2Dao().hasUnfinishedJobs()) DownloadManagerV2.enqueueWorker(appContext)
                 }
             }.launchIn(logScope)
         val readerRepository: ReaderRepository =

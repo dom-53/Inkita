@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.cache.CacheManager
+import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.data.api.dto.SeriesDetailDto
 import net.dom53.inkita.data.api.dto.VolumeDto
@@ -23,6 +24,7 @@ import net.dom53.inkita.ui.seriesdetail.InkitaDetailV2
 class DownloadQueueViewModel(
     private val downloadDao: DownloadV2Dao,
     private val cacheManager: CacheManager,
+    private val enqueueWorker: suspend () -> Unit,
 ) : ViewModel() {
     val tasks =
         downloadDao
@@ -63,26 +65,35 @@ class DownloadQueueViewModel(
 
     fun cancelTask(id: Long) {
         viewModelScope.launch {
-            updateJobStatus(id, DownloadJobV2Entity.STATUS_CANCELED)
+            downloadDao.transitionJob(
+                id,
+                listOf(
+                    DownloadJobV2Entity.STATUS_PENDING,
+                    DownloadJobV2Entity.STATUS_RUNNING,
+                    DownloadJobV2Entity.STATUS_PAUSED,
+                    DownloadJobV2Entity.STATUS_FAILED,
+                ),
+                DownloadJobV2Entity.STATUS_CANCELED,
+            )
         }
     }
 
     fun pauseTask(id: Long) {
         viewModelScope.launch {
-            updateJobStatus(id, DownloadJobV2Entity.STATUS_PAUSED)
+            downloadDao.transitionJob(
+                id,
+                listOf(DownloadJobV2Entity.STATUS_PENDING, DownloadJobV2Entity.STATUS_RUNNING),
+                DownloadJobV2Entity.STATUS_PAUSED,
+            )
         }
     }
 
     fun resumeTask(id: Long) {
-        viewModelScope.launch {
-            updateJobStatus(id, DownloadJobV2Entity.STATUS_PENDING)
-        }
+        requeueTask(id, DownloadJobV2Entity.STATUS_PAUSED)
     }
 
     fun retryTask(id: Long) {
-        viewModelScope.launch {
-            updateJobStatus(id, DownloadJobV2Entity.STATUS_PENDING)
-        }
+        requeueTask(id, DownloadJobV2Entity.STATUS_FAILED)
     }
 
     fun deleteDownloaded(itemId: Long) {
@@ -100,17 +111,20 @@ class DownloadQueueViewModel(
         viewModelScope.launch { downloadDao.deleteJobsByStatus(DownloadJobV2Entity.STATUS_COMPLETED) }
     }
 
-    private suspend fun updateJobStatus(
+    private fun requeueTask(
         id: Long,
-        status: String,
+        previousStatus: String,
     ) {
-        val job = downloadDao.getJob(id) ?: return
-        downloadDao.updateJob(
-            job.copy(
-                status = status,
-                updatedAt = System.currentTimeMillis(),
-            ),
-        )
+        viewModelScope.launch {
+            val changed =
+                downloadDao.transitionJob(
+                    id,
+                    listOf(previousStatus),
+                    DownloadJobV2Entity.STATUS_PENDING,
+                    resetRetries = previousStatus == DownloadJobV2Entity.STATUS_FAILED,
+                )
+            if (changed != 0) enqueueWorker()
+        }
     }
 
     private suspend fun updateLookup() {
@@ -216,9 +230,12 @@ object DownloadQueueViewModelFactory {
         context: android.content.Context,
         cacheManager: CacheManager,
     ): DownloadQueueViewModel {
+        val appContext = context.applicationContext
         val db =
             net.dom53.inkita.data.local.db.InkitaDatabase
-                .getInstance(context)
-        return DownloadQueueViewModel(db.downloadV2Dao(), cacheManager)
+                .getInstance(appContext)
+        return DownloadQueueViewModel(db.downloadV2Dao(), cacheManager) {
+            DownloadManagerV2.enqueueWorker(appContext)
+        }
     }
 }

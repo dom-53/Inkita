@@ -136,31 +136,15 @@ class MainActivity : AppCompatActivity() {
 private const val IMPORTANT_INFO_HEADER =
     "✅ Image API key was added — please fill it in Kavita Settings."
 
-private val IMPORTANT_INFO_ADDED =
-    listOf(
-        "Reader: pinch to zoom and pan in comics and Webtoon mode, with double-tap to reset",
-        "Settings: added Korean and Chinese language options",
-        "Cache: large series details can now be opened offline after loading them online",
-    )
+private val IMPORTANT_INFO_ADDED = emptyList<String>()
 
-private val IMPORTANT_INFO_CHANGED =
-    listOf(
-        "",
-    )
+private val IMPORTANT_INFO_CHANGED = emptyList<String>()
 
 private val IMPORTANT_INFO_FIXED =
     listOf(
-        "Updates: open the Android installer after downloading an update",
-        "Updates: fixed the automatic check for new versions on startup",
-        "Reader: open PDF settings to change the reading direction",
-        "Library: keep cached Home sections when a request fails and offer a retry",
-        "Cache: fixed a crash when opening a series with an oversized cached detail",
-        "Reader: fixed opening PDFs online when Kavita can download the file",
-        "Reader: load comic pages from the chapter archive when Kavita's page endpoint fails",
-        "Reader: resume completed comics on the last valid page",
-        "Library: fix loading libraries on newer Kavita versions",
-        "Settings: verify the Kavita connection before saving and show readable errors",
-        "Settings: support a custom HTTPS CA certificate for the configured Kavita server",
+        "Fixed database upgrades from older versions.",
+        "Preserved newer reading progress during sync.",
+        "Fixed download pause, resume, retry, and recovery after interruption.",
     )
 
 private const val FORCE_SHOW_IMPORTANT_INFO = false
@@ -182,6 +166,9 @@ private fun InfoSection(
     title: String,
     items: List<String>,
 ) {
+    if (items.isEmpty()) return
+
+    Spacer(modifier = Modifier.size(10.dp))
     Text(
         text = title,
         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
@@ -334,17 +321,14 @@ fun InkitaApp(
                                 text = "📌 ${pkg.versionName}",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             )
-                            Spacer(modifier = Modifier.size(8.dp))
                             InfoSection(
                                 title = "✨ Added",
                                 items = IMPORTANT_INFO_ADDED,
                             )
-                            Spacer(modifier = Modifier.size(10.dp))
                             InfoSection(
                                 title = "🔁 Changed",
                                 items = IMPORTANT_INFO_CHANGED,
                             )
-                            Spacer(modifier = Modifier.size(10.dp))
                             InfoSection(
                                 title = "🛠️ Fixed",
                                 items = IMPORTANT_INFO_FIXED,

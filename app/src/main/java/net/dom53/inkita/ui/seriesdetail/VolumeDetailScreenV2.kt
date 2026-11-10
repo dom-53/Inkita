@@ -145,7 +145,6 @@ fun VolumeDetailScreenV2(
                 )
             DownloadManagerV2(
                 appContext = context.applicationContext,
-                downloadDao = downloadDao,
                 strategies =
                     listOf(
                         epubStrategy,

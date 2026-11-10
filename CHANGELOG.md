@@ -4,6 +4,12 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Fixed
+
+- Fix a database migration that could prevent Inkita from opening after an upgrade from older versions such as v0.2.0-beta.2.
+- Preserve newer local reading progress when an older synchronization finishes.
+- Restart the download queue when resuming or retrying a job. Recover interrupted downloads and keep pause or cancel actions in effect when an in-flight request finishes.
+
 ## v0.3.2-beta.1
 
 If you're updating from v0.3.2-beta or older, use your browser to download the APK from [GitHub Releases](https://github.com/dom-53/Inkita/releases). Then open the downloaded file to install it.

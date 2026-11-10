@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
@@ -16,6 +17,62 @@ interface DownloadV2Dao {
 
     @Update
     suspend fun updateJob(job: DownloadJobV2Entity)
+
+    @Transaction
+    suspend fun insertJobWithItems(
+        job: DownloadJobV2Entity,
+        items: List<DownloadedItemV2Entity>,
+    ): Long {
+        val jobId = insertJob(job)
+        upsertItems(items.map { it.copy(jobId = jobId) })
+        return jobId
+    }
+
+    @Query(
+        """
+        UPDATE download_jobs_v2
+        SET status = :status, updatedAt = :updatedAt,
+            retryCount = CASE WHEN :resetRetries THEN 0 ELSE retryCount END,
+            error = CASE WHEN :status IN ('pending', 'running') THEN NULL ELSE error END
+        WHERE id = :jobId AND status IN (:allowedStatuses)
+        """,
+    )
+    suspend fun transitionJob(
+        jobId: Long,
+        allowedStatuses: List<String>,
+        status: String,
+        resetRetries: Boolean = false,
+        updatedAt: Long = System.currentTimeMillis(),
+    ): Int
+
+    @Query("UPDATE download_jobs_v2 SET status = 'pending', updatedAt = :updatedAt WHERE status = 'running'")
+    suspend fun recoverInterruptedJobs(updatedAt: Long = System.currentTimeMillis())
+
+    @Query("SELECT EXISTS(SELECT 1 FROM download_jobs_v2 WHERE status IN ('pending', 'running'))")
+    suspend fun hasUnfinishedJobs(): Boolean
+
+    @Query(
+        """
+        UPDATE download_jobs_v2 SET status = 'pending', retryCount = retryCount + 1, updatedAt = :updatedAt
+        WHERE id = :jobId AND status = 'failed' AND retryCount < :maxRetries
+        """,
+    )
+    suspend fun retryFailedJob(
+        jobId: Long,
+        maxRetries: Int,
+        updatedAt: Long = System.currentTimeMillis(),
+    ): Int
+
+    @Transaction
+    suspend fun updateRunningJob(
+        job: DownloadJobV2Entity,
+        item: DownloadedItemV2Entity? = null,
+    ): Boolean {
+        if (getJob(job.id)?.status != DownloadJobV2Entity.STATUS_RUNNING) return false
+        updateJob(job)
+        if (item != null) upsertItems(listOf(item))
+        return true
+    }
 
     @Query("SELECT * FROM download_jobs_v2 WHERE id = :jobId")
     suspend fun getJob(jobId: Long): DownloadJobV2Entity?
