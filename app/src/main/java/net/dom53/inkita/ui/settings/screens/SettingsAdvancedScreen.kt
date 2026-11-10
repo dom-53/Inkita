@@ -102,7 +102,7 @@ fun SettingsAdvancedScreen(
     var maxThumbnailsParallel by remember { mutableStateOf(4) }
     var disableBrowseThumbnails by remember { mutableStateOf(false) }
     val collectionsRepo = remember { CollectionsRepositoryImpl(context, appPreferences) }
-    val downloadV2Dao = remember { InkitaDatabase.getInstance(context).downloadV2Dao() }
+    val downloadV2Dao = remember(appPreferences.profile) { InkitaDatabase.getInstance(context, appPreferences.profile).downloadV2Dao() }
 
     LaunchedEffect(Unit) {
         cacheSizeBytes = cacheManager.getCacheSizeBytes()

@@ -25,6 +25,7 @@ import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity.Companion.STATU
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity.Companion.STATUS_PAUSED
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity.Companion.STATUS_PENDING
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity.Companion.STATUS_RUNNING
+import net.dom53.inkita.ui.download.DownloadQueueViewModel
 import net.dom53.inkita.ui.download.DownloadQueueViewModelFactory
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -81,7 +82,7 @@ class DownloadQueueTest {
             val id = queue.enqueue(pageCount = 1, schedule = false)
             assertEquals(1, queue.dao.transitionJob(id, listOf(STATUS_PENDING), STATUS_RUNNING))
 
-            DownloadManagerV2.enqueueWorker(queue.context)
+            DownloadManagerV2.enqueueWorker(queue.preferences)
 
             assertEquals(1, queue.awaitStatus(id, STATUS_COMPLETED).completedItems)
         }
@@ -121,8 +122,8 @@ class DownloadQueueTest {
         runBlocking {
             MockWebServer().use { server ->
                 server.start()
-                val queue = Queue(server)
-                val preferences = queue.preferences
+                val context = InstrumentationRegistry.getInstrumentation().targetContext
+                val preferences = AppPreferences(context)
                 val config = preferences.configFlow.first()
                 val retry = preferences.downloadRetryEnabledFlow.first()
                 val metered = preferences.downloadAllowMeteredFlow.first()
@@ -132,10 +133,14 @@ class DownloadQueueTest {
                     preferences.setDownloadRetryEnabled(false)
                     preferences.setDownloadAllowMetered(true)
                     preferences.setOfflineMode(false)
-                    block(queue)
-                    queue.awaitWorkerIdle()
+                    val queue = Queue(server, AppPreferences(context, preferences.activeSessionFlow.first()))
+                    try {
+                        block(queue)
+                        queue.awaitWorkerIdle()
+                    } finally {
+                        queue.cleanup()
+                    }
                 } finally {
-                    queue.cleanup()
                     preferences.updateKavitaConfig(config)
                     preferences.setDownloadRetryEnabled(retry)
                     preferences.setDownloadAllowMetered(metered)
@@ -146,13 +151,16 @@ class DownloadQueueTest {
 
     private class Queue(
         val server: MockWebServer,
+        val preferences: AppPreferences,
     ) {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val preferences = AppPreferences(context)
-        val dao = InkitaDatabase.getInstance(context).downloadV2Dao()
-        val viewModel = DownloadQueueViewModelFactory.create(context, CacheManagerImpl(preferences, thumbnailsDir = null))
+        private val context = preferences.appContext
+        val dao = InkitaDatabase.getInstance(context, preferences.profile).downloadV2Dao()
+        val viewModel =
+            DownloadQueueViewModelFactory
+                .create(preferences, CacheManagerImpl(preferences, thumbnailsDir = null))
+                .create(DownloadQueueViewModel::class.java)
         private val strategy = EpubDownloadStrategyV2(context, dao, preferences)
-        private val manager = DownloadManagerV2(context, mapOf(strategy.key to strategy))
+        private val manager = DownloadManagerV2(preferences, mapOf(strategy.key to strategy))
         private val jobIds = mutableListOf<Long>()
 
         suspend fun enqueue(

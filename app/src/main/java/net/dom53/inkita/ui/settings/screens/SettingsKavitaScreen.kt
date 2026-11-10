@@ -85,6 +85,7 @@ internal fun SettingsKavitaScreen(
     val focusManager = LocalFocusManager.current
 
     var serverUrl by remember { mutableStateOf("") }
+    var savedServerUrl by remember { mutableStateOf("") }
     var apiKeyInput by remember { mutableStateOf("") }
     var storedApiKey by remember { mutableStateOf("") }
     var imageApiKeyInput by remember { mutableStateOf("") }
@@ -125,6 +126,7 @@ internal fun SettingsKavitaScreen(
 
     fun applyConfig(config: AppConfig) {
         serverUrl = config.serverUrl.withoutHttpScheme()
+        savedServerUrl = config.serverUrl
         useHttps = !config.serverUrl.startsWith("http://", ignoreCase = true)
         storedApiKey = config.apiKey
         storedImageApiKey = config.imageApiKey
@@ -317,13 +319,18 @@ internal fun SettingsKavitaScreen(
                     snackbarHostState.currentSnackbarData?.dismiss()
                     saveError = null
                     val host = serverUrl.withoutHttpScheme()
-                    val apiKey = apiKeyInput.trim().ifBlank { storedApiKey }
+                    val url = (if (useHttps) "https://" else "http://") + host
+                    val savedUrl = savedServerUrl.toHttpUrlOrNull()?.toString()?.removeSuffix("/")
+                    val sameServer = savedUrl != null && savedUrl == url.toHttpUrlOrNull()?.toString()?.removeSuffix("/")
+                    val apiKey = apiKeyInput.trim().ifBlank { if (sameServer) storedApiKey else "" }
                     if (host.isBlank() || apiKey.isBlank()) {
                         saveError = context.getString(R.string.settings_kavita_login_toast)
                         return@Button
                     }
-                    val imageKey = imageApiKeyInput.trim().ifBlank { storedImageApiKey.ifBlank { apiKey } }
-                    val url = (if (useHttps) "https://" else "http://") + host
+                    val imageKey =
+                        imageApiKeyInput.trim().ifBlank {
+                            if (sameServer && apiKey == storedApiKey) storedImageApiKey.ifBlank { apiKey } else apiKey
+                        }
                     val config = AppConfig(url, apiKey, imageKey, 0, caCertificate.takeIf { useHttps })
                     if (useHttps) {
                         saveConfig(config)

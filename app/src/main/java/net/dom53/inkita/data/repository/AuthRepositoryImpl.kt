@@ -23,7 +23,7 @@ class AuthRepositoryImpl internal constructor(
 
     override suspend fun configure(config: AppConfig): AppConfig {
         val accountId = verifyConnection(config)
-        val verified = config.copy(userId = config.userId.takeIf { it > 0 } ?: accountId)
+        val verified = config.copy(userId = accountId)
         saveConfig(verified)
         return verified
     }

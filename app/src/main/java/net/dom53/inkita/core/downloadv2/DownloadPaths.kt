@@ -1,58 +1,69 @@
 package net.dom53.inkita.core.downloadv2
 
 import android.content.Context
+import net.dom53.inkita.core.storage.KavitaProfile
 import java.io.File
 
 object DownloadPaths {
     const val ASSETS_DIR = "assets"
 
-    fun baseDir(context: Context): File =
-        context.getExternalFilesDir("download")
-            ?: File(context.filesDir, "download").apply { mkdirs() }
+    fun baseDir(
+        context: Context,
+        profile: KavitaProfile,
+    ): File =
+        context.getExternalFilesDir(profile.downloadFolder)
+            ?: File(context.filesDir, profile.downloadFolder).apply { mkdirs() }
 
     fun seriesDir(
         context: Context,
+        profile: KavitaProfile,
         seriesId: Int,
-    ): File = File(baseDir(context), seriesId.toString())
+    ): File = File(baseDir(context, profile), seriesId.toString())
 
     fun volumesDir(
         context: Context,
+        profile: KavitaProfile,
         seriesId: Int,
-    ): File = File(seriesDir(context, seriesId), "volumes")
+    ): File = File(seriesDir(context, profile, seriesId), "volumes")
 
     fun volumeChaptersDir(
         context: Context,
+        profile: KavitaProfile,
         seriesId: Int,
         volumeId: Int,
-    ): File = File(File(volumesDir(context, seriesId), volumeId.toString()), "chapters")
+    ): File = File(File(volumesDir(context, profile, seriesId), volumeId.toString()), "chapters")
 
     fun chaptersDir(
         context: Context,
+        profile: KavitaProfile,
         seriesId: Int,
-    ): File = File(seriesDir(context, seriesId), "chapters")
+    ): File = File(seriesDir(context, profile, seriesId), "chapters")
 
     fun specialsDir(
         context: Context,
+        profile: KavitaProfile,
         seriesId: Int,
-    ): File = File(seriesDir(context, seriesId), "specials")
+    ): File = File(seriesDir(context, profile, seriesId), "specials")
 
     fun chapterDir(
         context: Context,
+        profile: KavitaProfile,
         seriesId: Int,
         volumeId: Int?,
         chapterId: Int,
     ): File =
         if (volumeId != null) {
-            File(volumeChaptersDir(context, seriesId, volumeId), chapterId.toString())
+            File(volumeChaptersDir(context, profile, seriesId, volumeId), chapterId.toString())
         } else {
-            File(chaptersDir(context, seriesId), chapterId.toString())
+            File(chaptersDir(context, profile, seriesId), chapterId.toString())
         }
 
     fun specialChapterDir(
         context: Context,
+        profile: KavitaProfile,
         seriesId: Int,
         chapterId: Int,
-    ): File = File(specialsDir(context, seriesId), chapterId.toString())
+    ): File = File(specialsDir(context, profile, seriesId), chapterId.toString())
 
     fun seriesRelativeDir(seriesId: Int): String = seriesId.toString()
 
@@ -101,11 +112,12 @@ object DownloadPaths {
 
     fun pdfFile(
         context: Context,
+        profile: KavitaProfile,
         seriesId: Int,
         volumeId: Int?,
         chapterId: Int,
     ): File {
-        val chapterDir = chapterDir(context, seriesId, volumeId, chapterId)
+        val chapterDir = chapterDir(context, profile, seriesId, volumeId, chapterId)
         val volume = volumeId ?: 0
         return File(chapterDir, "${seriesId}_$volume-$chapterId.pdf")
     }
@@ -123,16 +135,18 @@ object DownloadPaths {
 
     fun pdfTempFile(
         context: Context,
+        profile: KavitaProfile,
         chapterId: Int,
-    ): File = File(pdfTempDir(context), "pdf-$chapterId.pdf")
+    ): File = File(pdfTempDir(context), "${profile.id}/pdf-$chapterId.pdf")
 
     fun cbzFile(
         context: Context,
+        profile: KavitaProfile,
         seriesId: Int,
         volumeId: Int?,
         chapterId: Int,
     ): File {
-        val chapterDir = chapterDir(context, seriesId, volumeId, chapterId)
+        val chapterDir = chapterDir(context, profile, seriesId, volumeId, chapterId)
         val volume = volumeId ?: 0
         return File(chapterDir, "${seriesId}_$volume-$chapterId.cbz")
     }
@@ -162,13 +176,15 @@ object DownloadPaths {
 
     fun imagePageCacheDir(
         context: Context,
+        profile: KavitaProfile,
         chapterId: Int,
-    ): File = File(context.cacheDir, "image-pages/$chapterId")
+    ): File = File(context.cacheDir, "image-pages/${profile.id}/$chapterId")
 
     fun imagePageCacheFile(
         context: Context,
+        profile: KavitaProfile,
         chapterId: Int,
         page: Int,
         extension: String,
-    ): File = File(imagePageCacheDir(context, chapterId), "page-$page.$extension")
+    ): File = File(imagePageCacheDir(context, profile, chapterId), "page-$page.$extension")
 }

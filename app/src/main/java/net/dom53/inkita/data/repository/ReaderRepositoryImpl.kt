@@ -212,7 +212,7 @@ class ReaderRepositoryImpl(
 
         if (!isOnlineAllowed()) {
             readerDao.upsertLocalProgress(progressWithTs.toEntity())
-            ProgressSyncWorker.enqueue(context)
+            ProgressSyncWorker.enqueue(context, appPreferences.profile)
             return
         }
 
@@ -222,7 +222,7 @@ class ReaderRepositoryImpl(
         }.onFailure {
             // fallback to local cache if network fails
             readerDao.upsertLocalProgress(progressWithTs.toEntity())
-            ProgressSyncWorker.enqueue(context)
+            ProgressSyncWorker.enqueue(context, appPreferences.profile)
         }.onSuccess {
             readerDao.upsertLocalProgress(progressWithTs.toEntity())
         }
@@ -239,7 +239,7 @@ class ReaderRepositoryImpl(
                 progress
             }
         readerDao.upsertLocalProgress(progressWithTs.toEntity())
-        ProgressSyncWorker.enqueue(context)
+        ProgressSyncWorker.enqueue(context, appPreferences.profile)
     }
 
     override suspend fun getTimeLeft(
@@ -265,7 +265,7 @@ class ReaderRepositoryImpl(
         val storedPdf =
             bookInfo
                 ?.seriesId
-                ?.let { DownloadPaths.pdfFile(context, it, bookInfo.volumeId, chapterId) }
+                ?.let { DownloadPaths.pdfFile(context, appPreferences.profile, it, bookInfo.volumeId, chapterId) }
         if (storedPdf?.exists() == true) {
             recordPdfDownloadIfMissing(chapterId, storedPdf)
             return storedPdf
@@ -279,7 +279,7 @@ class ReaderRepositoryImpl(
             recordPdfDownloadIfMissing(chapterId, legacyTarget)
             return legacyTarget
         }
-        val tempTarget = DownloadPaths.pdfTempFile(context, chapterId)
+        val tempTarget = DownloadPaths.pdfTempFile(context, appPreferences.profile, chapterId)
         if (tempTarget.exists()) {
             return tempTarget
         }
@@ -535,6 +535,7 @@ class ReaderRepositoryImpl(
         val locals = runCatching { readerDao.getAllLocalProgress() }.getOrDefault(emptyList())
         if (locals.isEmpty()) return
         locals.forEach { localEntity ->
+            if (!appPreferences.isActiveSession()) return
             val local = localEntity.toDomain()
             val remote =
                 runCatching {
@@ -551,6 +552,7 @@ class ReaderRepositoryImpl(
                 remote != null &&
                     remote.page == local.page &&
                     (local.bookScrollId == null || remote.bookScrollId == local.bookScrollId)
+            if (!appPreferences.isActiveSession()) return
             val resp =
                 runCatching { api.setReaderProgress(latest.toDto()) }
                     .getOrNull()
@@ -639,6 +641,7 @@ class ReaderRepositoryImpl(
         val target =
             DownloadPaths.imagePageCacheFile(
                 context = context,
+                profile = appPreferences.profile,
                 chapterId = chapterId,
                 page = page,
                 extension = extension,

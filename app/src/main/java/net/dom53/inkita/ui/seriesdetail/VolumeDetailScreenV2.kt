@@ -85,9 +85,12 @@ fun VolumeDetailScreenV2(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    val downloadDao = remember(context.applicationContext) { InkitaDatabase.getInstance(context.applicationContext).downloadV2Dao() }
+    val downloadDao =
+        remember(context.applicationContext, appPreferences.profile) {
+            InkitaDatabase.getInstance(context.applicationContext, appPreferences.profile).downloadV2Dao()
+        }
     val chapterDownloadStates = remember { mutableStateMapOf<Int, DownloadState>() }
-    val payload = remember(volumeId) { VolumeDetailCache.get(volumeId) }
+    val payload = remember(appPreferences.profile, volumeId) { VolumeDetailCache.get(appPreferences.profile, volumeId) }
     val config by appPreferences.configFlow.collectAsState(
         initial = AppConfig(serverUrl = "", apiKey = "", imageApiKey = "", userId = 0),
     )
@@ -144,7 +147,7 @@ fun VolumeDetailScreenV2(
                     appPreferences = appPreferences,
                 )
             DownloadManagerV2(
-                appContext = context.applicationContext,
+                appPreferences = appPreferences,
                 strategies =
                     listOf(
                         epubStrategy,
@@ -180,7 +183,7 @@ fun VolumeDetailScreenV2(
             }
             applyLocalProgress(volumeState, readerRepository)?.let { updated ->
                 volumeState = updated
-                VolumeDetailCache.put(payload.copy(volume = updated))
+                VolumeDetailCache.put(appPreferences.profile, payload.copy(volume = updated))
             }
             if (offlineMode) {
                 onConsumeReaderReturn()
@@ -198,7 +201,7 @@ fun VolumeDetailScreenV2(
                                 title = payload.volume.title,
                             )
                         volumeState = merged
-                        VolumeDetailCache.put(payload.copy(volume = merged))
+                        VolumeDetailCache.put(appPreferences.profile, payload.copy(volume = merged))
                         if (LoggingManager.isDebugEnabled()) {
                             LoggingManager.d("VolumeDetailV2", "Volume refreshed from API volume=$volumeId")
                         }
@@ -215,7 +218,7 @@ fun VolumeDetailScreenV2(
             }
             applyLocalProgress(volumeState, readerRepository)?.let { updated ->
                 volumeState = updated
-                VolumeDetailCache.put(payload.copy(volume = updated))
+                VolumeDetailCache.put(appPreferences.profile, payload.copy(volume = updated))
             }
         }
     }
@@ -541,7 +544,7 @@ fun VolumeDetailScreenV2(
                                     volumeState = updatedVolume
                                     selectedChapter =
                                         updatedChapters.firstOrNull { it.id == chapter.id }
-                                    VolumeDetailCache.put(payload.copy(volume = updatedVolume))
+                                    VolumeDetailCache.put(appPreferences.profile, payload.copy(volume = updatedVolume))
                                     Toast
                                         .makeText(
                                             context,
@@ -875,7 +878,7 @@ fun VolumeDetailScreenV2(
                                                     pagesRead = updatedPagesRead,
                                                 )
                                             volumeState = updatedVolume
-                                            VolumeDetailCache.put(payload.copy(volume = updatedVolume))
+                                            VolumeDetailCache.put(appPreferences.profile, payload.copy(volume = updatedVolume))
                                             Toast
                                                 .makeText(
                                                     context,
@@ -955,7 +958,7 @@ fun VolumeDetailScreenV2(
                                                     pagesRead = updatedPagesRead,
                                                 )
                                             volumeState = updatedVolume
-                                            VolumeDetailCache.put(payload.copy(volume = updatedVolume))
+                                            VolumeDetailCache.put(appPreferences.profile, payload.copy(volume = updatedVolume))
                                             Toast
                                                 .makeText(
                                                     context,

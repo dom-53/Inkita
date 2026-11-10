@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.os.LocaleListCompat
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -76,6 +78,7 @@ import net.dom53.inkita.domain.repository.LibraryRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
 import net.dom53.inkita.ui.browse.BrowseScreen
 import net.dom53.inkita.ui.download.DownloadQueueScreen
+import net.dom53.inkita.ui.download.DownloadQueueViewModel
 import net.dom53.inkita.ui.download.DownloadQueueViewModelFactory
 import net.dom53.inkita.ui.history.HistoryScreen
 import net.dom53.inkita.ui.library.LibraryV2Screen
@@ -93,8 +96,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val components = StartupManager.init(applicationContext)
-        val appPreferences = components.preferences
+        val appPreferences = StartupManager.init(applicationContext)
         // Apply saved locale before composing UI so strings use correct language on first draw.
         val storedLanguage = runBlocking { appPreferences.appLanguageFlow.first() }
         val appLocales = AppCompatDelegate.getApplicationLocales()
@@ -111,18 +113,23 @@ class MainActivity : AppCompatActivity() {
         applyLocale(initialLanguage)
 
         setContent {
-            InkitaApp(
-                initialLanguage = initialLanguage,
-                appPreferences = components.preferences,
-                libraryRepository = components.libraryRepository,
-                authRepository = components.authRepository,
-                seriesRepository = components.seriesRepository,
-                collectionsRepository = components.collectionsRepository,
-                readingListRepository = components.readingListRepository,
-                personRepository = components.personRepository,
-                readerRepository = components.readerRepository,
-                cacheManager = components.cacheManager,
-            )
+            val session by appPreferences.activeSessionFlow.collectAsState(initial = null)
+            val current = session ?: return@setContent
+            key(current) {
+                val components = remember { StartupManager.components(AppPreferences(applicationContext, current)) }
+                InkitaApp(
+                    initialLanguage = initialLanguage,
+                    appPreferences = components.preferences,
+                    libraryRepository = components.libraryRepository,
+                    authRepository = components.authRepository,
+                    seriesRepository = components.seriesRepository,
+                    collectionsRepository = components.collectionsRepository,
+                    readingListRepository = components.readingListRepository,
+                    personRepository = components.personRepository,
+                    readerRepository = components.readerRepository,
+                    cacheManager = components.cacheManager,
+                )
+            }
         }
     }
 
@@ -499,8 +506,8 @@ fun InkitaApp(
                         )
                     }
                     composable(MainScreen.Downloads.route) {
-                        val ctx = LocalContext.current
-                        val vm = remember { DownloadQueueViewModelFactory.create(ctx, cacheManager) }
+                        val vm: DownloadQueueViewModel =
+                            viewModel(factory = DownloadQueueViewModelFactory.create(appPreferences, cacheManager))
                         DownloadQueueScreen(
                             viewModel = vm,
                             onOpenReader = { chapterId, page, sid, vid, fmt ->

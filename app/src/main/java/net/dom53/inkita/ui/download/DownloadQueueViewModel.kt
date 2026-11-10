@@ -1,6 +1,7 @@
 package net.dom53.inkita.ui.download
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.logging.LoggingManager
+import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.data.api.dto.SeriesDetailDto
 import net.dom53.inkita.data.api.dto.VolumeDto
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
@@ -227,15 +229,18 @@ data class DownloadLookup(
  */
 object DownloadQueueViewModelFactory {
     fun create(
-        context: android.content.Context,
+        preferences: AppPreferences,
         cacheManager: CacheManager,
-    ): DownloadQueueViewModel {
-        val appContext = context.applicationContext
-        val db =
-            net.dom53.inkita.data.local.db.InkitaDatabase
-                .getInstance(appContext)
-        return DownloadQueueViewModel(db.downloadV2Dao(), cacheManager) {
-            DownloadManagerV2.enqueueWorker(appContext)
+    ): ViewModelProvider.Factory =
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                val db =
+                    net.dom53.inkita.data.local.db.InkitaDatabase
+                        .getInstance(preferences.appContext, preferences.profile)
+                return DownloadQueueViewModel(db.downloadV2Dao(), cacheManager) {
+                    DownloadManagerV2.enqueueWorker(preferences)
+                } as T
+            }
         }
-    }
 }

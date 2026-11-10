@@ -97,7 +97,7 @@ class KavitaSettingsTest {
                 compose.waitUntil(timeoutMillis = 5000) { saved.value != original }
 
                 val expectedCa = readKavitaCaCertificate(authority.certificate.encoded.inputStream())
-                assertEquals(AppConfig(url.trimEnd('/'), "valid-key", "old-image-key", 2, expectedCa), saved.value)
+                assertEquals(AppConfig(url.trimEnd('/'), "valid-key", "valid-key", 2, expectedCa), saved.value)
                 assertEquals(
                     2,
                     runBlocking {
@@ -187,10 +187,26 @@ class KavitaSettingsTest {
 
             compose.waitUntil(timeoutMillis = 5000) { saved.value != original }
 
-            assertEquals(AppConfig(url.trimEnd('/'), "valid-key", "old-image-key", 2), saved.value)
+            assertEquals(AppConfig(url.trimEnd('/'), "valid-key", "valid-key", 2), saved.value)
             val request = server.takeRequest()
             assertEquals("/kavita/api/Account", request.path)
             assertEquals("valid-key", request.getHeader("x-api-key"))
+        }
+    }
+
+    @Test
+    fun changingServerRequiresAnExplicitApiKey() {
+        MockWebServer().use { server ->
+            server.start()
+            openSettings()
+            compose
+                .onNode(hasSetTextAction() and hasText(label(R.string.settings_kavita_server)))
+                .performTextReplacement(server.url("/").toString())
+            compose.onNodeWithText(label(R.string.settings_kavita_button_login)).performClick()
+
+            assertSaveError(label(R.string.settings_kavita_login_toast))
+            assertEquals(original, saved.value)
+            assertEquals(0, server.requestCount)
         }
     }
 

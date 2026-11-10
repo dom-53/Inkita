@@ -18,6 +18,7 @@ import net.dom53.inkita.core.downloadv2.strategies.PdfDownloadStrategyV2
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.core.storage.KavitaProfile
 import net.dom53.inkita.data.local.db.InkitaDatabase
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
@@ -33,9 +34,13 @@ class DownloadWorkerV2(
      * Pull pending jobs and execute them via their strategy until the queue is empty.
      */
     override suspend fun doWork(): Result {
-        val db = InkitaDatabase.getInstance(applicationContext)
+        val profileId = inputData.getString(KavitaProfile.WORK_INPUT) ?: return Result.success()
+        val activeSession = AppPreferences(applicationContext).activeSessionFlow
+        val session = activeSession.first()
+        if (session.profile.id != profileId || !session.config.isConfigured) return Result.success()
+        val db = InkitaDatabase.getInstance(applicationContext, session.profile)
         val dao = db.downloadV2Dao()
-        val appPreferences = AppPreferences(applicationContext)
+        val appPreferences = AppPreferences(applicationContext, session)
         val networkMonitor = NetworkMonitor.getInstance(applicationContext, appPreferences)
         val maxConcurrent = appPreferences.downloadMaxConcurrentFlow.first().coerceAtLeast(1)
         val retryEnabled = appPreferences.downloadRetryEnabledFlow.first()
@@ -66,11 +71,14 @@ class DownloadWorkerV2(
                 pending.forEach { job ->
                     launch {
                         semaphore.withPermit {
-                            runJob(job, dao, appPreferences, retryEnabled, maxRetries)
+                            if (activeSession.first() == session) {
+                                runJob(job, dao, appPreferences, retryEnabled, maxRetries)
+                            }
                         }
                     }
                 }
             }
+            if (activeSession.first() != session) return Result.success()
         }
         return Result.success()
     }

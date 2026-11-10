@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.core.storage.KavitaProfile
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
@@ -27,6 +28,7 @@ class DownloadStorageManager(
     private val appPreferences: AppPreferences,
 ) {
     private val appContext = context.applicationContext
+    private val profile = appPreferences.profile
 
     suspend fun write(
         relativePath: String,
@@ -85,12 +87,9 @@ class DownloadStorageManager(
         withContext(Dispatchers.IO) {
             val customRoot = appPreferences.downloadLocationUriFlow.first()
             if (customRoot == null) {
-                DownloadPaths.baseDir(appContext).deleteRecursively()
+                DownloadPaths.baseDir(appContext, profile).deleteRecursively()
             } else {
-                DocumentFile
-                    .fromTreeUri(appContext, Uri.parse(customRoot))
-                    ?.listFiles()
-                    ?.forEach { it.delete() }
+                downloadDocuments(customRoot).forEach { it.delete() }
             }
         }
     }
@@ -99,12 +98,9 @@ class DownloadStorageManager(
         withContext(Dispatchers.IO) {
             val customRoot = appPreferences.downloadLocationUriFlow.first()
             if (customRoot == null) {
-                dirSize(DownloadPaths.baseDir(appContext))
+                dirSize(DownloadPaths.baseDir(appContext, profile))
             } else {
-                DocumentFile
-                    .fromTreeUri(appContext, Uri.parse(customRoot))
-                    ?.let { documentSize(it) }
-                    ?: 0L
+                downloadDocuments(customRoot).sumOf { documentSize(it) }
             }
         }
 
@@ -117,7 +113,7 @@ class DownloadStorageManager(
             if (!localPath.startsWith(CONTENT_SCHEME)) {
                 return@withContext File(localPath.removePrefix(FILE_SCHEME)).takeIf { it.exists() }
             }
-            val cacheDir = File(appContext.cacheDir, cacheDirName).apply { mkdirs() }
+            val cacheDir = File(appContext.cacheDir, "$cacheDirName/${profile.id}").apply { mkdirs() }
             val target = File(cacheDir, "${hashName(localPath)}-$fileName")
             if (target.exists() && target.length() > 0L) return@withContext target
             openInputStream(localPath)?.use { input ->
@@ -177,7 +173,7 @@ class DownloadStorageManager(
                 appPreferences.setDownloadLocationUri(targetRootUri)
                 movedSourcePaths.forEach { deletePath(it) }
                 if (currentRootUri == null) {
-                    removeEmptyDirs(DownloadPaths.baseDir(appContext))
+                    removeEmptyDirs(DownloadPaths.baseDir(appContext, profile))
                 }
             } catch (e: Exception) {
                 copied.forEach { deletePath(it) }
@@ -282,7 +278,7 @@ class DownloadStorageManager(
         segments: List<String>,
         input: InputStream,
     ): StoredDownload {
-        val target = segments.fold(DownloadPaths.baseDir(appContext)) { file, segment -> File(file, segment) }
+        val target = segments.fold(DownloadPaths.baseDir(appContext, profile)) { file, segment -> File(file, segment) }
         target.parentFile?.mkdirs()
         val bytes = target.outputStream().use { output -> input.copyTo(output) }
         return StoredDownload(target.absolutePath, bytes)
@@ -293,7 +289,7 @@ class DownloadStorageManager(
         segments: List<String>,
         input: InputStream,
     ): StoredDownload {
-        val root = DocumentFile.fromTreeUri(appContext, Uri.parse(rootUri)) ?: error("Download folder is unavailable.")
+        val root = downloadDocumentRoot(rootUri, create = true) ?: error("Download folder is unavailable.")
         val fileName = segments.last()
         val parent =
             segments
@@ -307,6 +303,21 @@ class DownloadStorageManager(
             } ?: error("Cannot write $fileName")
         return StoredDownload(target.uri.toString(), bytes)
     }
+
+    private fun downloadDocumentRoot(
+        uri: String,
+        create: Boolean = false,
+    ): DocumentFile? {
+        val tree = DocumentFile.fromTreeUri(appContext, Uri.parse(uri)) ?: return null
+        if (profile == KavitaProfile.Legacy) return tree
+        return tree.findFile(profile.downloadFolder) ?: if (create) tree.createDirectory(profile.downloadFolder) else null
+    }
+
+    private fun downloadDocuments(uri: String): List<DocumentFile> =
+        downloadDocumentRoot(uri)
+            ?.listFiles()
+            .orEmpty()
+            .filterNot { profile == KavitaProfile.Legacy && it.name.orEmpty().startsWith(KavitaProfile.DOWNLOAD_FOLDER_PREFIX) }
 
     private fun openInputStream(localPath: String): InputStream? =
         if (localPath.startsWith(CONTENT_SCHEME)) {

@@ -82,8 +82,8 @@ fun SettingsDownloadScreen(
     var migrationInProgress by remember { mutableStateOf(false) }
 
     val downloadV2Dao =
-        remember {
-            InkitaDatabase.getInstance(context).downloadV2Dao()
+        remember(appPreferences.profile) {
+            InkitaDatabase.getInstance(context, appPreferences.profile).downloadV2Dao()
         }
     val downloadStorageManager =
         remember {

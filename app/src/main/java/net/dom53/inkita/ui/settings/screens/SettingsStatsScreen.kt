@@ -75,9 +75,7 @@ fun SettingsStatsScreen(
                     config.userId
                 } else {
                     val acc = api.getAccount()
-                    val accId = acc.body()?.id ?: 0
-                    if (accId > 0) appPreferences.updateUserId(accId)
-                    accId
+                    acc.body()?.id ?: 0
                 }
             val statsResp = api.getUserReadStats(userId = uid)
             val dailyResp = api.getReadingCountByDay(userId = uid, days = 30)

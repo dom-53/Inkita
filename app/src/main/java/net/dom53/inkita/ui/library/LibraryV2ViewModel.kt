@@ -49,7 +49,7 @@ class LibraryV2ViewModel(
     private val _state = MutableStateFlow(LibraryV2UiState())
     val state: StateFlow<LibraryV2UiState> = _state
     private val downloadDao =
-        InkitaDatabase.getInstance(appPreferences.appContext).downloadV2Dao()
+        InkitaDatabase.getInstance(appPreferences.appContext, appPreferences.profile).downloadV2Dao()
     private var lastDownloadedItems: List<DownloadedItemV2Entity> = emptyList()
     private var homeLoadJob: Job? = null
 

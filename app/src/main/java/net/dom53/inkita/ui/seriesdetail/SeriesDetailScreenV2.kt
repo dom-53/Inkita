@@ -184,8 +184,8 @@ fun SeriesDetailScreenV2(
     val specialPageTitleCache = remember(seriesId) { mutableStateMapOf<Int, Map<Int, String>>() }
     val volumeDownloadStates = remember { mutableStateMapOf<Int, DownloadState>() }
     val downloadDao =
-        remember(context.applicationContext) {
-            InkitaDatabase.getInstance(context.applicationContext).downloadV2Dao()
+        remember(context.applicationContext, appPreferences.profile) {
+            InkitaDatabase.getInstance(context.applicationContext, appPreferences.profile).downloadV2Dao()
         }
     val downloadedItemsBySeries =
         downloadDao
@@ -233,7 +233,7 @@ fun SeriesDetailScreenV2(
                     appPreferences = appPreferences,
                 )
             DownloadManagerV2(
-                appContext = context.applicationContext,
+                appPreferences = appPreferences,
                 strategies =
                     listOf(
                         epubStrategy,
@@ -266,7 +266,7 @@ fun SeriesDetailScreenV2(
         downloadTreeLoading = true
         val root =
             withContext(Dispatchers.IO) {
-                val dir = DownloadPaths.seriesDir(context.applicationContext, seriesId)
+                val dir = DownloadPaths.seriesDir(context.applicationContext, appPreferences.profile, seriesId)
                 if (dir.exists()) buildFileTree(dir) else null
             }
         downloadTreeNodes = root?.let { listOf(it) } ?: emptyList()
@@ -762,6 +762,7 @@ fun SeriesDetailScreenV2(
                                     downloadStates = volumeDownloadStates,
                                     onOpenVolume = { volume ->
                                         VolumeDetailCache.put(
+                                            appPreferences.profile,
                                             VolumeDetailPayload(
                                                 seriesId = seriesId,
                                                 libraryId = detail?.series?.libraryId,
