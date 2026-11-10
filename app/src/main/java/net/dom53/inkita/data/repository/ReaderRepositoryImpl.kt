@@ -1,6 +1,7 @@
 package net.dom53.inkita.data.repository
 
 import android.content.Context
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.downloadv2.DownloadStorageManager
@@ -216,15 +217,11 @@ class ReaderRepositoryImpl(
             return
         }
 
-        runCatching {
-            val api = apiOrThrow()
-            api.setReaderProgress(progressWithTs.toDto())
-        }.onFailure {
-            // fallback to local cache if network fails
-            readerDao.upsertLocalProgress(progressWithTs.toEntity())
-            ProgressSyncWorker.enqueue(context, appPreferences.profile)
-        }.onSuccess {
-            readerDao.upsertLocalProgress(progressWithTs.toEntity())
+        val sent = sendProgress(progressWithTs)
+        readerDao.upsertLocalProgress(progressWithTs.toEntity())
+        if (!sent) {
+            // The current worker may already have read its batch.
+            ProgressSyncWorker.enqueue(context, appPreferences.profile, followUp = true)
         }
 
         maybeDeleteAfterCompletion(progressWithTs, totalPages)
@@ -529,13 +526,14 @@ class ReaderRepositoryImpl(
         // no-op for delete-after; sliding window is handled via progress
     }
 
-    override suspend fun syncLocalProgress() {
-        if (!isOnlineAllowed()) return
-        val api = runCatching { apiOrThrow() }.getOrElse { return }
-        val locals = runCatching { readerDao.getAllLocalProgress() }.getOrDefault(emptyList())
-        if (locals.isEmpty()) return
+    override suspend fun syncLocalProgress(): Boolean {
+        if (!isOnlineAllowed()) return false
+        val locals = readerDao.getAllLocalProgress()
+        if (locals.isEmpty()) return true
+        val api = apiOrThrow()
+        var allSent = true
         locals.forEach { localEntity ->
-            if (!appPreferences.isActiveSession()) return
+            if (!appPreferences.isActiveSession()) return true
             val local = localEntity.toDomain()
             val remote =
                 runCatching {
@@ -552,12 +550,13 @@ class ReaderRepositoryImpl(
                 remote != null &&
                     remote.page == local.page &&
                     (local.bookScrollId == null || remote.bookScrollId == local.bookScrollId)
-            if (!appPreferences.isActiveSession()) return
-            val resp =
-                runCatching { api.setReaderProgress(latest.toDto()) }
-                    .getOrNull()
+            if (!appPreferences.isActiveSession()) return true
+            if (!sendProgress(latest, api)) {
+                allSent = false
+                return@forEach
+            }
             val continuePointConfirmed =
-                if (resp?.isSuccessful == true && remoteAlreadyMatchesLocal && local.seriesId != null) {
+                if (remoteAlreadyMatchesLocal && local.seriesId != null) {
                     val continueResponse = runCatching { api.getContinuePoint(local.seriesId) }.getOrNull()
                     val continuePoint = continueResponse?.takeIf { it.isSuccessful }?.body()
                     val samePosition =
@@ -587,12 +586,13 @@ class ReaderRepositoryImpl(
                         "remoteMatches=$remoteAlreadyMatchesLocal continueConfirmed=$continuePointConfirmed",
                 )
             }
-            if (resp?.isSuccessful == true && continuePointConfirmed) {
+            if (continuePointConfirmed) {
                 readerDao.finishProgressSync(localEntity, replacement = null)
             } else {
                 readerDao.finishProgressSync(localEntity, replacement = latest.toEntity())
             }
         }
+        return allSent
     }
 
     override suspend fun getLatestLocalProgress(seriesId: Int): ReaderProgress? {
@@ -613,6 +613,20 @@ class ReaderRepositoryImpl(
                 .maxByOrNull { it.lastModifiedUtc }
         return latest?.toDomain()
     }
+
+    private suspend fun sendProgress(
+        progress: ReaderProgress,
+        api: KavitaApi? = null,
+    ): Boolean =
+        try {
+            val response = (api ?: apiOrThrow()).setReaderProgress(progress.toDto())
+            response.errorBody()?.close()
+            response.isSuccessful
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            false
+        }
 
     private suspend fun apiOrThrow(): KavitaApi {
         val config = appPreferences.configFlow.first()

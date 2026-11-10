@@ -35,8 +35,7 @@ class ProgressSyncWorker(
         val services = InkitaServices.get(applicationContext, AppPreferences(applicationContext, session))
         val repo: ReaderRepository = services.readerRepository
         return runCatching {
-            repo.syncLocalProgress()
-            Result.success()
+            if (repo.syncLocalProgress()) Result.success() else Result.retry()
         }.getOrElse { e ->
             if (e is CancellationException) throw e
             Result.retry()
@@ -49,6 +48,7 @@ class ProgressSyncWorker(
         fun enqueue(
             context: Context,
             profile: KavitaProfile,
+            followUp: Boolean = false,
         ) {
             if (profile == KavitaProfile.Guest) return
             val monitor = NetworkMonitor.getInstance(context)
@@ -64,7 +64,11 @@ class ProgressSyncWorker(
                     ).build()
             WorkManager
                 .getInstance(context)
-                .enqueueUniqueWork("$UNIQUE_WORK_NAME-${profile.id}", ExistingWorkPolicy.KEEP, request)
+                .enqueueUniqueWork(
+                    "$UNIQUE_WORK_NAME-${profile.id}",
+                    if (followUp) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP,
+                    request,
+                )
         }
     }
 }
