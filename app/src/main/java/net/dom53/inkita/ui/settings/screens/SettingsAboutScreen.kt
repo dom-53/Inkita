@@ -59,16 +59,13 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.mikepenz.aboutlibraries.ui.compose.android.produceLibraries
 import com.mikepenz.aboutlibraries.ui.compose.m3.LibrariesContainer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import net.dom53.inkita.BuildConfig
 import net.dom53.inkita.R
 import net.dom53.inkita.core.logging.LoggingManager
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import net.dom53.inkita.core.update.UpdateChecker
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -122,37 +119,6 @@ fun SettingsAboutScreen(onBack: () -> Unit) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
-    fun parseVersion(value: String): Version? {
-        val regex = Regex("""(\d+)\.(\d+)\.(\d+)(?:-([A-Za-z0-9.-]+))?""")
-        val m = regex.matchEntire(value) ?: return null
-        val (maj, min, patch, pre) = m.destructured
-        return Version(maj.toInt(), min.toInt(), patch.toInt(), pre.ifBlank { null })
-    }
-
-    fun isRemoteNewer(
-        current: Version,
-        remote: Version,
-    ): Boolean {
-        if (remote.major != current.major) return remote.major > current.major
-        if (remote.minor != current.minor) return remote.minor > current.minor
-        if (remote.patch != current.patch) return remote.patch > current.patch
-        val curPre = current.preRelease
-        val remPre = remote.preRelease
-        return when {
-            curPre == null && remPre == null -> false
-            curPre == null && remPre != null -> false // remote is prerelease, current stable -> not newer
-            curPre != null && remPre == null -> true // remote stable, current prerelease -> newer
-            else -> remPre!! > curPre!!
-        }
-    }
-
-    fun isRemoteCodeNewer(
-        currentCode: Long,
-        remoteCode: Long?,
-    ): Boolean {
-        if (remoteCode == null || remoteCode <= 0) return false
-        return remoteCode > currentCode
-    }
     DisposableEffect(context, lifecycle, pendingDownloadId, awaitingInstallPermission) {
         val downloadId = pendingDownloadId ?: return@DisposableEffect onDispose { }
         if (awaitingInstallPermission) return@DisposableEffect onDispose { }
@@ -234,48 +200,23 @@ fun SettingsAboutScreen(onBack: () -> Unit) {
         isCheckingUpdate = true
         scope.launch {
             val message =
-                withContext(Dispatchers.IO) {
-                    try {
-                        val url = URL("https://dom-53.github.io/Inkita/updates.json")
-                        val conn =
-                            (url.openConnection() as HttpURLConnection).apply {
-                                connectTimeout = 5000
-                                readTimeout = 5000
-                            }
-                        val response = conn.inputStream.bufferedReader().use { it.readText() }
-                        val json = JSONObject(response)
-                        val remoteChannel = json.optString("channel").ifBlank { "stable" }
-                        val acceptChannel =
-                            when {
-                                remoteChannel == BuildConfig.RELEASE_CHANNEL -> true
-                                BuildConfig.RELEASE_CHANNEL == "preview" && remoteChannel == "stable" -> true // preview build can take stable
-                                else -> false
-                            }
-                        if (!acceptChannel) {
-                            return@withContext context.getString(R.string.settings_about_up_to_date)
-                        }
-                        val remoteVersionRaw = json.optString("version")
-                        val remoteCode = json.optLong("versionCode", 0)
-                        val remoteVersion = parseVersion(remoteVersionRaw) ?: return@withContext context.getString(R.string.settings_about_up_to_date)
-                        val currentVersion = parseVersion(BuildConfig.VERSION_NAME) ?: return@withContext context.getString(R.string.settings_about_up_to_date)
-                        return@withContext if (isRemoteCodeNewer(versionCode, remoteCode) || isRemoteNewer(currentVersion, remoteVersion)) {
-                            val apkUrl = json.optString("url")
-                            if (apkUrl.isNullOrBlank()) {
-                                context.getString(R.string.settings_about_update_failed)
-                            } else {
-                                pendingUpdateVersion = remoteVersionRaw
-                                pendingUpdateUrl = apkUrl
-                                showUpdateDialog = true
-                                context.getString(R.string.settings_about_update_available, remoteVersionRaw)
-                            }
-                        } else {
-                            context.getString(R.string.settings_about_up_to_date)
-                        }
-                    } catch (_: Exception) {
-                        context.getString(R.string.settings_about_update_failed)
+                try {
+                    val update = UpdateChecker.findUpdate(versionName, versionCode, BuildConfig.RELEASE_CHANNEL)
+                    if (update == null) {
+                        context.getString(R.string.settings_about_up_to_date)
+                    } else {
+                        pendingUpdateVersion = update.versionName
+                        pendingUpdateUrl = update.url
+                        showUpdateDialog = true
+                        context.getString(R.string.settings_about_update_available, update.versionName)
                     }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    context.getString(R.string.settings_about_update_failed)
+                } finally {
+                    isCheckingUpdate = false
                 }
-            isCheckingUpdate = false
             showToast(message)
         }
     }
@@ -482,10 +423,3 @@ fun SettingsAboutScreen(onBack: () -> Unit) {
         )
     }
 }
-
-private data class Version(
-    val major: Int,
-    val minor: Int,
-    val patch: Int,
-    val preRelease: String? = null,
-)

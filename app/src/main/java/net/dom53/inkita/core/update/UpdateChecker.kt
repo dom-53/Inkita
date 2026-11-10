@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.annotation.RequiresPermission
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.BuildConfig
@@ -13,6 +14,7 @@ import net.dom53.inkita.R
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.notification.AppNotificationManager
 import org.json.JSONObject
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -24,6 +26,7 @@ object UpdateChecker {
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     suspend fun checkForUpdate(context: Context) {
         try {
+            val pkg = context.packageManager.getPackageInfo(context.packageName, 0)
             val showingProgress =
                 AppNotificationManager.showProgress(
                     id = NOTIFICATION_ID,
@@ -34,7 +37,12 @@ object UpdateChecker {
                     max = null,
                     ongoing = true,
                 )
-            val info = fetchUpdateInfo(context)
+            val info =
+                try {
+                    findUpdate(pkg.versionName.orEmpty(), pkg.longVersionCode, BuildConfig.RELEASE_CHANNEL)
+                } finally {
+                    if (showingProgress) AppNotificationManager.cancel(NOTIFICATION_ID)
+                }
             if (LoggingManager.isDebugEnabled()) {
                 LoggingManager.d("UpdateChecker", "Update info=${info?.versionName ?: "none"}")
             }
@@ -49,7 +57,6 @@ object UpdateChecker {
                     )
                 }
 
-            if (showingProgress) AppNotificationManager.cancel(NOTIFICATION_ID)
             if (info == null || pending == null) {
                 if (LoggingManager.isDebugEnabled()) {
                     LoggingManager.d("UpdateChecker", "No update available")
@@ -67,81 +74,55 @@ object UpdateChecker {
                 autoCancel = true,
                 contentIntent = pending,
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             LoggingManager.w("UpdateChecker", "Startup update check failed", e)
         }
     }
 
-    private suspend fun fetchUpdateInfo(context: Context): UpdateInfo? =
+    internal suspend fun findUpdate(
+        currentName: String,
+        currentCode: Long,
+        channel: String,
+        feedUrl: String = UPDATES_URL,
+    ): UpdateInfo? =
         withContext(Dispatchers.IO) {
-            val url = URL(UPDATES_URL)
+            val url = URL(feedUrl)
             val conn =
                 (url.openConnection() as HttpURLConnection).apply {
                     connectTimeout = 5000
                     readTimeout = 5000
                 }
 
-            val response = conn.inputStream.bufferedReader().use { it.readText() }
+            val response =
+                try {
+                    if (conn.responseCode !in 200..299) throw IOException("Update feed HTTP ${conn.responseCode}")
+                    conn.inputStream.bufferedReader().use { it.readText() }
+                } finally {
+                    conn.disconnect()
+                }
             val json = JSONObject(response)
 
             val remoteChannel = json.optString("channel").ifBlank { "stable" }
             val acceptChannel =
                 when {
-                    remoteChannel == BuildConfig.RELEASE_CHANNEL -> true
-                    BuildConfig.RELEASE_CHANNEL == "preview" && remoteChannel == "stable" -> true
+                    remoteChannel == channel -> true
+                    channel == "preview" && remoteChannel == "stable" -> true
                     else -> false
                 }
             if (!acceptChannel) return@withContext null
 
             val remoteVersionRaw = json.optString("version")
             val remoteCode = json.optLong("versionCode", 0)
-            val remoteVersion = parseVersion(remoteVersionRaw) ?: return@withContext null
-
-            val pkg = context.packageManager.getPackageInfo(context.packageName, 0)
-            val currentVersion = parseVersion(pkg.versionName ?: "") ?: return@withContext null
-            val currentCode = pkg.longVersionCode
-
-            val apkUrl = json.optString("url").takeIf { it.isNotBlank() } ?: return@withContext null
-
-            return@withContext if (isRemoteNewer(currentVersion, remoteVersion) || remoteCode > currentCode) {
-                UpdateInfo(remoteVersionRaw, apkUrl)
-            } else {
-                null
-            }
+            if (!isNewerRelease(currentName, currentCode, remoteVersionRaw, remoteCode)) return@withContext null
+            val apkUrl =
+                json.optString("url").takeIf { it.isNotBlank() }
+                    ?: throw IOException("Update feed is missing the download URL")
+            UpdateInfo(remoteVersionRaw, apkUrl)
         }
 
-    private fun parseVersion(value: String): Version? {
-        val regex = Regex("""(\d+)\.(\d+)\.(\d+)(?:-([A-Za-z0-9.-]+))?""")
-        val m = regex.matchEntire(value) ?: return null
-        val (maj, min, patch, pre) = m.destructured
-        return Version(maj.toInt(), min.toInt(), patch.toInt(), pre.ifBlank { null })
-    }
-
-    private fun isRemoteNewer(
-        current: Version,
-        remote: Version,
-    ): Boolean {
-        if (remote.major != current.major) return remote.major > current.major
-        if (remote.minor != current.minor) return remote.minor > current.minor
-        if (remote.patch != current.patch) return remote.patch > current.patch
-        val curPre = current.preRelease
-        val remPre = remote.preRelease
-        return when {
-            curPre == null && remPre == null -> false
-            curPre == null && remPre != null -> false
-            curPre != null && remPre == null -> true
-            else -> remPre!! > curPre!!
-        }
-    }
-
-    private data class Version(
-        val major: Int,
-        val minor: Int,
-        val patch: Int,
-        val preRelease: String?,
-    )
-
-    private data class UpdateInfo(
+    internal data class UpdateInfo(
         val versionName: String,
         val url: String,
     )

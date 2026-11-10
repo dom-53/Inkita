@@ -152,6 +152,10 @@ private val IMPORTANT_INFO_FIXED =
         "Fixed database upgrades from older versions.",
         "Preserved newer reading progress during sync.",
         "Fixed download pause, resume, retry, and recovery after interruption.",
+        "Kept local data separate for each Kavita server and account.",
+        "Retried reading progress uploads after server errors.",
+        "Fixed moving downloads and deleting downloaded files.",
+        "Fixed update checks and numbered beta version comparisons.",
     )
 
 private const val FORCE_SHOW_IMPORTANT_INFO = false
