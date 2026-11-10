@@ -19,6 +19,7 @@ data class ReaderUiState(
     val error: String? = null,
     val content: String? = null,
     val fromOffline: Boolean = false,
+    val offlineAssetPaths: Set<String> = emptySet(),
     val imageUrl: String? = null,
     val imageUrls: Map<Int, String> = emptyMap(),
     val webtoonChapters: List<WebtoonChapterUiState> = emptyList(),
@@ -272,6 +273,7 @@ abstract class BaseReaderViewModel(
             it.copy(
                 content = result.content ?: it.content,
                 fromOffline = result.fromOffline,
+                offlineAssetPaths = result.offlineAssetPaths,
                 pageIndex = pageIndex,
                 isLoading = false,
                 error = null,

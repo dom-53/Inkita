@@ -50,22 +50,29 @@ class ReaderRepositoryImpl(
     ): ReaderPageResult {
         val preferOffline = appPreferences.preferOfflinePagesFlow.first()
         val downloadedV2 = downloadV2Dao?.getDownloadedPageForChapter(chapterId, page)
-        val downloadedHtmlV2 =
-            downloadedV2?.localPath?.let { path ->
-                if (isPathPresent(path)) {
-                    readDownloadedHtml(path)
-                } else {
-                    null
-                }
-            }
-        val cached = readerDao.getPage(chapterId, page)?.html
-        val offlineHtml = downloadedHtmlV2
 
-        if (!isOnlineAllowed() && offlineHtml == null) {
-            throw PageNotDownloadedException("Page not downloaded for offline reading")
+        suspend fun downloadedPage(): ReaderPageResult? {
+            val item = downloadedV2 ?: return null
+            val path = item.localPath ?: return null
+            val html = readDownloadedHtml(path) ?: return null
+            val assets =
+                try {
+                    downloadStorageManager.epubAssetPaths(item, path)
+                } catch (_: IOException) {
+                    emptySet()
+                } catch (_: SecurityException) {
+                    emptySet()
+                }
+            return ReaderPageResult(html, true, assets)
         }
 
-        if (preferOffline && offlineHtml != null) return ReaderPageResult(offlineHtml, true)
+        val cached = readerDao.getPage(chapterId, page)?.html
+
+        if (!isOnlineAllowed()) {
+            return downloadedPage() ?: throw PageNotDownloadedException("Page not downloaded for offline reading")
+        }
+
+        if (preferOffline) downloadedPage()?.let { return it }
 
         val apiHtml =
             try {
@@ -85,21 +92,19 @@ class ReaderRepositoryImpl(
                 )
                 body
             } catch (io: IOException) {
-                if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
+                if (!preferOffline) downloadedPage()?.let { return it }
                 if (cached != null) return ReaderPageResult(cached, false)
                 if (!isOnlineAllowed()) throw PageNotDownloadedException("Page not downloaded for offline reading")
                 throw io
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
-                if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
+                if (!preferOffline) downloadedPage()?.let { return it }
                 if (cached != null) return ReaderPageResult(cached, false)
                 throw e
             }
 
-        if (apiHtml != null) return ReaderPageResult(apiHtml, false)
-        if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
-        if (cached != null) return ReaderPageResult(cached, false)
-
-        throw PageNotDownloadedException("Page not downloaded for offline reading")
+        return ReaderPageResult(apiHtml, false)
     }
 
     override suspend fun getImageResult(

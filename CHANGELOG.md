@@ -15,6 +15,7 @@ All notable changes to this project will be documented here.
 - Preserve downloaded files and database paths if changing the download location fails. Keep pre-existing files in the destination folder.
 - Delete the file when removing a downloaded item, while preserving files still referenced by another item.
 - Use a shared update check at startup and in About settings. Compare numbered prereleases correctly, including beta.9 and beta.10.
+- Restrict EPUB WebView access to book resources and block scripts embedded in books. Previously downloaded books can still be read offline.
 
 ## v0.3.2-beta.1
 

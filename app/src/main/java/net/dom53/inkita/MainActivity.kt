@@ -156,6 +156,7 @@ private val IMPORTANT_INFO_FIXED =
         "Retried reading progress uploads after server errors.",
         "Fixed moving downloads and deleting downloaded files.",
         "Fixed update checks and numbered beta version comparisons.",
+        "Secured EPUB rendering while keeping existing downloads readable offline.",
     )
 
 private const val FORCE_SHOW_IMPORTANT_INFO = false

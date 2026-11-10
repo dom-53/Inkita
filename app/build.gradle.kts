@@ -160,6 +160,8 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.documentfile)
+    implementation("androidx.webkit:webkit:1.14.0")
+    implementation("org.jsoup:jsoup:1.22.2")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

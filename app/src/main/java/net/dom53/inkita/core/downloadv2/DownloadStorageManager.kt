@@ -65,6 +65,45 @@ class DownloadStorageManager internal constructor(
             }.getOrNull()
         }
 
+    internal suspend fun epubAssetPaths(
+        item: DownloadedItemV2Entity,
+        pagePath: String,
+    ): Set<String> =
+        withContext(Dispatchers.IO) {
+            if (pagePath.startsWith(CONTENT_SCHEME)) {
+                val seriesId = item.seriesId ?: return@withContext emptySet()
+                val chapterId = item.chapterId ?: return@withContext emptySet()
+                val page = Uri.parse(pagePath)
+                if (!DocumentsContract.isTreeUri(page)) return@withContext emptySet()
+                val tree = DocumentsContract.buildTreeDocumentUri(page.authority ?: return@withContext emptySet(), DocumentsContract.getTreeDocumentId(page))
+                val chapter =
+                    DownloadPaths
+                        .chapterRelativeDir(seriesId, item.volumeId, chapterId)
+                        .split('/')
+                        .fold(downloadDocumentRoot(tree.toString())) { dir, segment -> dir?.findFile(segment) }
+                val entries = chapter?.listFiles().orEmpty()
+                if (entries.none { it.uri == page && it.isFile }) return@withContext emptySet()
+                entries
+                    .firstOrNull { it.name == DownloadPaths.ASSETS_DIR && it.isDirectory }
+                    ?.listFiles()
+                    .orEmpty()
+                    .filter { it.isFile }
+                    .map { it.uri.toString() }
+                    .toSet()
+            } else {
+                val page = localFile(pagePath)
+                val directory = File(page.parentFile ?: return@withContext emptySet(), DownloadPaths.ASSETS_DIR)
+                val expected = File(page.canonicalFile.parentFile, DownloadPaths.ASSETS_DIR)
+                if (directory.canonicalFile != expected) return@withContext emptySet()
+                directory
+                    .listFiles()
+                    .orEmpty()
+                    .filter { it.isFile && it.canonicalFile.parentFile == expected }
+                    .map { Uri.fromFile(it).toString() }
+                    .toSet()
+            }
+        }
+
     suspend fun exists(localPath: String?): Boolean =
         withContext(Dispatchers.IO) {
             if (localPath.isNullOrBlank()) {

@@ -1,7 +1,6 @@
 package net.dom53.inkita
 
 import android.net.Uri
-import android.webkit.WebResourceRequest
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.ActivityResultRegistryOwner
@@ -33,6 +32,7 @@ import net.dom53.inkita.data.repository.AuthRepositoryImpl
 import net.dom53.inkita.ui.reader.screen.KavitaWebResources
 import net.dom53.inkita.ui.settings.screens.SettingsKavitaScreen
 import net.dom53.inkita.ui.theme.InkitaTheme
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.mockwebserver.MockResponse
@@ -113,10 +113,10 @@ class KavitaSettingsTest {
                     assertEquals("cover", response.body?.string())
                 }
                 val resources = KavitaWebResources(saved.value)
-                val embedded = resources.intercept(webResource(server.url("/epub-image").toString()))
+                val embedded = resources.fetch(server.url("/epub-image"))
                 assertEquals("image/png", embedded?.mimeType)
                 assertEquals("epub-image", embedded?.data?.bufferedReader()?.use { it.readText() })
-                assertNull(resources.intercept(webResource("https://elsewhere.example/epub-image")))
+                assertNull(resources.fetch("https://elsewhere.example/epub-image".toHttpUrl()))
                 assertEquals(4, server.requestCount)
             }
         } finally {
@@ -292,21 +292,6 @@ class KavitaSettingsTest {
         url: String,
         authority: HeldCertificate,
     ): AppConfig = original.copy(serverUrl = url, caCertificate = readKavitaCaCertificate(authority.certificate.encoded.inputStream()))
-
-    private fun webResource(url: String): WebResourceRequest =
-        object : WebResourceRequest {
-            override fun getUrl(): Uri = Uri.parse(url)
-
-            override fun isForMainFrame(): Boolean = false
-
-            override fun isRedirect(): Boolean = false
-
-            override fun hasGesture(): Boolean = false
-
-            override fun getMethod(): String = "GET"
-
-            override fun getRequestHeaders(): Map<String, String> = emptyMap()
-        }
 
     private fun saveOverHttp(
         url: String,
