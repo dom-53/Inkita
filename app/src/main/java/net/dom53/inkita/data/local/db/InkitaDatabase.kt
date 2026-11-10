@@ -537,6 +537,13 @@ abstract class InkitaDatabase : RoomDatabase() {
         private val MIGRATION_18_19 =
             object : Migration(18, 19) {
                 override fun migrate(db: SupportSQLiteDatabase) {
+                    // Migration 16 → 17 already creates this column.
+                    db.query("PRAGMA table_info(download_jobs_v2)").use { columns ->
+                        val nameIndex = columns.getColumnIndexOrThrow("name")
+                        while (columns.moveToNext()) {
+                            if (columns.getString(nameIndex) == "retryCount") return
+                        }
+                    }
                     db.execSQL("ALTER TABLE download_jobs_v2 ADD COLUMN retryCount INTEGER NOT NULL DEFAULT 0")
                 }
             }
