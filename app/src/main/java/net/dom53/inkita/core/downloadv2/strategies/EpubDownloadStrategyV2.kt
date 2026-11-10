@@ -184,21 +184,25 @@ class EpubDownloadStrategyV2(
                 if (!htmlResp.isSuccessful) throw HttpException(htmlResp)
                 if (downloadDao.getJob(jobId)?.status != DownloadJobV2Entity.STATUS_RUNNING) return
                 val htmlRaw = htmlResp.body() ?: ""
-                val (rewrittenHtml, assetsBytes) = rewriteAndDownloadImages(htmlRaw, assetsRelativeDir, config)
-                if (downloadDao.getJob(jobId)?.status != DownloadJobV2Entity.STATUS_RUNNING) return
                 val htmlPath = DownloadPaths.epubPageRelativePath(seriesId, volumeId, chapterId, page)
-                val storedHtml = storageManager.writeText(htmlPath, rewrittenHtml)
                 val saved =
-                    downloadDao.updateRunningJob(
-                        job.copy(completedItems = completed + 1, updatedAt = System.currentTimeMillis()),
-                        item.copy(
-                            status = DownloadedItemV2Entity.STATUS_COMPLETED,
-                            localPath = storedHtml.localPath,
-                            bytes = storedHtml.bytes + assetsBytes,
-                            updatedAt = System.currentTimeMillis(),
-                            error = null,
-                        ),
-                    )
+                    storageManager.saveDownload {
+                        val (rewrittenHtml, assetsBytes) = rewriteAndDownloadImages(htmlRaw, assetsRelativeDir, config, this)
+                        if (downloadDao.getJob(jobId)?.status != DownloadJobV2Entity.STATUS_RUNNING) return@saveDownload false
+                        val storedHtml = writeText(htmlPath, rewrittenHtml)
+                        commit {
+                            downloadDao.updateRunningJob(
+                                job.copy(completedItems = completed + 1, updatedAt = System.currentTimeMillis()),
+                                item.copy(
+                                    status = DownloadedItemV2Entity.STATUS_COMPLETED,
+                                    localPath = storedHtml.localPath,
+                                    bytes = storedHtml.bytes + assetsBytes,
+                                    updatedAt = System.currentTimeMillis(),
+                                    error = null,
+                                ),
+                            )
+                        }
+                    }
                 if (!saved) return
                 completed++
                 currentItem = null
@@ -259,6 +263,7 @@ class EpubDownloadStrategyV2(
         html: String,
         assetsRelativeDir: String,
         config: AppConfig,
+        pending: DownloadStorageManager.DownloadWrite,
     ): Pair<String, Long> =
         withContext(Dispatchers.IO) {
             var result = html
@@ -287,7 +292,7 @@ class EpubDownloadStrategyV2(
                         .orEmpty()
                 val fileName = hashName(absoluteUrl) + ext
                 try {
-                    val (localPath, bytes) = downloadBinary(absoluteUrl, fileName, assetsRelativeDir, config.apiKey, calls)
+                    val (localPath, bytes) = downloadBinary(absoluteUrl, "$assetsRelativeDir/$fileName", config.apiKey, calls, pending)
                     totalBytes += bytes
                     replacements[src] = toHtmlUri(localPath)
                 } catch (_: IOException) {
@@ -306,10 +311,10 @@ class EpubDownloadStrategyV2(
      */
     private suspend fun downloadBinary(
         url: String,
-        fileName: String,
-        assetsRelativeDir: String,
+        relativePath: String,
         apiKey: String,
         calls: Call.Factory,
+        pending: DownloadStorageManager.DownloadWrite,
     ): Pair<String, Long> =
         withContext(Dispatchers.IO) {
             val request =
@@ -323,7 +328,7 @@ class EpubDownloadStrategyV2(
                 val body = response.body ?: throw IOException("Empty body")
                 val stored =
                     body.byteStream().use { input ->
-                        storageManager.writeAsset(assetsRelativeDir, fileName, input)
+                        pending.write(relativePath, input)
                     }
                 stored.localPath to stored.bytes
             }

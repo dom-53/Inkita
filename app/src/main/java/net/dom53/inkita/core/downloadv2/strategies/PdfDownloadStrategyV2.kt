@@ -2,9 +2,7 @@ package net.dom53.inkita.core.downloadv2.strategies
 
 import android.content.Context
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
 import net.dom53.inkita.core.downloadv2.DownloadStorageManager
@@ -112,9 +110,8 @@ class PdfDownloadStrategyV2(
             if (seriesId == null) seriesId = info?.seriesId
             if (volumeId == null) volumeId = info?.volumeId
         }
-        val relativePath =
-            seriesId?.let { DownloadPaths.pdfRelativePath(it, volumeId, chapterId) }
-                ?: DownloadPaths.archiveDownloadRelativePath(null, null, chapterId, "pdf-$chapterId.pdf")
+        // The reader still probes the historical PDF filename when a download has no database record.
+        val relativePath = DownloadPaths.archiveDownloadRelativePath(seriesId, volumeId, chapterId, "pdf-$chapterId.pdf")
 
         try {
             val url =
@@ -142,33 +139,7 @@ class PdfDownloadStrategyV2(
                         return
                     }
                 if (downloadDao.getJob(jobId)?.status != DownloadJobV2Entity.STATUS_RUNNING) return
-                val stored =
-                    withContext(Dispatchers.IO) {
-                        body.byteStream().use { input ->
-                            storageManager.write(relativePath, input)
-                        }
-                    }
-                val item =
-                    downloadDao
-                        .getItemsForJob(jobId)
-                        .firstOrNull()
-                        ?.copy(
-                            status = DownloadedItemV2Entity.STATUS_COMPLETED,
-                            localPath = stored.localPath,
-                            bytes = stored.bytes,
-                            updatedAt = System.currentTimeMillis(),
-                            error = null,
-                        )
-                val completed =
-                    downloadDao.updateRunningJob(
-                        job.copy(
-                            status = DownloadJobV2Entity.STATUS_COMPLETED,
-                            completedItems = 1,
-                            updatedAt = System.currentTimeMillis(),
-                            error = null,
-                        ),
-                        item,
-                    )
+                val completed = body.byteStream().use { input -> storageManager.saveDownloadFile(downloadDao, job, relativePath, input) }
                 if (!completed) return
             }
             if (LoggingManager.isDebugEnabled()) {

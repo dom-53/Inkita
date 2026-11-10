@@ -9,7 +9,9 @@ All notable changes to this project will be documented here.
 - Fix a database migration that could prevent Inkita from opening after an upgrade from older versions such as v0.2.0-beta.2.
 - Preserve newer local reading progress when an older synchronization finishes.
 - Restart the download queue when resuming or retrying a job. Recover interrupted downloads and keep pause or cancel actions in effect when an in-flight request finishes.
+- Remove files from unfinished downloads when an in-flight job is paused or canceled.
 - Keep cached library data, downloads, and pending reading progress separate for each Kavita server and account.
+- Keep cached collections and collection prefetch settings separate for each Kavita profile.
 - Require an explicitly entered API key when changing the Kavita server address.
 - Retry reading progress uploads after HTTP errors and keep failed entries available for the next synchronization attempt.
 - Preserve downloaded files and database paths if changing the download location fails. Keep pre-existing files in the destination folder.

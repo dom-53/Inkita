@@ -7,14 +7,18 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.storage.KavitaProfile
 import net.dom53.inkita.data.local.db.InkitaDatabase
+import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
+import net.dom53.inkita.data.local.db.entity.DownloadJobV2Entity
 import net.dom53.inkita.data.local.db.entity.DownloadedItemV2Entity
 import net.dom53.inkita.domain.model.Format
 import java.io.ByteArrayInputStream
@@ -52,11 +56,78 @@ class DownloadStorageManager internal constructor(
         text: String,
     ): StoredDownload = write(relativePath, ByteArrayInputStream(text.toByteArray(Charsets.UTF_8)))
 
-    suspend fun writeAsset(
-        relativeDir: String,
-        fileName: String,
+    internal suspend fun saveDownloadFile(
+        dao: DownloadV2Dao,
+        job: DownloadJobV2Entity,
+        relativePath: String,
         input: InputStream,
-    ): StoredDownload = write("$relativeDir/$fileName", input)
+    ): Boolean =
+        saveDownload {
+            val item = dao.getItemsForJob(job.id).firstOrNull() ?: return@saveDownload false
+            val stored = write(relativePath, input)
+            val now = System.currentTimeMillis()
+            commit {
+                dao.updateRunningJob(
+                    job.copy(
+                        status = DownloadJobV2Entity.STATUS_COMPLETED,
+                        completedItems = 1,
+                        updatedAt = now,
+                        error = null,
+                    ),
+                    item.copy(
+                        status = DownloadedItemV2Entity.STATUS_COMPLETED,
+                        localPath = stored.localPath,
+                        bytes = stored.bytes,
+                        updatedAt = now,
+                        error = null,
+                    ),
+                )
+            }
+        }
+
+    internal suspend fun saveDownload(block: suspend DownloadWrite.() -> Boolean): Boolean =
+        withContext(Dispatchers.IO) {
+            val pending = DownloadWrite(appPreferences.downloadLocationUriFlow.first())
+            try {
+                pending.block()
+            } finally {
+                pending.discardUncommitted()
+            }
+        }
+
+    internal inner class DownloadWrite(
+        private val targetRootUri: String?,
+    ) {
+        private val uncommittedPaths = mutableListOf<String>()
+
+        fun write(
+            relativePath: String,
+            input: InputStream,
+        ): StoredDownload =
+            this@DownloadStorageManager
+                .write(relativePath, input, targetRootUri, preserveExisting = true)
+                .also { uncommittedPaths += it.localPath }
+
+        fun writeText(
+            relativePath: String,
+            text: String,
+        ): StoredDownload = write(relativePath, ByteArrayInputStream(text.toByteArray(Charsets.UTF_8)))
+
+        suspend fun commit(save: suspend () -> Boolean): Boolean {
+            currentCoroutineContext().ensureActive()
+            // Keep the result of the database transaction and the cleanup decision together.
+            return withContext(NonCancellable) {
+                save().also { if (it) uncommittedPaths.clear() }
+            }
+        }
+
+        fun discardUncommitted() {
+            for (path in uncommittedPaths.asReversed()) {
+                runCatching { check(deletePath(path)) }
+                    .onFailure { LoggingManager.w("DownloadStorage", "Could not remove an unfinished download file", it) }
+            }
+        }
+    }
 
     suspend fun readText(localPath: String): String? =
         withContext(Dispatchers.IO) {

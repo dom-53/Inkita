@@ -2,9 +2,7 @@ package net.dom53.inkita.core.downloadv2.strategies
 
 import android.content.Context
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.downloadv2.DownloadRequestV2
 import net.dom53.inkita.core.downloadv2.DownloadStorageManager
@@ -140,33 +138,7 @@ class ChapterImageArchiveDownloadStrategyV2(
                         return
                     }
                 if (downloadDao.getJob(jobId)?.status != DownloadJobV2Entity.STATUS_RUNNING) return
-                val stored =
-                    withContext(Dispatchers.IO) {
-                        body.byteStream().use { input ->
-                            storageManager.write(relativePath, input)
-                        }
-                    }
-                val item =
-                    downloadDao
-                        .getItemsForJob(jobId)
-                        .firstOrNull()
-                        ?.copy(
-                            status = DownloadedItemV2Entity.STATUS_COMPLETED,
-                            localPath = stored.localPath,
-                            bytes = stored.bytes,
-                            updatedAt = System.currentTimeMillis(),
-                            error = null,
-                        )
-                val completed =
-                    downloadDao.updateRunningJob(
-                        job.copy(
-                            status = DownloadJobV2Entity.STATUS_COMPLETED,
-                            completedItems = 1,
-                            updatedAt = System.currentTimeMillis(),
-                            error = null,
-                        ),
-                        item,
-                    )
+                val completed = body.byteStream().use { input -> storageManager.saveDownloadFile(downloadDao, job, relativePath, input) }
                 if (!completed) return
             }
             if (LoggingManager.isDebugEnabled()) {
