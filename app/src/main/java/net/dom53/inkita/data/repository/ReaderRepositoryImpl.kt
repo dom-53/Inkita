@@ -586,9 +586,9 @@ class ReaderRepositoryImpl(
                 )
             }
             if (resp?.isSuccessful == true && continuePointConfirmed) {
-                readerDao.clearLocalProgress(local.chapterId)
+                readerDao.finishProgressSync(localEntity, replacement = null)
             } else {
-                readerDao.upsertLocalProgress(latest.toEntity())
+                readerDao.finishProgressSync(localEntity, replacement = latest.toEntity())
             }
         }
     }

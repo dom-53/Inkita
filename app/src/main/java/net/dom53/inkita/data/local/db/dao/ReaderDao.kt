@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import net.dom53.inkita.data.local.db.entity.CachedPageEntity
 import net.dom53.inkita.data.local.db.entity.LocalReaderProgressEntity
 
@@ -32,4 +33,18 @@ interface ReaderDao {
 
     @Query("DELETE FROM local_progress WHERE chapterId = :chapterId")
     suspend fun clearLocalProgress(chapterId: Int)
+
+    @Transaction
+    suspend fun finishProgressSync(
+        original: LocalReaderProgressEntity,
+        replacement: LocalReaderProgressEntity?,
+    ) {
+        if (getLocalProgress(original.chapterId) != original) return
+
+        if (replacement == null) {
+            clearLocalProgress(original.chapterId)
+        } else {
+            upsertLocalProgress(replacement)
+        }
+    }
 }
