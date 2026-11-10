@@ -3,12 +3,19 @@ package net.dom53.inkita
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
+import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
+import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.storage.AppConfig
+import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.core.storage.KavitaProfile
+import net.dom53.inkita.core.storage.KavitaSession
 import net.dom53.inkita.data.api.KavitaApi
+import net.dom53.inkita.data.local.db.InkitaDatabase
+import net.dom53.inkita.data.repository.ReaderRepositoryImpl
 import net.dom53.inkita.data.repository.fetchPdfForReading
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -25,6 +32,39 @@ import java.nio.file.Files
 
 @RunWith(AndroidJUnit4::class)
 class OnlinePdfTest {
+    @Test
+    fun historicalPdfIsOnlyAvailableToItsOriginalProfile() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val chapterId = 1_930_000_097
+        val config = AppConfig("", "", "", 0)
+        val legacy = AppPreferences(context, KavitaSession(config, KavitaProfile.Legacy))
+        val other = AppPreferences(context, KavitaSession(config, KavitaProfile("pdf-isolation-test")))
+        val legacyPdf = checkNotNull(context.getExternalFilesDir("Inkita/downloads/pdfs")).resolve("pdf-$chapterId.pdf")
+        val otherPdf = DownloadPaths.pdfTempFile(context, other.profile, chapterId)
+        val database = Room.inMemoryDatabaseBuilder(context, InkitaDatabase::class.java).build()
+        try {
+            val pdf = createPdf()
+            legacyPdf.writeBytes(pdf)
+            otherPdf.parentFile?.mkdirs()
+            otherPdf.writeBytes(pdf)
+
+            runBlocking {
+                val downloads = database.downloadV2Dao()
+                val otherReader = ReaderRepositoryImpl(context, other, database.readerDao(), downloads)
+                assertEquals(otherPdf, otherReader.getPdfFile(chapterId))
+                assertTrue(downloads.getItemsForChapter(chapterId).isEmpty())
+
+                val legacyReader = ReaderRepositoryImpl(context, legacy, database.readerDao(), downloads)
+                assertEquals(legacyPdf, legacyReader.getPdfFile(chapterId))
+                assertEquals(legacyPdf.absolutePath, downloads.getItemsForChapter(chapterId).single().localPath)
+            }
+        } finally {
+            otherPdf.delete()
+            legacyPdf.delete()
+            database.close()
+        }
+    }
+
     @Test
     fun opensPdfWhenReaderEndpointFailsButDownloadWorks() =
         withServer { server, api, target ->

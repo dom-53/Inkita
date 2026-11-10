@@ -8,6 +8,7 @@ import net.dom53.inkita.core.downloadv2.DownloadStorageManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.core.storage.KavitaProfile
 import net.dom53.inkita.core.sync.ProgressSyncWorker
 import net.dom53.inkita.data.api.KavitaApi
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
@@ -272,14 +273,12 @@ class ReaderRepositoryImpl(
             recordPdfDownloadIfMissing(chapterId, storedPdf)
             return storedPdf
         }
-        val legacyTarget =
-            File(
-                context.getExternalFilesDir("Inkita/downloads/pdfs"),
-                "pdf-$chapterId.pdf",
-            )
-        if (legacyTarget.exists()) {
-            recordPdfDownloadIfMissing(chapterId, legacyTarget)
-            return legacyTarget
+        if (appPreferences.profile == KavitaProfile.Legacy) {
+            val legacyTarget = context.getExternalFilesDir("Inkita/downloads/pdfs")?.resolve("pdf-$chapterId.pdf")
+            if (legacyTarget?.isFile == true) {
+                recordPdfDownloadIfMissing(chapterId, legacyTarget)
+                return legacyTarget
+            }
         }
         val tempTarget = DownloadPaths.pdfTempFile(context, appPreferences.profile, chapterId)
         if (tempTarget.exists()) {
