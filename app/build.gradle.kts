@@ -118,20 +118,8 @@ dependencies {
     // optional - Kotlin Extensions and Coroutines support for Room
     implementation("androidx.room:room-ktx:$roomVersion")
 
-    // optional - RxJava2 support for Room
-    implementation("androidx.room:room-rxjava2:$roomVersion")
-
-    // optional - RxJava3 support for Room
-    implementation("androidx.room:room-rxjava3:$roomVersion")
-
-    // optional - Guava support for Room, including Optional and ListenableFuture
-    implementation("androidx.room:room-guava:$roomVersion")
-
     // optional - Test helpers
     testImplementation("androidx.room:room-testing:$roomVersion")
-
-    // optional - Paging 3 Integration
-    implementation("androidx.room:room-paging:$roomVersion")
 
     implementation(libs.androidx.core.ktx)
     implementation("androidx.appcompat:appcompat:1.7.0")
