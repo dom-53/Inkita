@@ -89,10 +89,19 @@ internal class EpubWebContent(
             .forEach { element.removeAttr(it.key) }
         for (attribute in listOf("src", "href", "xlink:href", "poster")) {
             if (!element.hasAttr(attribute)) continue
-            val mapped = resourceUrl(element.attr(attribute).trim())
+            val value = element.attr(attribute).trim()
+            val mapped =
+                if (element.normalName() == "a" && attribute == "href" && value.startsWith("#")) {
+                    // Resolve anchors against the reader document even when a base URL is set for book resources.
+                    documentUrl + value
+                } else {
+                    resourceUrl(value)
+                }
             if (mapped == null) element.removeAttr(attribute) else element.attr(attribute, mapped)
         }
     }
+
+    fun isDocumentUrl(url: String?): Boolean = url?.substringBefore('#') == documentUrl
 
     private fun resourceUrl(value: String): String? {
         if (value.isEmpty()) return null
@@ -113,7 +122,7 @@ internal class EpubWebContent(
             return blockedResource()
         }
         if (request.isForMainFrame) {
-            if (uri.toString() != documentUrl) return blockedResource()
+            if (!isDocumentUrl(uri.toString())) return blockedResource()
             return WebResourceResponse(
                 "text/html",
                 "UTF-8",
@@ -182,7 +191,13 @@ internal fun WebView.configureEpubWebView(
             override fun shouldOverrideUrlLoading(
                 view: WebView?,
                 request: WebResourceRequest,
-            ): Boolean = true
+            ): Boolean =
+                !(
+                    request.isForMainFrame &&
+                        request.method == "GET" &&
+                        request.url.encodedFragment != null &&
+                        content().isDocumentUrl(request.url.toString())
+                )
 
             override fun onPageFinished(
                 view: WebView,

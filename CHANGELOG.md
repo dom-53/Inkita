@@ -18,6 +18,7 @@ All notable changes to this project will be documented here.
 - Delete the file when removing a downloaded item, while preserving files still referenced by another item.
 - Use a shared update check at startup and in About settings. Compare numbered prereleases correctly, including beta.9 and beta.10.
 - Restrict EPUB WebView access to book resources and block scripts embedded in books. Previously downloaded books can still be read offline.
+- Restore EPUB links to footnotes and other anchors on the current page.
 
 ## v0.3.2-beta.1
 

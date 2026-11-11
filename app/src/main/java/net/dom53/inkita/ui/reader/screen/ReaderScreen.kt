@@ -1412,7 +1412,7 @@ internal fun ReaderWebView(
             } else {
                 webView.evaluateJavascript(styleJs, null)
             }
-            if (webView.url == content.documentUrl && webView.progress == 100) {
+            if (content.isDocumentUrl(webView.url) && webView.progress == 100) {
                 pendingScrollY?.let { y ->
                     webView.post {
                         webView.scrollTo(0, y)

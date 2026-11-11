@@ -33,6 +33,26 @@ class EpubWebViewTest {
     val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
+    fun onlineEpubFollowsFootnoteLinksWithABookResourceBaseUrl() {
+        MockWebServer().use { server ->
+            server.dispatcher =
+                object : Dispatcher() {
+                    override fun dispatch(request: RecordedRequest): MockResponse = MockResponse().setResponseCode(404)
+                }
+            server.start()
+            val config = AppConfig(server.url("/kavita/").toString(), "reader-test-key", "", 1)
+            assertFootnoteRoundTrip(config, fromOffline = false)
+            val paths = List(server.requestCount) { server.takeRequest(1, TimeUnit.SECONDS)?.requestUrl?.encodedPath }
+            assertEquals(emptyList<String>(), paths.filterNot { it == "/favicon.ico" })
+        }
+    }
+
+    @Test
+    fun offlineEpubFollowsFootnoteLinks() {
+        assertFootnoteRoundTrip(config = null, fromOffline = true)
+    }
+
+    @Test
     fun onlineEpubLoadsAuthenticatedImagesAndKeepsReaderControls() {
         MockWebServer().use { kavita ->
             MockWebServer().use { unrelated ->
@@ -136,6 +156,36 @@ class EpubWebViewTest {
         }
         compose.waitForIdle()
         return fixture
+    }
+
+    private fun assertFootnoteRoundTrip(
+        config: AppConfig?,
+        fromOffline: Boolean,
+    ) {
+        val html =
+            """
+            <p id="start"><a id="note-link" href="#pozn%C3%A1mka">Read the note</a></p>
+            <div style="height: 1600px"></div>
+            <p id="poznámka"><a id="back-link" href="#start">Return to the text</a></p>
+            <div style="height: 1300px"></div>
+            """.trimIndent()
+        val reader = mount(ReaderPageResult(html, fromOffline), config)
+        awaitJs(reader, "document.readyState === 'complete' && document.getElementById('note-link') !== null")
+
+        clickLink(reader, "note-link")
+        awaitJs(reader, "decodeURIComponent(location.hash) === '#poznámka' && window.scrollY > 500")
+
+        clickLink(reader, "back-link")
+        awaitJs(reader, "location.hash === '#start' && window.scrollY < 100")
+    }
+
+    private fun clickLink(
+        reader: ReaderFixture,
+        id: String,
+    ) {
+        compose.runOnUiThread {
+            reader.webView.evaluateJavascript("document.getElementById('$id').click()", null)
+        }
     }
 
     private fun awaitJs(
