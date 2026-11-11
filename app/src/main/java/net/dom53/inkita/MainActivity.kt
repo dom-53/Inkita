@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.os.LocaleListCompat
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -76,6 +78,7 @@ import net.dom53.inkita.domain.repository.LibraryRepository
 import net.dom53.inkita.domain.repository.SeriesRepository
 import net.dom53.inkita.ui.browse.BrowseScreen
 import net.dom53.inkita.ui.download.DownloadQueueScreen
+import net.dom53.inkita.ui.download.DownloadQueueViewModel
 import net.dom53.inkita.ui.download.DownloadQueueViewModelFactory
 import net.dom53.inkita.ui.history.HistoryScreen
 import net.dom53.inkita.ui.library.LibraryV2Screen
@@ -93,8 +96,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val components = StartupManager.init(applicationContext)
-        val appPreferences = components.preferences
+        val appPreferences = StartupManager.init(applicationContext)
         // Apply saved locale before composing UI so strings use correct language on first draw.
         val storedLanguage = runBlocking { appPreferences.appLanguageFlow.first() }
         val appLocales = AppCompatDelegate.getApplicationLocales()
@@ -111,18 +113,23 @@ class MainActivity : AppCompatActivity() {
         applyLocale(initialLanguage)
 
         setContent {
-            InkitaApp(
-                initialLanguage = initialLanguage,
-                appPreferences = components.preferences,
-                libraryRepository = components.libraryRepository,
-                authRepository = components.authRepository,
-                seriesRepository = components.seriesRepository,
-                collectionsRepository = components.collectionsRepository,
-                readingListRepository = components.readingListRepository,
-                personRepository = components.personRepository,
-                readerRepository = components.readerRepository,
-                cacheManager = components.cacheManager,
-            )
+            val session by appPreferences.activeSessionFlow.collectAsState(initial = null)
+            val current = session ?: return@setContent
+            key(current) {
+                val components = remember { StartupManager.components(AppPreferences(applicationContext, current)) }
+                InkitaApp(
+                    initialLanguage = initialLanguage,
+                    appPreferences = components.preferences,
+                    libraryRepository = components.libraryRepository,
+                    authRepository = components.authRepository,
+                    seriesRepository = components.seriesRepository,
+                    collectionsRepository = components.collectionsRepository,
+                    readingListRepository = components.readingListRepository,
+                    personRepository = components.personRepository,
+                    readerRepository = components.readerRepository,
+                    cacheManager = components.cacheManager,
+                )
+            }
         }
     }
 
@@ -136,31 +143,20 @@ class MainActivity : AppCompatActivity() {
 private const val IMPORTANT_INFO_HEADER =
     "✅ Image API key was added — please fill it in Kavita Settings."
 
-private val IMPORTANT_INFO_ADDED =
-    listOf(
-        "Reader: pinch to zoom and pan in comics and Webtoon mode, with double-tap to reset",
-        "Settings: added Korean and Chinese language options",
-        "Cache: large series details can now be opened offline after loading them online",
-    )
+private val IMPORTANT_INFO_ADDED = emptyList<String>()
 
-private val IMPORTANT_INFO_CHANGED =
-    listOf(
-        "",
-    )
+private val IMPORTANT_INFO_CHANGED = emptyList<String>()
 
 private val IMPORTANT_INFO_FIXED =
     listOf(
-        "Updates: open the Android installer after downloading an update",
-        "Updates: fixed the automatic check for new versions on startup",
-        "Reader: open PDF settings to change the reading direction",
-        "Library: keep cached Home sections when a request fails and offer a retry",
-        "Cache: fixed a crash when opening a series with an oversized cached detail",
-        "Reader: fixed opening PDFs online when Kavita can download the file",
-        "Reader: load comic pages from the chapter archive when Kavita's page endpoint fails",
-        "Reader: resume completed comics on the last valid page",
-        "Library: fix loading libraries on newer Kavita versions",
-        "Settings: verify the Kavita connection before saving and show readable errors",
-        "Settings: support a custom HTTPS CA certificate for the configured Kavita server",
+        "Fixed database upgrades from older versions.",
+        "Preserved newer reading progress during sync.",
+        "Fixed download pause, resume, retry, and recovery after interruption.",
+        "Kept local data separate for each Kavita server and account.",
+        "Retried reading progress uploads after server errors.",
+        "Fixed moving downloads and deleting downloaded files.",
+        "Fixed update checks and numbered beta version comparisons.",
+        "Secured EPUB rendering while keeping existing downloads readable offline.",
     )
 
 private const val FORCE_SHOW_IMPORTANT_INFO = false
@@ -182,6 +178,9 @@ private fun InfoSection(
     title: String,
     items: List<String>,
 ) {
+    if (items.isEmpty()) return
+
+    Spacer(modifier = Modifier.size(10.dp))
     Text(
         text = title,
         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
@@ -334,17 +333,14 @@ fun InkitaApp(
                                 text = "📌 ${pkg.versionName}",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             )
-                            Spacer(modifier = Modifier.size(8.dp))
                             InfoSection(
                                 title = "✨ Added",
                                 items = IMPORTANT_INFO_ADDED,
                             )
-                            Spacer(modifier = Modifier.size(10.dp))
                             InfoSection(
                                 title = "🔁 Changed",
                                 items = IMPORTANT_INFO_CHANGED,
                             )
-                            Spacer(modifier = Modifier.size(10.dp))
                             InfoSection(
                                 title = "🛠️ Fixed",
                                 items = IMPORTANT_INFO_FIXED,
@@ -515,8 +511,8 @@ fun InkitaApp(
                         )
                     }
                     composable(MainScreen.Downloads.route) {
-                        val ctx = LocalContext.current
-                        val vm = remember { DownloadQueueViewModelFactory.create(ctx, cacheManager) }
+                        val vm: DownloadQueueViewModel =
+                            viewModel(factory = DownloadQueueViewModelFactory.create(appPreferences, cacheManager))
                         DownloadQueueScreen(
                             viewModel = vm,
                             onOpenReader = { chapterId, page, sid, vid, fmt ->

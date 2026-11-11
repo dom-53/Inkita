@@ -1,4 +1,4 @@
-﻿package net.dom53.inkita.ui.reader.screen
+package net.dom53.inkita.ui.reader.screen
 
 import android.app.Activity
 import android.content.Context
@@ -10,11 +10,7 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.view.GestureDetector
 import android.view.MotionEvent
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
-import android.webkit.WebSettings
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -1232,9 +1228,9 @@ internal fun ReaderWebView(
     fontOption: ReaderFontOption,
     textAlignCss: String,
     themeMode: ReaderThemeMode,
-    serverUrl: String?,
-    apiKey: String?,
     config: AppConfig?,
+    fromOffline: Boolean,
+    offlineAssetPaths: Set<String>,
     onToggleOverlay: () -> Unit,
     pendingScrollY: Int?,
     onConsumePendingScroll: () -> Unit = {},
@@ -1246,19 +1242,19 @@ internal fun ReaderWebView(
     onScrollIdle: (String?) -> Unit = {},
 ) {
     if (html.isBlank()) return
-    var lastLoadedHash by remember { mutableStateOf<String?>(null) }
-    val contentHash = remember(html) { html.hashCode().toString() }
-    val enriched =
-        if (apiKey != null) {
-            html.replace(Regex("(book-resources\\?[^\"'>]+)")) { match ->
-                val value = match.value
-                if (value.contains("apiKey=")) value else "$value&apiKey=$apiKey"
-            }
-        } else {
-            html
+    val context = LocalContext.current
+    var loadedContent by remember { mutableStateOf<EpubWebContent?>(null) }
+    val content =
+        remember(context, html, config, fromOffline, offlineAssetPaths) {
+            EpubWebContent(context, html, config, fromOffline, offlineAssetPaths)
         }
+    val currentContent by rememberUpdatedState(content)
+    val currentScrollY by rememberUpdatedState(pendingScrollY)
+    val consumeScroll by rememberUpdatedState(onConsumePendingScroll)
+    val currentScrollId by rememberUpdatedState(pendingScrollId)
+    val consumeScrollId by rememberUpdatedState(onConsumeScrollId)
     val paddingTopPx = paddingPx / 2f
-    val fontFaceCss = fontOption.fontFaceCss()
+    val fontFaceCss = fontOption.fontFaceCss().replace("file:///android_asset/fonts/", READER_FONT_URL)
     val (bgColor, textColor) = themeColorsFor(themeMode)
     val themeCss =
         """
@@ -1295,12 +1291,14 @@ internal fun ReaderWebView(
             padding-bottom: ${paddingTopPx}px !important;
         }
         """.trimIndent()
-    val toLoad =
-        if (enriched.contains("<head", ignoreCase = true)) {
-            enriched.replaceFirst(Regex("(?i)<head>"), "<head><style>$cssBlock</style>")
-        } else {
-            "<html><head><style>$cssBlock</style></head><body>$enriched</body></html>"
-        }
+    val styleJs =
+        """
+        (function() {
+            var tag = document.querySelector('head > style#reader-style');
+            if (tag) tag.textContent = ${org.json.JSONObject.quote(cssBlock)};
+        })();
+        """.trimIndent()
+    val currentStyle by rememberUpdatedState(styleJs)
     val scrollHandler = remember { Handler(Looper.getMainLooper()) }
     var scrollRunnable: Runnable? by remember { mutableStateOf(null) }
     val scrollIdJs =
@@ -1339,11 +1337,6 @@ internal fun ReaderWebView(
         """
         }
 
-    val kavitaResources by rememberUpdatedState(
-        remember(config?.serverUrl, config?.caCertificate) {
-            config?.takeIf { it.caCertificate != null }?.let(::KavitaWebResources)
-        },
-    )
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { context ->
@@ -1379,36 +1372,20 @@ internal fun ReaderWebView(
                     },
                 )
             WebView(context).apply {
-                settings.cacheMode = WebSettings.LOAD_DEFAULT
-                settings.loadsImagesAutomatically = true
-                settings.domStorageEnabled = true
-                settings.javaScriptEnabled = true
-                settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-                settings.allowFileAccess = true
-                settings.allowFileAccessFromFileURLs = true
-                settings.allowUniversalAccessFromFileURLs = true
-                webViewClient =
-                    object : WebViewClient() {
-                        override fun shouldInterceptRequest(
-                            view: WebView?,
-                            request: WebResourceRequest,
-                        ): WebResourceResponse? = kavitaResources?.intercept(request)
-
-                        override fun onPageFinished(
-                            view: WebView?,
-                            url: String?,
-                        ) {
-                            super.onPageFinished(view, url)
-                            val y = pendingScrollY
-                            if (view != null && y != null) {
-                                view.post {
-                                    view.scrollTo(0, y)
-                                    view.postDelayed({ view.scrollTo(0, y) }, 50)
-                                }
-                                onConsumePendingScroll()
-                            }
-                        }
+                configureEpubWebView({ currentContent }) { view ->
+                    view.evaluateJavascript(currentStyle, null)
+                    currentScrollId?.let { id ->
+                        view.evaluateJavascript(epubScrollToElementJs(id), null)
+                        consumeScrollId()
                     }
+                    currentScrollY?.let { y ->
+                        view.post {
+                            view.scrollTo(0, y)
+                            view.postDelayed({ view.scrollTo(0, y) }, 50)
+                        }
+                        consumeScroll()
+                    }
+                }
                 setOnTouchListener { _, event ->
                     gestureDetector.onTouchEvent(event)
                     false
@@ -1418,8 +1395,7 @@ internal fun ReaderWebView(
                     scrollRunnable =
                         Runnable {
                             evaluateJavascript(scrollIdJs) { result ->
-                                val cleaned = result?.removePrefix("\"")?.removeSuffix("\"")
-                                val id = cleaned?.takeIf { it.isNotBlank() && it != "null" }
+                                val id = result?.let { org.json.JSONTokener(it).nextValue() as? String }
                                 onScrollIdle(id)
                             }
                         }
@@ -1430,74 +1406,13 @@ internal fun ReaderWebView(
         },
         update = { webView ->
             webView.setBackgroundColor(Color.Transparent.toArgb())
-            val styleJs =
-                """
-                (function() {
-                    var css = `$cssBlock`;
-                    var tag = document.getElementById('reader-style');
-                    if (!tag) {
-                        tag = document.createElement('style');
-                        tag.id = 'reader-style';
-                        document.head.appendChild(tag);
-                    }
-                    tag.innerHTML = css;
-                })();
-                """.trimIndent()
-            if (lastLoadedHash != contentHash) {
-                lastLoadedHash = contentHash
-                webView.loadDataWithBaseURL(
-                    serverUrl ?: "https://",
-                    toLoad,
-                    "text/html",
-                    "UTF-8",
-                    null,
-                )
-                pendingScrollId?.let { id ->
-                    val isIdx = id.startsWith("idx:")
-                    val targetJs =
-                        if (isIdx) {
-                            val idx = id.removePrefix("idx:").toIntOrNull() ?: -1
-                            """
-                            (function() {
-                                var elems = document.querySelectorAll('body *');
-                                if ($idx >= 0 && $idx < elems.length) {
-                                    var el = elems[$idx];
-                                    var top = el.getBoundingClientRect().top + window.pageYOffset;
-                                    window.scrollTo(0, top);
-                                    return true;
-                                }
-                                return false;
-                            })();
-                            """.trimIndent()
-                        } else {
-                            val clean =
-                                id
-                                    .removePrefix("id(\"")
-                                    .removeSuffix("\")")
-                                    .removePrefix("id('")
-                                    .removeSuffix("')")
-                            """
-                            (function() {
-                                var el = document.getElementById("$clean");
-                                if (el) {
-                                    var top = el.getBoundingClientRect().top + window.pageYOffset;
-                                    window.scrollTo(0, top);
-                                    return true;
-                                }
-                                return false;
-                            })();
-                            """.trimIndent()
-                            // Todo: musí se to dělat přes js?
-                        }
-                    webView.postDelayed({
-                        webView.evaluateJavascript(targetJs, null)
-                        onConsumeScrollId()
-                    }, 150)
-                }
+            if (loadedContent !== content) {
+                loadedContent = content
+                content.load(webView, cssBlock)
             } else {
                 webView.evaluateJavascript(styleJs, null)
             }
-            if (lastLoadedHash == contentHash) {
+            if (content.isDocumentUrl(webView.url) && webView.progress == 100) {
                 pendingScrollY?.let { y ->
                     webView.post {
                         webView.scrollTo(0, y)
@@ -1508,6 +1423,28 @@ internal fun ReaderWebView(
             }
         },
     )
+}
+
+private fun epubScrollToElementJs(id: String): String {
+    val element =
+        if (id.startsWith("idx:")) {
+            val index = id.removePrefix("idx:").toIntOrNull() ?: -1
+            "document.querySelectorAll('body *')[$index]"
+        } else {
+            val clean =
+                id
+                    .removePrefix("id(\"")
+                    .removeSuffix("\")")
+                    .removePrefix("id('")
+                    .removeSuffix("')")
+            "document.getElementById(${org.json.JSONObject.quote(clean)})"
+        }
+    return """
+        (function() {
+            var el = $element;
+            if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.pageYOffset);
+        })();
+        """.trimIndent()
 }
 
 @Composable

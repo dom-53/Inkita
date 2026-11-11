@@ -8,6 +8,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import net.dom53.inkita.core.storage.KavitaProfile
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.LibraryV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
@@ -66,9 +67,7 @@ abstract class InkitaDatabase : RoomDatabase() {
     abstract fun downloadV2Dao(): DownloadV2Dao
 
     companion object {
-        @Volatile
-        @Suppress("ktlint:standard:property-naming")
-        private var INSTANCE: InkitaDatabase? = null
+        private val databases = mutableMapOf<KavitaProfile, InkitaDatabase>()
 
         private val MIGRATION_1_2 =
             object : Migration(1, 2) {
@@ -592,37 +591,41 @@ abstract class InkitaDatabase : RoomDatabase() {
                 }
             }
 
-        fun getInstance(context: Context): InkitaDatabase =
-            INSTANCE ?: synchronized(this) {
-                INSTANCE ?: Room
-                    .databaseBuilder(
-                        context.applicationContext,
-                        InkitaDatabase::class.java,
-                        "inkita.db",
-                    ).addMigrations(
-                        MIGRATION_1_2,
-                        MIGRATION_2_3,
-                        MIGRATION_3_4,
-                        MIGRATION_4_5,
-                        MIGRATION_5_6,
-                        MIGRATION_6_7,
-                        MIGRATION_7_8,
-                        MIGRATION_8_9,
-                        MIGRATION_9_10,
-                        MIGRATION_10_11,
-                        MIGRATION_11_12,
-                        MIGRATION_12_13,
-                        MIGRATION_13_14,
-                        MIGRATION_14_15,
-                        MIGRATION_15_16,
-                        MIGRATION_16_17,
-                        MIGRATION_17_18,
-                        MIGRATION_18_19,
-                        MIGRATION_19_20,
-                        MIGRATION_20_21,
-                        MIGRATION_21_22,
-                    ).build()
-                    .also { INSTANCE = it }
+        fun getInstance(
+            context: Context,
+            profile: KavitaProfile,
+        ): InkitaDatabase =
+            synchronized(databases) {
+                databases.getOrPut(profile) {
+                    Room
+                        .databaseBuilder(
+                            context.applicationContext,
+                            InkitaDatabase::class.java,
+                            profile.databaseName,
+                        ).addMigrations(
+                            MIGRATION_1_2,
+                            MIGRATION_2_3,
+                            MIGRATION_3_4,
+                            MIGRATION_4_5,
+                            MIGRATION_5_6,
+                            MIGRATION_6_7,
+                            MIGRATION_7_8,
+                            MIGRATION_8_9,
+                            MIGRATION_9_10,
+                            MIGRATION_10_11,
+                            MIGRATION_11_12,
+                            MIGRATION_12_13,
+                            MIGRATION_13_14,
+                            MIGRATION_14_15,
+                            MIGRATION_15_16,
+                            MIGRATION_16_17,
+                            MIGRATION_17_18,
+                            MIGRATION_18_19,
+                            MIGRATION_19_20,
+                            MIGRATION_20_21,
+                            MIGRATION_21_22,
+                        ).build()
+                }
             }
     }
 }

@@ -81,10 +81,11 @@ fun SettingsDownloadScreen(
     var showLocationConfirmDialog by remember { mutableStateOf(false) }
     var migrationInProgress by remember { mutableStateOf(false) }
 
-    val downloadV2Dao =
-        remember {
-            InkitaDatabase.getInstance(context).downloadV2Dao()
+    val database =
+        remember(appPreferences.profile) {
+            InkitaDatabase.getInstance(context, appPreferences.profile)
         }
+    val downloadV2Dao = database.downloadV2Dao()
     val downloadStorageManager =
         remember {
             DownloadStorageManager(context, appPreferences)
@@ -386,9 +387,7 @@ fun SettingsDownloadScreen(
                         scope.launch {
                             val result =
                                 runCatching {
-                                    withContext(Dispatchers.IO) {
-                                        downloadStorageManager.migrateDownloadLocation(downloadV2Dao, target)
-                                    }
+                                    downloadStorageManager.migrateDownloadLocation(database, target)
                                 }
                             migrationInProgress = false
                             showLocationConfirmDialog = false

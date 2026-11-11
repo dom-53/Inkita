@@ -10,11 +10,15 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import net.dom53.inkita.core.cache.CacheManager
 import net.dom53.inkita.core.cache.CacheManagerImpl
+import net.dom53.inkita.core.di.InkitaServices
+import net.dom53.inkita.core.downloadv2.DownloadManagerV2
 import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.logging.LoggingManager
 import net.dom53.inkita.core.network.NetworkMonitor
@@ -27,7 +31,6 @@ import net.dom53.inkita.data.repository.AuthRepositoryImpl
 import net.dom53.inkita.data.repository.CollectionsRepositoryImpl
 import net.dom53.inkita.data.repository.LibraryRepositoryImpl
 import net.dom53.inkita.data.repository.PersonRepositoryImpl
-import net.dom53.inkita.data.repository.ReaderRepositoryImpl
 import net.dom53.inkita.data.repository.ReadingListRepositoryImpl
 import net.dom53.inkita.data.repository.SeriesRepositoryImpl
 import net.dom53.inkita.domain.repository.AuthRepository
@@ -56,7 +59,7 @@ object StartupManager {
     )
 
     @Volatile
-    private var cached: Components? = null
+    private var cachedPreferences: AppPreferences? = null
     private val logScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -64,8 +67,9 @@ object StartupManager {
      * Initialise singletons used across the app. Safe to call multiple times; returns cached instance.
      */
     @Suppress("MaxLineLength")
-    fun init(context: Context): Components {
-        cached?.let { return it }
+    @Synchronized
+    fun init(context: Context): AppPreferences {
+        cachedPreferences?.let { return it }
 
         val appContext = context.applicationContext
         val preferences = AppPreferences(appContext)
@@ -73,22 +77,6 @@ object StartupManager {
         // Migrate legacy API key storage into encrypted prefs.
         runCatching { kotlinx.coroutines.runBlocking { preferences.migrateSensitiveIfNeeded() } }
         AppNotificationManager.init(appContext)
-        val database = InkitaDatabase.getInstance(appContext)
-        val thumbsDir = File(appContext.filesDir, "thumbnails")
-        val cacheManager =
-            CacheManagerImpl(
-                preferences,
-                database.libraryV2Dao(),
-                database.seriesDetailV2Dao(),
-                thumbsDir,
-                appContext.getDatabasePath("inkita.db"),
-            )
-        val libraryRepository: LibraryRepository = LibraryRepositoryImpl(appContext, preferences)
-        val seriesRepository: SeriesRepository = SeriesRepositoryImpl(appContext, preferences, cacheManager)
-        val collectionsRepository: CollectionsRepository = CollectionsRepositoryImpl(appContext, preferences)
-        val readingListRepository: ReadingListRepository = ReadingListRepositoryImpl(appContext, preferences)
-        val personRepository: PersonRepository = PersonRepositoryImpl(appContext, preferences)
-        val authRepository: AuthRepository = AuthRepositoryImpl(preferences)
         val networkMonitor = NetworkMonitor.getInstance(appContext, preferences)
         val isDebuggable = (appContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         LoggingManager.setErrorsEnabled(true)
@@ -113,28 +101,21 @@ object StartupManager {
             .onEach { enabled ->
                 LoggingManager.setEnabled(enabled || (isDebuggable && Debug.isDebuggerConnected()))
             }.launchIn(logScope)
-        networkMonitor.status
-            .onEach { status ->
+        combine(networkMonitor.status, preferences.activeSessionFlow, ::Pair)
+            .onEach { (status, session) ->
                 if (LoggingManager.isDebugEnabled()) {
                     LoggingManager.d(
                         "NetworkMonitor",
                         "online=${status.isOnline} allowed=${status.isOnlineAllowed} type=${status.connectionType} metered=${status.isMetered} roaming=${status.isRoaming} offlineMode=${status.offlineMode}",
                     )
                 }
-                if (status.isOnlineAllowed) {
-                    ProgressSyncWorker.enqueue(appContext)
+                if (status.isOnlineAllowed && session.config.isConfigured) {
+                    ProgressSyncWorker.enqueue(appContext, session.profile)
+                    if (InkitaDatabase.getInstance(appContext, session.profile).downloadV2Dao().hasUnfinishedJobs()) {
+                        DownloadManagerV2.enqueueWorker(AppPreferences(appContext, session))
+                    }
                 }
             }.launchIn(logScope)
-        val readerRepository: ReaderRepository =
-            ReaderRepositoryImpl(
-                appContext,
-                preferences,
-                database.readerDao(),
-                database.downloadV2Dao(),
-            )
-
-        // Kick off sync of offline reader progress; worker will only run when online.
-        ProgressSyncWorker.enqueue(appContext)
         // Check for app updates and post a notification if available (best-effort).
         appScope.launch {
             val hasPermission =
@@ -170,26 +151,44 @@ object StartupManager {
             }
         }
 
-        val components =
-            Components(
-                preferences = preferences,
-                cacheManager = cacheManager,
-                libraryRepository = libraryRepository,
-                seriesRepository = seriesRepository,
-                collectionsRepository = collectionsRepository,
-                readingListRepository = readingListRepository,
-                personRepository = personRepository,
-                authRepository = authRepository,
-                readerRepository = readerRepository,
+        cachedPreferences = preferences
+        return preferences
+    }
+
+    fun components(preferences: AppPreferences): Components {
+        val context = preferences.appContext
+        val profile = preferences.profile
+        val database = InkitaDatabase.getInstance(context, profile)
+        val cacheManager =
+            CacheManagerImpl(
+                preferences,
+                database.libraryV2Dao(),
+                database.seriesDetailV2Dao(),
+                File(context.filesDir, profile.thumbnailFolder),
+                context.getDatabasePath(profile.databaseName),
             )
-        cached = components
-        return components
+        return Components(
+            preferences = preferences,
+            cacheManager = cacheManager,
+            libraryRepository = LibraryRepositoryImpl(context, preferences),
+            seriesRepository = SeriesRepositoryImpl(context, preferences, cacheManager),
+            collectionsRepository = CollectionsRepositoryImpl(context, preferences),
+            readingListRepository = ReadingListRepositoryImpl(context, preferences),
+            personRepository = PersonRepositoryImpl(context, preferences),
+            authRepository = AuthRepositoryImpl(preferences),
+            readerRepository = InkitaServices.get(context, preferences).readerRepository,
+        )
     }
 
     /**
      * Hook for foreground transitions to reschedule important one-off jobs.
      */
     fun onResume(context: Context) {
-        ProgressSyncWorker.enqueue(context.applicationContext)
+        val appContext = context.applicationContext
+        val preferences = init(appContext)
+        appScope.launch {
+            val session = preferences.activeSessionFlow.first()
+            if (session.config.isConfigured) ProgressSyncWorker.enqueue(appContext, session.profile)
+        }
     }
 }

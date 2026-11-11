@@ -5,4 +5,5 @@ data class ReaderLoadResult(
     val fromOffline: Boolean = false,
     val pdfPath: String? = null,
     val imageUrl: String? = null,
+    val offlineAssetPaths: Set<String> = emptySet(),
 )

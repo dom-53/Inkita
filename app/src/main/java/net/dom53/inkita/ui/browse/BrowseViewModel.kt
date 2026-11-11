@@ -82,7 +82,7 @@ class BrowseViewModel(
     private var lastOfflineError = false
     private val pagingInFlight = AtomicBoolean(false)
     private val downloadDao =
-        InkitaDatabase.getInstance(appPreferences.appContext).downloadV2Dao()
+        InkitaDatabase.getInstance(appPreferences.appContext, appPreferences.profile).downloadV2Dao()
     private var lastDownloadedItems: List<DownloadedItemV2Entity> = emptyList()
 
     init {

@@ -4,6 +4,22 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Fixed
+
+- Fix a database migration that could prevent Inkita from opening after an upgrade from older versions such as v0.2.0-beta.2.
+- Preserve newer local reading progress when an older synchronization finishes.
+- Restart the download queue when resuming or retrying a job. Recover interrupted downloads and keep pause or cancel actions in effect when an in-flight request finishes.
+- Remove files from unfinished downloads when an in-flight job is paused or canceled.
+- Keep cached library data, downloads, and pending reading progress separate for each Kavita server and account.
+- Keep cached collections and collection prefetch settings separate for each Kavita profile.
+- Require an explicitly entered API key when changing the Kavita server address.
+- Retry reading progress uploads after temporary errors. Keep rejected entries locally so other chapters can sync.
+- Preserve downloaded files and database paths if changing the download location fails. Keep pre-existing files in the destination folder.
+- Delete the file when removing a downloaded item, while preserving files still referenced by another item.
+- Use a shared update check at startup and in About settings. Compare numbered prereleases correctly, including beta.9 and beta.10.
+- Restrict EPUB WebView access to book resources and block scripts embedded in books. Previously downloaded books can still be read offline.
+- Restore EPUB links to footnotes and other anchors on the current page.
+
 ## v0.3.2-beta.1
 
 If you're updating from v0.3.2-beta or older, use your browser to download the APK from [GitHub Releases](https://github.com/dom-53/Inkita/releases). Then open the downloaded file to install it.

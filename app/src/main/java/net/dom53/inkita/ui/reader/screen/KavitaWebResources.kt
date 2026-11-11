@@ -1,61 +1,55 @@
 package net.dom53.inkita.ui.reader.screen
 
-import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import net.dom53.inkita.core.network.forKavita
 import net.dom53.inkita.core.network.isSameOrigin
 import net.dom53.inkita.core.storage.AppConfig
-import okhttp3.Headers.Companion.toHeaders
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
 import java.io.IOException
 import java.security.GeneralSecurityException
 
-/** WebView keeps its normal trust policy. Fetch only resources from the opted-in Kavita origin here. */
 internal class KavitaWebResources(
-    config: AppConfig,
+    private val config: AppConfig,
 ) {
     private val origin = config.serverUrl.toHttpUrl()
-    private val calls = OkHttpClient().forKavita(config)
+    private val calls = client.forKavita(config)
 
-    fun intercept(resource: WebResourceRequest): WebResourceResponse? {
-        val url = resource.url.toString().toHttpUrlOrNull() ?: return null
-        if (resource.isForMainFrame || resource.method != "GET" || !origin.isSameOrigin(url)) return null
-
-        val request =
-            Request
-                .Builder()
-                .url(url)
-                .headers(resource.requestHeaders.toHeaders())
-                .build()
+    fun fetch(url: HttpUrl): WebResourceResponse? {
+        if (!origin.isSameOrigin(url)) return null
+        val clean = url.withoutApiKey()
+        val request = Request.Builder().url(clean)
+        if (clean.pathSegments.lastOrNull() == "book-resources") {
+            // Keep compatibility with Kavita versions that read the key from the query.
+            request
+                .url(clean.newBuilder().addQueryParameter("apiKey", config.apiKey).build())
+                .header("x-api-key", config.apiKey)
+        }
         return try {
-            calls.newCall(request).execute().asWebResource()
+            val response = calls.newCall(request.build()).execute()
+            val body = response.body
+            if (!response.isSuccessful || body == null) {
+                response.close()
+                null
+            } else {
+                val type = body.contentType()
+                WebResourceResponse(type?.let { "${it.type}/${it.subtype}" }, type?.charset()?.name(), body.byteStream())
+            }
         } catch (_: IOException) {
-            failure()
+            null
         } catch (_: GeneralSecurityException) {
-            failure()
+            null
         }
     }
 
-    private fun Response.asWebResource(): WebResourceResponse {
-        val content = body
-        if (code in 300..399 || content == null) {
-            content?.close()
-            return failure()
-        }
-        val type = content.contentType()
-        return WebResourceResponse(
-            type?.let { "${it.type}/${it.subtype}" },
-            type?.charset()?.name(),
-            code,
-            message.ifBlank { "HTTP $code" },
-            headers.toMultimap().mapValues { (_, values) -> values.joinToString(", ") },
-            content.byteStream(),
-        )
+    private companion object {
+        val client =
+            OkHttpClient
+                .Builder()
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .build()
     }
-
-    private fun failure() = WebResourceResponse("text/plain", "UTF-8", 502, "Bad Gateway", emptyMap(), null)
 }

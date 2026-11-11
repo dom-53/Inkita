@@ -26,9 +26,36 @@ class SecureStorage(
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
 
-    fun getApiKey(): String = safeGet(KEY_API_KEY)
+    fun getApiKey(reference: String?): String = safeGet(keyFor(KEY_API_KEY, reference))
 
-    fun getImageApiKey(): String = safeGet(KEY_IMAGE_API_KEY)
+    fun getImageApiKey(reference: String?): String = safeGet(keyFor(KEY_IMAGE_API_KEY, reference))
+
+    fun saveKavitaKeys(
+        reference: String,
+        apiKey: String,
+        imageApiKey: String,
+    ) {
+        check(
+            prefs
+                .edit()
+                .putString(keyFor(KEY_API_KEY, reference), apiKey)
+                .putString(keyFor(KEY_IMAGE_API_KEY, reference), imageApiKey)
+                .commit(),
+        ) { "Unable to save Kavita credentials" }
+    }
+
+    fun removeKavitaKeys(reference: String?) {
+        prefs
+            .edit()
+            .remove(keyFor(KEY_API_KEY, reference))
+            .remove(keyFor(KEY_IMAGE_API_KEY, reference))
+            .apply()
+    }
+
+    private fun keyFor(
+        key: String,
+        reference: String?,
+    ): String = if (reference == null) key else "$key:$reference"
 
     fun setApiKey(apiKey: String) {
         prefs
@@ -37,25 +64,11 @@ class SecureStorage(
             .apply()
     }
 
-    fun setImageApiKey(apiKey: String) {
-        prefs
-            .edit()
-            .putString(KEY_IMAGE_API_KEY, apiKey)
-            .apply()
-    }
-
     fun clearLegacyTokens() {
         prefs
             .edit()
             .remove(KEY_TOKEN)
             .remove(KEY_REFRESH_TOKEN)
-            .apply()
-    }
-
-    fun clear() {
-        prefs
-            .edit()
-            .clear()
             .apply()
     }
 

@@ -31,7 +31,7 @@ fun PdfReaderScreen(
     val context = LocalContext.current
     DisposableEffect(chapterId) {
         onDispose {
-            val tempFile = DownloadPaths.pdfTempFile(context, chapterId)
+            val tempFile = DownloadPaths.pdfTempFile(context, appPreferences.profile, chapterId)
             if (tempFile.exists()) {
                 tempFile.delete()
                 if (LoggingManager.isDebugEnabled()) {

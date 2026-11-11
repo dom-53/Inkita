@@ -83,13 +83,13 @@ fun SettingsAdvancedScreen(
     var ttlFieldFocused by remember { mutableStateOf(false) }
     var prefetchInProgress by remember { mutableStateOf(true) }
     var prefetchWant by remember { mutableStateOf(false) }
-    var prefetchCollections by remember { mutableStateOf(false) }
+    var prefetchCollections by remember(appPreferences.profile) { mutableStateOf(false) }
     var prefetchDetails by remember { mutableStateOf(false) }
     var prefetchAllowMetered by remember { mutableStateOf(false) }
     var prefetchAllowLowBattery by remember { mutableStateOf(false) }
-    var prefetchCollectionsAll by remember { mutableStateOf(true) }
-    var selectedCollectionIds by remember { mutableStateOf(setOf<Int>()) }
-    var collectionOptions by remember { mutableStateOf<List<Collection>>(emptyList()) }
+    var prefetchCollectionsAll by remember(appPreferences.profile) { mutableStateOf(true) }
+    var selectedCollectionIds by remember(appPreferences.profile) { mutableStateOf(setOf<Int>()) }
+    var collectionOptions by remember(appPreferences.profile) { mutableStateOf<List<Collection>>(emptyList()) }
     var clearTarget by remember { mutableStateOf(ClearTarget.All) }
     var showClearDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -101,8 +101,8 @@ fun SettingsAdvancedScreen(
     var browsePageSize by remember { mutableStateOf(25) }
     var maxThumbnailsParallel by remember { mutableStateOf(4) }
     var disableBrowseThumbnails by remember { mutableStateOf(false) }
-    val collectionsRepo = remember { CollectionsRepositoryImpl(context, appPreferences) }
-    val downloadV2Dao = remember { InkitaDatabase.getInstance(context).downloadV2Dao() }
+    val collectionsRepo = remember(context, appPreferences) { CollectionsRepositoryImpl(context, appPreferences) }
+    val downloadV2Dao = remember(appPreferences.profile) { InkitaDatabase.getInstance(context, appPreferences.profile).downloadV2Dao() }
 
     LaunchedEffect(Unit) {
         cacheSizeBytes = cacheManager.getCacheSizeBytes()
@@ -163,7 +163,7 @@ fun SettingsAdvancedScreen(
     LaunchedEffect(Unit) {
         appPreferences.prefetchWantFlow.collectLatest { prefetchWant = it }
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(appPreferences) {
         appPreferences.prefetchCollectionsFlow.collectLatest { prefetchCollections = it }
     }
     LaunchedEffect(Unit) {
@@ -175,10 +175,10 @@ fun SettingsAdvancedScreen(
     LaunchedEffect(Unit) {
         appPreferences.prefetchAllowLowBatteryFlow.collectLatest { prefetchAllowLowBattery = it }
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(appPreferences) {
         appPreferences.prefetchCollectionsAllFlow.collectLatest { prefetchCollectionsAll = it }
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(appPreferences) {
         appPreferences.prefetchCollectionIdsFlow.collectLatest { ids -> selectedCollectionIds = ids.toSet() }
     }
     LaunchedEffect(Unit) {
@@ -193,17 +193,13 @@ fun SettingsAdvancedScreen(
     LaunchedEffect(Unit) {
         appPreferences.disableBrowseThumbnailsFlow.collectLatest { disableBrowseThumbnails = it }
     }
-    LaunchedEffect(Unit) {
-        val cached = runCatching { appPreferences.loadCachedCollections() }.getOrDefault(emptyList())
-        if (cached.isNotEmpty()) {
-            collectionOptions = cached
-        }
+    LaunchedEffect(collectionsRepo) {
+        collectionOptions = runCatching { appPreferences.loadCachedCollections() }.getOrDefault(emptyList())
+        if (appPreferences.offlineModeFlow.first()) return@LaunchedEffect
         runCatching { collectionsRepo.getCollections() }
             .onSuccess { fresh ->
-                if (fresh.isNotEmpty()) {
-                    collectionOptions = fresh
-                    appPreferences.saveCollectionsCache(fresh)
-                }
+                collectionOptions = fresh
+                appPreferences.saveCollectionsCache(fresh)
             }
     }
 

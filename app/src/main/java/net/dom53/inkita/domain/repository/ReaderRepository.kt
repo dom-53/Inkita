@@ -74,7 +74,8 @@ interface ReaderRepository {
         volumeIds: List<Int>,
     )
 
-    suspend fun syncLocalProgress()
+    /** Returns true when this sync attempt can finish without a retry. */
+    suspend fun syncLocalProgress(): Boolean
 
     suspend fun getLatestLocalProgress(seriesId: Int): ReaderProgress?
 

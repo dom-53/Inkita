@@ -77,11 +77,7 @@ fun HistoryScreen(appPreferences: AppPreferences) {
                 config.userId
             } else {
                 val acc = runCatching { api.getAccount() }.getOrNull()
-                val accId = acc?.body()?.id ?: 0
-                if (accId > 0) {
-                    appPreferences.updateUserId(accId)
-                }
-                accId
+                acc?.body()?.id ?: 0
             }
         runCatching { api.getReadingHistory(userId = userIdToUse) }
             .onSuccess { resp ->

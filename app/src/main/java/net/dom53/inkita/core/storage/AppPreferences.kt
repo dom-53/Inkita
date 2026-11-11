@@ -10,11 +10,19 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import net.dom53.inkita.core.prefetch.PrefetchPolicy
 import net.dom53.inkita.domain.model.Collection
+import java.util.UUID
 
 private val Context.dataStore by preferencesDataStore(name = "inkita_prefs")
 
@@ -56,12 +64,17 @@ data class ReaderPrefs(
 @Suppress("TooManyFunctions")
 class AppPreferences(
     private val context: Context,
+    private val session: KavitaSession? = null,
 ) {
     val appContext: Context
         get() = context.applicationContext
-    private val secureStorage = SecureStorage(appContext)
+    private val secureStorage by lazy { SecureStorage(appContext) }
+    val profile: KavitaProfile = session?.profile ?: KavitaProfile.Guest
 
     companion object {
+        private val authMutex = Mutex()
+        private val KEY_CREDENTIALS_REF = stringPreferencesKey("kavita_credentials_ref")
+        private val KEY_LEGACY_PROFILE = stringPreferencesKey("legacy_kavita_profile")
         private val KEY_SERVER_URL = stringPreferencesKey("server_url")
         private val KEY_KAVITA_CA = stringPreferencesKey("kavita_ca")
         private val KEY_API_KEY = stringPreferencesKey("api_key")
@@ -131,24 +144,46 @@ class AppPreferences(
         private const val DEFAULT_MAX_RETRY_ATTEMPT = 3
     }
 
-    val configFlow: Flow<AppConfig> =
-        context.dataStore.data.map { prefs ->
-            AppConfig(
-                serverUrl = prefs[KEY_SERVER_URL] ?: "",
-                apiKey =
-                    secureStorage.getApiKey().ifBlank {
-                        prefs[KEY_API_KEY] ?: ""
-                    },
-                imageApiKey =
-                    secureStorage.getImageApiKey().ifBlank {
-                        secureStorage.getApiKey().ifBlank {
-                            prefs[KEY_API_KEY] ?: ""
-                        }
-                    },
-                userId = prefs[KEY_USER_ID]?.toIntOrNull() ?: 0,
-                caCertificate = prefs[KEY_KAVITA_CA],
-            )
-        }
+    private val cachedCollectionsKey = collectionProfileKey(KEY_CACHED_COLLECTIONS, ::stringPreferencesKey)
+    private val prefetchCollectionsKey = collectionProfileKey(KEY_PREFETCH_COLLECTIONS, ::booleanPreferencesKey)
+    private val prefetchCollectionsAllKey = collectionProfileKey(KEY_PREFETCH_COLLECTIONS_ALL, ::booleanPreferencesKey)
+    private val prefetchCollectionIdsKey = collectionProfileKey(KEY_PREFETCH_COLLECTION_IDS, ::stringPreferencesKey)
+
+    private fun <T> collectionProfileKey(
+        legacyKey: Preferences.Key<T>,
+        createKey: (String) -> Preferences.Key<T>,
+    ): Preferences.Key<T> = if (profile == KavitaProfile.Legacy) legacyKey else createKey("${legacyKey.name}_${profile.id}")
+
+    val activeSessionFlow: Flow<KavitaSession> =
+        context.dataStore.data
+            .map { authMutex.withLock { readSession(context.dataStore.data.first()) } }
+            .distinctUntilChanged()
+
+    val configFlow: Flow<AppConfig> = session?.let { flowOf(it.config) } ?: activeSessionFlow.map { it.config }
+
+    suspend fun isActiveSession(): Boolean = session == null || activeSessionFlow.first() == session
+
+    private fun readConfig(prefs: Preferences): AppConfig {
+        val reference = prefs[KEY_CREDENTIALS_REF]
+        val legacyKey = if (reference == null) prefs[KEY_API_KEY].orEmpty() else ""
+        val apiKey = secureStorage.getApiKey(reference).ifBlank { legacyKey }
+        return AppConfig(
+            serverUrl = prefs[KEY_SERVER_URL].orEmpty(),
+            apiKey = apiKey,
+            imageApiKey = secureStorage.getImageApiKey(reference).ifBlank { apiKey },
+            userId = prefs[KEY_USER_ID]?.toIntOrNull() ?: 0,
+            caCertificate = prefs[KEY_KAVITA_CA],
+        )
+    }
+
+    private fun readSession(prefs: Preferences): KavitaSession {
+        val config = readConfig(prefs)
+        if (!config.isConfigured) return KavitaSession(config, KavitaProfile.Guest)
+        val id = config.profileId()
+        val owner = prefs[KEY_LEGACY_PROFILE]
+        val usesLegacyStorage = owner == id || (owner == null && prefs[KEY_CREDENTIALS_REF] == null)
+        return KavitaSession(config, if (usesLegacyStorage) KavitaProfile.Legacy else KavitaProfile(id))
+    }
 
     val readerPrefsFlow: Flow<ReaderPrefs> =
         context.dataStore.data.map { prefs ->
@@ -229,7 +264,7 @@ class AppPreferences(
     val prefetchWantFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_WANT] ?: false }
     val prefetchCollectionsFlow: Flow<Boolean> =
-        context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_COLLECTIONS] ?: false }
+        context.dataStore.data.map { prefs -> prefs[prefetchCollectionsKey] ?: false }
     val prefetchDetailsFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_DETAILS] ?: false }
     val prefetchAllowMeteredFlow: Flow<Boolean> =
@@ -242,8 +277,11 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_ALLOW_LOW_BATTERY] ?: false }
     val downloadMaxConcurrentFlow: Flow<Int> =
         context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_MAX_CONCURRENT] ?: 2 }
+    private val downloadLocationKey =
+        if (profile == KavitaProfile.Legacy) KEY_DOWNLOAD_LOCATION_URI else stringPreferencesKey("download_location_${profile.id}")
+
     val downloadLocationUriFlow: Flow<String?> =
-        context.dataStore.data.map { prefs -> prefs[KEY_DOWNLOAD_LOCATION_URI]?.takeIf { it.isNotBlank() } }
+        context.dataStore.data.map { prefs -> prefs[downloadLocationKey]?.takeIf { it.isNotBlank() } }
     val preferOfflinePagesFlow: Flow<Boolean> =
         context.dataStore.data.map { prefs -> prefs[KEY_PREFER_OFFLINE_PAGES] ?: true }
     val importantInfoVersionFlow: Flow<Int> =
@@ -268,11 +306,11 @@ class AppPreferences(
         context.dataStore.data.map { prefs -> prefs[KEY_SHOW_DOWNLOAD_BADGES] ?: true }
 
     val prefetchCollectionsAllFlow: Flow<Boolean> =
-        context.dataStore.data.map { prefs -> prefs[KEY_PREFETCH_COLLECTIONS_ALL] ?: true }
+        context.dataStore.data.map { prefs -> prefs[prefetchCollectionsAllKey] ?: true }
 
     val prefetchCollectionIdsFlow: Flow<List<Int>> =
         context.dataStore.data.map { prefs ->
-            prefs[KEY_PREFETCH_COLLECTION_IDS]
+            prefs[prefetchCollectionIdsKey]
                 ?.split(',')
                 ?.mapNotNull { it.toIntOrNull() }
                 ?.filter { it > 0 }
@@ -291,28 +329,53 @@ class AppPreferences(
             collectionIds = prefetchCollectionIdsFlow.first(),
         )
 
-    suspend fun updateKavitaConfig(config: AppConfig) {
-        context.dataStore.edit { prefs ->
-            prefs[KEY_SERVER_URL] = config.serverUrl
-            prefs.remove(KEY_API_KEY)
-            prefs[KEY_USER_ID] = config.userId.toString()
-            val certificate = config.caCertificate
-            if (certificate == null) prefs.remove(KEY_KAVITA_CA) else prefs[KEY_KAVITA_CA] = certificate
-        }
-        secureStorage.setApiKey(config.apiKey)
-        secureStorage.setImageApiKey(config.imageApiKey)
-    }
+    suspend fun updateKavitaConfig(config: AppConfig) = changeKavitaConfig { config }
 
-    suspend fun clearAuth(clearServer: Boolean = false) {
-        context.dataStore.edit { prefs ->
-            if (clearServer) {
-                prefs[KEY_SERVER_URL] = ""
-                prefs.remove(KEY_KAVITA_CA)
-            }
-            prefs.remove(KEY_API_KEY)
-            prefs[KEY_USER_ID] = "0"
+    suspend fun clearAuth(clearServer: Boolean = false) =
+        changeKavitaConfig { current ->
+            current.copy(
+                serverUrl = if (clearServer) "" else current.serverUrl,
+                apiKey = "",
+                imageApiKey = "",
+                userId = 0,
+                caCertificate = if (clearServer) null else current.caCertificate,
+            )
         }
-        secureStorage.clear()
+
+    private suspend fun changeKavitaConfig(change: (AppConfig) -> AppConfig) {
+        withContext(Dispatchers.IO) {
+            authMutex.withLock {
+                // Publish the matching credential reference and server in a single DataStore edit.
+                withContext(NonCancellable) {
+                    val prefs = context.dataStore.data.first()
+                    val previousRef = prefs[KEY_CREDENTIALS_REF]
+                    val previous = readConfig(prefs)
+                    val config = change(previous)
+                    val legacyOwner =
+                        prefs[KEY_LEGACY_PROFILE]
+                            ?: previous.takeIf { previousRef == null && it.isConfigured }?.profileId()
+                    val verifiedLegacyOwner =
+                        if (config.isConfigured && legacyOwner == config.profileId(useAccountId = false)) config.profileId() else legacyOwner
+                    val reference = UUID.randomUUID().toString()
+                    secureStorage.saveKavitaKeys(reference, config.apiKey, config.imageApiKey)
+                    try {
+                        context.dataStore.edit { next ->
+                            next[KEY_CREDENTIALS_REF] = reference
+                            next[KEY_SERVER_URL] = config.serverUrl
+                            next[KEY_USER_ID] = config.userId.toString()
+                            next.remove(KEY_API_KEY)
+                            if (verifiedLegacyOwner != null) next[KEY_LEGACY_PROFILE] = verifiedLegacyOwner
+                            val certificate = config.caCertificate
+                            if (certificate == null) next.remove(KEY_KAVITA_CA) else next[KEY_KAVITA_CA] = certificate
+                        }
+                    } catch (e: Exception) {
+                        secureStorage.removeKavitaKeys(reference)
+                        throw e
+                    }
+                    secureStorage.removeKavitaKeys(previousRef)
+                }
+            }
+        }
     }
 
     /**
@@ -326,7 +389,7 @@ class AppPreferences(
         val hasLegacyRefresh = prefs[LEGACY_KEY_REFRESH_TOKEN] != null
         val hasLegacyApi = prefs[KEY_API_KEY] != null
 
-        val secureApiKey = secureStorage.getApiKey()
+        val secureApiKey = secureStorage.getApiKey(null)
 
         if (secureApiKey.isBlank() && legacyApiKey.isNotBlank()) {
             secureStorage.setApiKey(legacyApiKey)
@@ -337,12 +400,6 @@ class AppPreferences(
                 ds.remove(LEGACY_KEY_REFRESH_TOKEN)
                 ds.remove(KEY_API_KEY)
             }
-        }
-    }
-
-    suspend fun updateUserId(userId: Int) {
-        context.dataStore.edit { prefs ->
-            prefs[KEY_USER_ID] = userId.toString()
         }
     }
 
@@ -506,7 +563,7 @@ class AppPreferences(
                 collections.joinToString("||") { c ->
                     "${c.id}|${c.name.replace("|", " ")}"
                 }
-            prefs[KEY_CACHED_COLLECTIONS] = encoded
+            prefs[cachedCollectionsKey] = encoded
         }
     }
 
@@ -524,7 +581,7 @@ class AppPreferences(
 
     suspend fun setPrefetchCollections(enabled: Boolean) {
         context.dataStore.edit { prefs ->
-            prefs[KEY_PREFETCH_COLLECTIONS] = enabled
+            prefs[prefetchCollectionsKey] = enabled
         }
     }
 
@@ -567,9 +624,9 @@ class AppPreferences(
     suspend fun setDownloadLocationUri(uri: String?) {
         context.dataStore.edit { prefs ->
             if (uri.isNullOrBlank()) {
-                prefs.remove(KEY_DOWNLOAD_LOCATION_URI)
+                prefs.remove(downloadLocationKey)
             } else {
-                prefs[KEY_DOWNLOAD_LOCATION_URI] = uri
+                prefs[downloadLocationKey] = uri
             }
         }
     }
@@ -600,13 +657,13 @@ class AppPreferences(
 
     suspend fun setPrefetchCollectionsAll(enabled: Boolean) {
         context.dataStore.edit { prefs ->
-            prefs[KEY_PREFETCH_COLLECTIONS_ALL] = enabled
+            prefs[prefetchCollectionsAllKey] = enabled
         }
     }
 
     suspend fun setPrefetchCollectionIds(ids: List<Int>) {
         context.dataStore.edit { prefs ->
-            prefs[KEY_PREFETCH_COLLECTION_IDS] = ids.joinToString(",")
+            prefs[prefetchCollectionIdsKey] = ids.joinToString(",")
         }
     }
 
@@ -654,7 +711,7 @@ class AppPreferences(
 
     suspend fun loadCachedCollections(): List<Collection> {
         val prefs = context.dataStore.data.first()
-        val encoded = prefs[KEY_CACHED_COLLECTIONS] ?: return emptyList()
+        val encoded = prefs[cachedCollectionsKey] ?: return emptyList()
         return encoded
             .split("||")
             .filter { it.isNotBlank() }

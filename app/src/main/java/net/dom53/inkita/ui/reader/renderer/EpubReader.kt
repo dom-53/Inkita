@@ -50,9 +50,9 @@ object EpubReader : BaseReader {
                     else -> "left"
                 },
             themeMode = params.themeMode,
-            serverUrl = params.serverUrl,
-            apiKey = params.apiKey,
             config = params.config,
+            fromOffline = params.uiState.fromOffline,
+            offlineAssetPaths = params.uiState.offlineAssetPaths,
             onToggleOverlay = callbacks.onToggleOverlay,
             pendingScrollY = params.pendingScrollY,
             onConsumePendingScroll = callbacks.onConsumePendingScroll,

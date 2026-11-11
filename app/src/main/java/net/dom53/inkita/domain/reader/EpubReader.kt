@@ -25,6 +25,7 @@ class EpubReader(
         return ReaderLoadResult(
             content = result.html,
             fromOffline = result.fromOffline,
+            offlineAssetPaths = result.offlineAssetPaths,
         )
     }
 

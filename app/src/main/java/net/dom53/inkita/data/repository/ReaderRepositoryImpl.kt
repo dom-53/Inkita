@@ -1,12 +1,14 @@
 package net.dom53.inkita.data.repository
 
 import android.content.Context
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import net.dom53.inkita.core.downloadv2.DownloadPaths
 import net.dom53.inkita.core.downloadv2.DownloadStorageManager
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.network.NetworkMonitor
 import net.dom53.inkita.core.storage.AppPreferences
+import net.dom53.inkita.core.storage.KavitaProfile
 import net.dom53.inkita.core.sync.ProgressSyncWorker
 import net.dom53.inkita.data.api.KavitaApi
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
@@ -27,8 +29,17 @@ import net.dom53.inkita.domain.model.ReaderTimeLeft
 import net.dom53.inkita.domain.repository.ReaderRepository
 import java.io.File
 import java.io.IOException
+import java.net.HttpURLConnection
 import java.util.Locale
 import java.util.zip.ZipFile
+
+private const val HTTP_TOO_MANY_REQUESTS = 429
+
+private enum class ProgressUploadResult {
+    Sent,
+    RetryableFailure,
+    Rejected,
+}
 
 class ReaderRepositoryImpl(
     private val context: Context,
@@ -49,22 +60,29 @@ class ReaderRepositoryImpl(
     ): ReaderPageResult {
         val preferOffline = appPreferences.preferOfflinePagesFlow.first()
         val downloadedV2 = downloadV2Dao?.getDownloadedPageForChapter(chapterId, page)
-        val downloadedHtmlV2 =
-            downloadedV2?.localPath?.let { path ->
-                if (isPathPresent(path)) {
-                    readDownloadedHtml(path)
-                } else {
-                    null
-                }
-            }
-        val cached = readerDao.getPage(chapterId, page)?.html
-        val offlineHtml = downloadedHtmlV2
 
-        if (!isOnlineAllowed() && offlineHtml == null) {
-            throw PageNotDownloadedException("Page not downloaded for offline reading")
+        suspend fun downloadedPage(): ReaderPageResult? {
+            val item = downloadedV2 ?: return null
+            val path = item.localPath ?: return null
+            val html = readDownloadedHtml(path) ?: return null
+            val assets =
+                try {
+                    downloadStorageManager.epubAssetPaths(item, path)
+                } catch (_: IOException) {
+                    emptySet()
+                } catch (_: SecurityException) {
+                    emptySet()
+                }
+            return ReaderPageResult(html, true, assets)
         }
 
-        if (preferOffline && offlineHtml != null) return ReaderPageResult(offlineHtml, true)
+        val cached = readerDao.getPage(chapterId, page)?.html
+
+        if (!isOnlineAllowed()) {
+            return downloadedPage() ?: throw PageNotDownloadedException("Page not downloaded for offline reading")
+        }
+
+        if (preferOffline) downloadedPage()?.let { return it }
 
         val apiHtml =
             try {
@@ -84,21 +102,19 @@ class ReaderRepositoryImpl(
                 )
                 body
             } catch (io: IOException) {
-                if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
+                if (!preferOffline) downloadedPage()?.let { return it }
                 if (cached != null) return ReaderPageResult(cached, false)
                 if (!isOnlineAllowed()) throw PageNotDownloadedException("Page not downloaded for offline reading")
                 throw io
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
-                if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
+                if (!preferOffline) downloadedPage()?.let { return it }
                 if (cached != null) return ReaderPageResult(cached, false)
                 throw e
             }
 
-        if (apiHtml != null) return ReaderPageResult(apiHtml, false)
-        if (offlineHtml != null) return ReaderPageResult(offlineHtml, true)
-        if (cached != null) return ReaderPageResult(cached, false)
-
-        throw PageNotDownloadedException("Page not downloaded for offline reading")
+        return ReaderPageResult(apiHtml, false)
     }
 
     override suspend fun getImageResult(
@@ -212,19 +228,15 @@ class ReaderRepositoryImpl(
 
         if (!isOnlineAllowed()) {
             readerDao.upsertLocalProgress(progressWithTs.toEntity())
-            ProgressSyncWorker.enqueue(context)
+            ProgressSyncWorker.enqueue(context, appPreferences.profile)
             return
         }
 
-        runCatching {
-            val api = apiOrThrow()
-            api.setReaderProgress(progressWithTs.toDto())
-        }.onFailure {
-            // fallback to local cache if network fails
-            readerDao.upsertLocalProgress(progressWithTs.toEntity())
-            ProgressSyncWorker.enqueue(context)
-        }.onSuccess {
-            readerDao.upsertLocalProgress(progressWithTs.toEntity())
+        val result = sendProgress(progressWithTs)
+        readerDao.upsertLocalProgress(progressWithTs.toEntity())
+        if (result == ProgressUploadResult.RetryableFailure) {
+            // The current worker may already have read its batch.
+            ProgressSyncWorker.enqueue(context, appPreferences.profile, followUp = true)
         }
 
         maybeDeleteAfterCompletion(progressWithTs, totalPages)
@@ -239,7 +251,7 @@ class ReaderRepositoryImpl(
                 progress
             }
         readerDao.upsertLocalProgress(progressWithTs.toEntity())
-        ProgressSyncWorker.enqueue(context)
+        ProgressSyncWorker.enqueue(context, appPreferences.profile)
     }
 
     override suspend fun getTimeLeft(
@@ -265,21 +277,19 @@ class ReaderRepositoryImpl(
         val storedPdf =
             bookInfo
                 ?.seriesId
-                ?.let { DownloadPaths.pdfFile(context, it, bookInfo.volumeId, chapterId) }
+                ?.let { DownloadPaths.pdfFile(context, appPreferences.profile, it, bookInfo.volumeId, chapterId) }
         if (storedPdf?.exists() == true) {
             recordPdfDownloadIfMissing(chapterId, storedPdf)
             return storedPdf
         }
-        val legacyTarget =
-            File(
-                context.getExternalFilesDir("Inkita/downloads/pdfs"),
-                "pdf-$chapterId.pdf",
-            )
-        if (legacyTarget.exists()) {
-            recordPdfDownloadIfMissing(chapterId, legacyTarget)
-            return legacyTarget
+        if (appPreferences.profile == KavitaProfile.Legacy) {
+            val legacyTarget = context.getExternalFilesDir("Inkita/downloads/pdfs")?.resolve("pdf-$chapterId.pdf")
+            if (legacyTarget?.isFile == true) {
+                recordPdfDownloadIfMissing(chapterId, legacyTarget)
+                return legacyTarget
+            }
         }
-        val tempTarget = DownloadPaths.pdfTempFile(context, chapterId)
+        val tempTarget = DownloadPaths.pdfTempFile(context, appPreferences.profile, chapterId)
         if (tempTarget.exists()) {
             return tempTarget
         }
@@ -529,12 +539,14 @@ class ReaderRepositoryImpl(
         // no-op for delete-after; sliding window is handled via progress
     }
 
-    override suspend fun syncLocalProgress() {
-        if (!isOnlineAllowed()) return
-        val api = runCatching { apiOrThrow() }.getOrElse { return }
-        val locals = runCatching { readerDao.getAllLocalProgress() }.getOrDefault(emptyList())
-        if (locals.isEmpty()) return
+    override suspend fun syncLocalProgress(): Boolean {
+        if (!isOnlineAllowed()) return false
+        val locals = readerDao.getAllLocalProgress()
+        if (locals.isEmpty()) return true
+        val api = apiOrThrow()
+        var needsRetry = false
         locals.forEach { localEntity ->
+            if (!appPreferences.isActiveSession()) return true
             val local = localEntity.toDomain()
             val remote =
                 runCatching {
@@ -551,11 +563,17 @@ class ReaderRepositoryImpl(
                 remote != null &&
                     remote.page == local.page &&
                     (local.bookScrollId == null || remote.bookScrollId == local.bookScrollId)
-            val resp =
-                runCatching { api.setReaderProgress(latest.toDto()) }
-                    .getOrNull()
+            if (!appPreferences.isActiveSession()) return true
+            when (sendProgress(latest, api)) {
+                ProgressUploadResult.Sent -> Unit
+                ProgressUploadResult.RetryableFailure -> {
+                    needsRetry = true
+                    return@forEach
+                }
+                ProgressUploadResult.Rejected -> return@forEach
+            }
             val continuePointConfirmed =
-                if (resp?.isSuccessful == true && remoteAlreadyMatchesLocal && local.seriesId != null) {
+                if (remoteAlreadyMatchesLocal && local.seriesId != null) {
                     val continueResponse = runCatching { api.getContinuePoint(local.seriesId) }.getOrNull()
                     val continuePoint = continueResponse?.takeIf { it.isSuccessful }?.body()
                     val samePosition =
@@ -585,12 +603,13 @@ class ReaderRepositoryImpl(
                         "remoteMatches=$remoteAlreadyMatchesLocal continueConfirmed=$continuePointConfirmed",
                 )
             }
-            if (resp?.isSuccessful == true && continuePointConfirmed) {
-                readerDao.clearLocalProgress(local.chapterId)
+            if (continuePointConfirmed) {
+                readerDao.finishProgressSync(localEntity, replacement = null)
             } else {
-                readerDao.upsertLocalProgress(latest.toEntity())
+                readerDao.finishProgressSync(localEntity, replacement = latest.toEntity())
             }
         }
+        return !needsRetry
     }
 
     override suspend fun getLatestLocalProgress(seriesId: Int): ReaderProgress? {
@@ -611,6 +630,29 @@ class ReaderRepositoryImpl(
                 .maxByOrNull { it.lastModifiedUtc }
         return latest?.toDomain()
     }
+
+    private suspend fun sendProgress(
+        progress: ReaderProgress,
+        api: KavitaApi? = null,
+    ): ProgressUploadResult =
+        try {
+            val response = (api ?: apiOrThrow()).setReaderProgress(progress.toDto())
+            response.errorBody()?.close()
+            val status = response.code()
+            when {
+                response.isSuccessful -> ProgressUploadResult.Sent
+                status == HttpURLConnection.HTTP_CLIENT_TIMEOUT ||
+                    status == HTTP_TOO_MANY_REQUESTS ||
+                    status in 500..599 -> ProgressUploadResult.RetryableFailure
+                else -> ProgressUploadResult.Rejected
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: IOException) {
+            ProgressUploadResult.RetryableFailure
+        } catch (_: Exception) {
+            ProgressUploadResult.Rejected
+        }
 
     private suspend fun apiOrThrow(): KavitaApi {
         val config = appPreferences.configFlow.first()
@@ -639,6 +681,7 @@ class ReaderRepositoryImpl(
         val target =
             DownloadPaths.imagePageCacheFile(
                 context = context,
+                profile = appPreferences.profile,
                 chapterId = chapterId,
                 page = page,
                 extension = extension,

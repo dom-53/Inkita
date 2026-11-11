@@ -1,6 +1,7 @@
 package net.dom53.inkita.ui.seriesdetail
 
 import net.dom53.inkita.core.logging.LoggingManager
+import net.dom53.inkita.core.storage.KavitaProfile
 import net.dom53.inkita.data.api.dto.VolumeDto
 
 data class VolumeDetailPayload(
@@ -11,10 +12,13 @@ data class VolumeDetailPayload(
 )
 
 object VolumeDetailCache {
-    private val data = mutableMapOf<Int, VolumeDetailPayload>()
+    private val data = mutableMapOf<Pair<KavitaProfile, Int>, VolumeDetailPayload>()
 
-    fun put(payload: VolumeDetailPayload) {
-        data[payload.volume.id] = payload
+    fun put(
+        profile: KavitaProfile,
+        payload: VolumeDetailPayload,
+    ) {
+        data[profile to payload.volume.id] = payload
         if (LoggingManager.isDebugEnabled()) {
             LoggingManager.d(
                 "VolumeDetailCache",
@@ -23,8 +27,11 @@ object VolumeDetailCache {
         }
     }
 
-    fun get(volumeId: Int): VolumeDetailPayload? {
-        val payload = data[volumeId]
+    fun get(
+        profile: KavitaProfile,
+        volumeId: Int,
+    ): VolumeDetailPayload? {
+        val payload = data[profile to volumeId]
         if (LoggingManager.isDebugEnabled()) {
             LoggingManager.d(
                 "VolumeDetailCache",
@@ -32,12 +39,5 @@ object VolumeDetailCache {
             )
         }
         return payload
-    }
-
-    fun remove(volumeId: Int) {
-        data.remove(volumeId)
-        if (LoggingManager.isDebugEnabled()) {
-            LoggingManager.d("VolumeDetailCache", "Remove volume=$volumeId")
-        }
     }
 }
