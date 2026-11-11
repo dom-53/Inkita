@@ -52,7 +52,7 @@ class ReaderProgressRetryTest {
                         }
                     },
                     postStatus = { chapterId ->
-                        if (chapterId == SECOND_CHAPTER && failedChapterPosts.incrementAndGet() == 1) 503 else 204
+                        if (chapterId == SECOND_CHAPTER && failedChapterPosts.incrementAndGet() == 1) 429 else 204
                     },
                 )
             fixture.storeProgress(FIRST_CHAPTER)
@@ -109,6 +109,50 @@ class ReaderProgressRetryTest {
             }
             assertEquals(2, failedChapterPosts.get())
             assertNull(fixture.dao.getLocalProgress(FIRST_CHAPTER))
+        }
+
+    @Test
+    fun workerFinishesWhenAChapterIsPermanentlyRejected() =
+        withProfile { fixture ->
+            val rejectedPosts = AtomicInteger()
+            fixture.server.dispatcher =
+                ProgressDispatcher(postStatus = { chapterId ->
+                    if (chapterId == FIRST_CHAPTER) {
+                        rejectedPosts.incrementAndGet()
+                        404
+                    } else {
+                        204
+                    }
+                })
+            fixture.storeProgress(FIRST_CHAPTER)
+            fixture.storeProgress(SECOND_CHAPTER)
+            ProgressSyncWorker.enqueue(fixture.context, fixture.profile)
+
+            await {
+                val workers = fixture.workManager.getWorkInfosForUniqueWork(fixture.uniqueWork).get(5, TimeUnit.SECONDS)
+                workers.singleOrNull()?.state == WorkInfo.State.SUCCEEDED
+            }
+            assertEquals(1, rejectedPosts.get())
+            assertEquals(PAGE, fixture.dao.getLocalProgress(FIRST_CHAPTER)?.page)
+            assertNull(fixture.dao.getLocalProgress(SECOND_CHAPTER))
+        }
+
+    @Test
+    fun permanentlyRejectedSaveDoesNotQueueFollowUp() =
+        withProfile { fixture ->
+            val rejectedPosts = AtomicInteger()
+            fixture.server.dispatcher =
+                ProgressDispatcher(postStatus = {
+                    rejectedPosts.incrementAndGet()
+                    403
+                })
+
+            fixture.repository.setProgress(ReaderProgress(chapterId = FIRST_CHAPTER, page = PAGE, seriesId = FIRST_CHAPTER))
+
+            val workers = fixture.workManager.getWorkInfosForUniqueWork(fixture.uniqueWork).get(5, TimeUnit.SECONDS)
+            assertTrue(workers.isEmpty())
+            assertEquals(1, rejectedPosts.get())
+            assertEquals(PAGE, fixture.dao.getLocalProgress(FIRST_CHAPTER)?.page)
         }
 
     private fun withProfile(block: suspend (Fixture) -> Unit) =

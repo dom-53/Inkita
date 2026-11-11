@@ -29,8 +29,17 @@ import net.dom53.inkita.domain.model.ReaderTimeLeft
 import net.dom53.inkita.domain.repository.ReaderRepository
 import java.io.File
 import java.io.IOException
+import java.net.HttpURLConnection
 import java.util.Locale
 import java.util.zip.ZipFile
+
+private const val HTTP_TOO_MANY_REQUESTS = 429
+
+private enum class ProgressUploadResult {
+    Sent,
+    RetryableFailure,
+    Rejected,
+}
 
 class ReaderRepositoryImpl(
     private val context: Context,
@@ -223,9 +232,9 @@ class ReaderRepositoryImpl(
             return
         }
 
-        val sent = sendProgress(progressWithTs)
+        val result = sendProgress(progressWithTs)
         readerDao.upsertLocalProgress(progressWithTs.toEntity())
-        if (!sent) {
+        if (result == ProgressUploadResult.RetryableFailure) {
             // The current worker may already have read its batch.
             ProgressSyncWorker.enqueue(context, appPreferences.profile, followUp = true)
         }
@@ -535,7 +544,7 @@ class ReaderRepositoryImpl(
         val locals = readerDao.getAllLocalProgress()
         if (locals.isEmpty()) return true
         val api = apiOrThrow()
-        var allSent = true
+        var needsRetry = false
         locals.forEach { localEntity ->
             if (!appPreferences.isActiveSession()) return true
             val local = localEntity.toDomain()
@@ -555,9 +564,13 @@ class ReaderRepositoryImpl(
                     remote.page == local.page &&
                     (local.bookScrollId == null || remote.bookScrollId == local.bookScrollId)
             if (!appPreferences.isActiveSession()) return true
-            if (!sendProgress(latest, api)) {
-                allSent = false
-                return@forEach
+            when (sendProgress(latest, api)) {
+                ProgressUploadResult.Sent -> Unit
+                ProgressUploadResult.RetryableFailure -> {
+                    needsRetry = true
+                    return@forEach
+                }
+                ProgressUploadResult.Rejected -> return@forEach
             }
             val continuePointConfirmed =
                 if (remoteAlreadyMatchesLocal && local.seriesId != null) {
@@ -596,7 +609,7 @@ class ReaderRepositoryImpl(
                 readerDao.finishProgressSync(localEntity, replacement = latest.toEntity())
             }
         }
-        return allSent
+        return !needsRetry
     }
 
     override suspend fun getLatestLocalProgress(seriesId: Int): ReaderProgress? {
@@ -621,15 +634,24 @@ class ReaderRepositoryImpl(
     private suspend fun sendProgress(
         progress: ReaderProgress,
         api: KavitaApi? = null,
-    ): Boolean =
+    ): ProgressUploadResult =
         try {
             val response = (api ?: apiOrThrow()).setReaderProgress(progress.toDto())
             response.errorBody()?.close()
-            response.isSuccessful
+            val status = response.code()
+            when {
+                response.isSuccessful -> ProgressUploadResult.Sent
+                status == HttpURLConnection.HTTP_CLIENT_TIMEOUT ||
+                    status == HTTP_TOO_MANY_REQUESTS ||
+                    status in 500..599 -> ProgressUploadResult.RetryableFailure
+                else -> ProgressUploadResult.Rejected
+            }
         } catch (e: CancellationException) {
             throw e
+        } catch (_: IOException) {
+            ProgressUploadResult.RetryableFailure
         } catch (_: Exception) {
-            false
+            ProgressUploadResult.Rejected
         }
 
     private suspend fun apiOrThrow(): KavitaApi {

@@ -13,7 +13,7 @@ All notable changes to this project will be documented here.
 - Keep cached library data, downloads, and pending reading progress separate for each Kavita server and account.
 - Keep cached collections and collection prefetch settings separate for each Kavita profile.
 - Require an explicitly entered API key when changing the Kavita server address.
-- Retry reading progress uploads after HTTP errors and keep failed entries available for the next synchronization attempt.
+- Retry reading progress uploads after temporary errors. Keep rejected entries locally so other chapters can sync.
 - Preserve downloaded files and database paths if changing the download location fails. Keep pre-existing files in the destination folder.
 - Delete the file when removing a downloaded item, while preserving files still referenced by another item.
 - Use a shared update check at startup and in About settings. Compare numbered prereleases correctly, including beta.9 and beta.10.
