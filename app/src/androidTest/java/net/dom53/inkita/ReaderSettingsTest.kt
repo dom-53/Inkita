@@ -20,6 +20,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
@@ -27,6 +28,7 @@ import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import net.dom53.inkita.core.network.KavitaApiFactory
 import net.dom53.inkita.core.storage.AppConfig
 import net.dom53.inkita.core.storage.AppPreferences
@@ -41,6 +43,7 @@ import net.dom53.inkita.domain.model.ReaderImageResult
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.repository.ReaderRepository
 import net.dom53.inkita.ui.reader.screen.ReaderScreen
+import net.dom53.inkita.ui.settings.screens.SettingsReaderScreen
 import net.dom53.inkita.ui.theme.InkitaTheme
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -73,6 +76,36 @@ class ReaderSettingsTest {
 
     @Test
     fun opensSettingsForDownloadedPdf() = opensSettings(Format.Pdf, downloaded = true)
+
+    @Test
+    fun readerPreferencesCanScrollToTheThemeAndChangeTheFont() {
+        compose.activityRule.scenario.onActivity {
+            it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        }
+        compose.waitUntil(5000) { compose.activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
+        val context = compose.activity
+        val preferences = AppPreferences(context.applicationContext)
+        val original = runBlocking { preferences.readerPrefsFlow.first() }
+        try {
+            runBlocking { preferences.updateReaderPrefs { copy(fontFamily = "literata", useSerif = true) } }
+            compose.setContent {
+                InkitaTheme(darkTheme = false, dynamicColor = false) {
+                    SettingsReaderScreen(appPreferences = preferences, onBack = {})
+                }
+            }
+
+            compose.onNodeWithText(context.getString(R.string.reader_theme_header)).performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Literata").performScrollTo().performTouchInput { click() }
+            compose.onNodeWithText("Noto Sans").performScrollTo().performClick()
+
+            compose.onNodeWithText("Noto Sans").assertIsDisplayed()
+            runBlocking {
+                withTimeout(5000) { preferences.readerPrefsFlow.first { it.fontFamily == "noto_sans" && !it.useSerif } }
+            }
+        } finally {
+            runBlocking { preferences.updateReaderPrefs { copy(fontFamily = original.fontFamily, useSerif = original.useSerif) } }
+        }
+    }
 
     private fun opensSettings(
         format: Format,
