@@ -6,6 +6,7 @@ All notable changes to this project will be documented here.
 
 ### Fixed
 
+- Fix a crash on the series screen when the Kavita server cannot be reached (for example a home server on mobile data). One failed request among the many that load the screen could take the whole app down; it now shows the cached series and an error instead.
 - Fix a database migration that could prevent Inkita from opening after an upgrade from older versions such as v0.2.0-beta.2.
 - Preserve newer local reading progress when an older synchronization finishes.
 - Restart the download queue when resuming or retrying a job. Recover interrupted downloads and keep pause or cancel actions in effect when an in-flight request finishes.
