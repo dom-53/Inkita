@@ -36,6 +36,13 @@ data class ReaderRenderParams(
     val imageReaderMode: ImageReaderMode,
     val imagePrefetchPages: Int,
     val pdfRightToLeft: Boolean = false,
+    val epubPaged: Boolean = false,
+    val openAtEnd: Boolean = false,
+    val insetTopPx: Int = 0,
+    val insetBottomPx: Int = 0,
+    val enterDirection: Int = 0,
+    val hasPrevPage: Boolean = false,
+    val hasNextPage: Boolean = false,
 )
 
 data class ReaderRenderCallbacks(
@@ -49,4 +56,7 @@ data class ReaderRenderCallbacks(
     val onWebViewReady: (WebView) -> Unit,
     val onScrollIdle: (String?) -> Unit,
     val onPdfPageChanged: (Int, Int) -> Unit,
+    val onEpubPageChanged: (Int, Int) -> Unit = { _, _ -> },
+    val onConsumeOpenAtEnd: () -> Unit = {},
+    val onConsumeEnter: () -> Unit = {},
 )

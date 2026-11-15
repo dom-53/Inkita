@@ -5,6 +5,7 @@ import net.dom53.inkita.domain.model.ReaderBookInfo
 import net.dom53.inkita.domain.model.ReaderChapterNav
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.ReaderTimeLeft
+import net.dom53.inkita.domain.model.ReaderTocItem
 import net.dom53.inkita.domain.repository.ReaderRepository
 
 class EpubReader(
@@ -30,6 +31,8 @@ class EpubReader(
     }
 
     override suspend fun getBookInfo(chapterId: Int): ReaderBookInfo? = readerRepository.getBookInfo(chapterId)
+
+    override suspend fun getToc(chapterId: Int): List<ReaderTocItem> = readerRepository.getToc(chapterId)
 
     override suspend fun getProgress(chapterId: Int): ReaderProgress? = readerRepository.getProgress(chapterId)
 

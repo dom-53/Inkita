@@ -5,6 +5,7 @@ import net.dom53.inkita.domain.model.ReaderBookInfo
 import net.dom53.inkita.domain.model.ReaderChapterNav
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.ReaderTimeLeft
+import net.dom53.inkita.domain.model.ReaderTocItem
 
 interface BaseReader {
     val format: Format
@@ -20,6 +21,8 @@ interface BaseReader {
     ): ReaderLoadResult
 
     suspend fun getBookInfo(chapterId: Int): ReaderBookInfo?
+
+    suspend fun getToc(chapterId: Int): List<ReaderTocItem> = emptyList()
 
     suspend fun getProgress(chapterId: Int): ReaderProgress?
 

@@ -4,8 +4,14 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Added
+
+- Optional page-by-page EPUB reading (Reader settings, Navigation tab, or Settings > Reader). Each book page is split into screen-sized pages that you turn by tapping the left or right edge of the screen or swiping, like an e-reader. Off by default; scrolling is unchanged.
+- Table of contents button in the EPUB reader to jump to any chapter or section, including its position inside the page.
+
 ### Fixed
 
+- Open a new EPUB page at its start instead of reusing the previous page's scroll position.
 - Fix a database migration that could prevent Inkita from opening after an upgrade from older versions such as v0.2.0-beta.2.
 - Preserve newer local reading progress when an older synchronization finishes.
 - Restart the download queue when resuming or retrying a job. Recover interrupted downloads and keep pause or cancel actions in effect when an in-flight request finishes.
