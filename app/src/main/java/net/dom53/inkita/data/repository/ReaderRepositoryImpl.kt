@@ -11,6 +11,7 @@ import net.dom53.inkita.core.storage.AppPreferences
 import net.dom53.inkita.core.storage.KavitaProfile
 import net.dom53.inkita.core.sync.ProgressSyncWorker
 import net.dom53.inkita.data.api.KavitaApi
+import net.dom53.inkita.data.api.dto.BookChapterItemDto
 import net.dom53.inkita.data.local.db.dao.DownloadV2Dao
 import net.dom53.inkita.data.local.db.dao.ReaderDao
 import net.dom53.inkita.data.local.db.entity.CachedPageEntity
@@ -26,6 +27,7 @@ import net.dom53.inkita.domain.model.ReaderImageResult
 import net.dom53.inkita.domain.model.ReaderPageResult
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.ReaderTimeLeft
+import net.dom53.inkita.domain.model.ReaderTocItem
 import net.dom53.inkita.domain.repository.ReaderRepository
 import java.io.File
 import java.io.IOException
@@ -48,6 +50,7 @@ class ReaderRepositoryImpl(
     private val downloadV2Dao: DownloadV2Dao? = null,
 ) : ReaderRepository {
     private val archiveEntryCache = mutableMapOf<String, List<String>>()
+    private val tocCache = mutableMapOf<Int, List<ReaderTocItem>>()
     private val downloadStorageManager = DownloadStorageManager(context, appPreferences)
 
     class PageNotDownloadedException(
@@ -447,6 +450,47 @@ class ReaderRepositoryImpl(
                 info.copy(chapterNumber = resolveChapterNumber(api, info, chapterId))
             }
         }.getOrNull() ?: getOfflineBookInfo(chapterId)
+
+    override suspend fun getToc(chapterId: Int): List<ReaderTocItem> {
+        synchronized(tocCache) { tocCache[chapterId] }?.let { return it }
+        if (!isOnlineAllowed()) return emptyList()
+        val toc =
+            try {
+                val resp = apiOrThrow().getBookChapters(chapterId)
+                if (resp.isSuccessful) resp.body().orEmpty().flatMap { flattenTocItem(it, 0) } else emptyList()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                emptyList()
+            }
+        if (toc.isNotEmpty()) synchronized(tocCache) { tocCache[chapterId] = toc }
+        return toc
+    }
+
+    private fun flattenTocItem(
+        item: BookChapterItemDto,
+        depth: Int,
+    ): List<ReaderTocItem> {
+        val title = item.title?.trim().orEmpty()
+        val self =
+            if (title.isEmpty()) {
+                emptyList()
+            } else {
+                listOf(
+                    ReaderTocItem(
+                        title = title,
+                        page = item.page ?: 0,
+                        anchor =
+                            item.part
+                                ?.trim()
+                                ?.removePrefix("#")
+                                ?.takeIf { it.isNotEmpty() },
+                        depth = depth,
+                    ),
+                )
+            }
+        return self + item.children.orEmpty().flatMap { flattenTocItem(it, if (self.isEmpty()) depth else depth + 1) }
+    }
 
     private suspend fun resolveChapterNumber(
         api: net.dom53.inkita.data.api.KavitaApi,

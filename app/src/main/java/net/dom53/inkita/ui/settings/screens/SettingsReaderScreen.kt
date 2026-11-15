@@ -29,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -121,6 +122,27 @@ fun SettingsReaderScreen(
         HorizontalDivider()
 
         Text(stringResource(R.string.reader_text_settings), style = MaterialTheme.typography.titleMedium)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.reader_paged_mode), style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = stringResource(R.string.reader_paged_mode_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = prefs.epubPaged,
+                onCheckedChange = { enabled ->
+                    scope.launch { appPreferences.updateReaderPrefs { copy(epubPaged = enabled) } }
+                },
+                modifier = Modifier.padding(start = 12.dp),
+            )
+        }
         StepperRow(stringResource(R.string.reader_font_size), "${fontSize.toInt()}") { delta ->
             val newVal = (fontSize + delta).coerceIn(8f, 36f)
             fontSize = newVal

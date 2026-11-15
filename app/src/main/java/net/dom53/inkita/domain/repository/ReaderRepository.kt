@@ -6,6 +6,7 @@ import net.dom53.inkita.domain.model.ReaderImageResult
 import net.dom53.inkita.domain.model.ReaderPageResult
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.ReaderTimeLeft
+import net.dom53.inkita.domain.model.ReaderTocItem
 
 interface ReaderRepository {
     suspend fun getPageResult(
@@ -59,6 +60,9 @@ interface ReaderRepository {
     suspend fun getContinuePoint(seriesId: Int): ReaderChapterNav?
 
     suspend fun getBookInfo(chapterId: Int): ReaderBookInfo?
+
+    /** Table of contents of an EPUB, empty when unavailable (e.g. offline). */
+    suspend fun getToc(chapterId: Int): List<ReaderTocItem> = emptyList()
 
     suspend fun markSeriesRead(seriesId: Int)
 

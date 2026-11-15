@@ -290,6 +290,10 @@
     <string name="reader_image_prefetch_pages_short">%1$d pages</string>
     <string name="reader_image_prefetch_pages_value">%1$d pages</string>
     <string name="reader_text_settings">Text settings</string>
+    <string name="reader_chapter_label">Chapter</string>
+    <string name="reader_paged_mode">Page-by-page reading</string>
+    <string name="reader_paged_mode_subtitle">Turn screen-sized pages like an e-reader instead of scrolling. Tap the screen edges or swipe.</string>
+    <string name="reader_contents">Contents</string>
     <string name="reader_font_size">Font size</string>
     <string name="reader_line_height">Line height</string>
     <string name="reader_padding">Padding</string>

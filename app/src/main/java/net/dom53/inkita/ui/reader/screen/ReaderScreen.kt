@@ -10,6 +10,8 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.ViewConfiguration
+import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -22,6 +24,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -39,6 +44,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Toc
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +56,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -71,6 +78,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -85,6 +93,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dom53.inkita.R
@@ -95,6 +104,7 @@ import net.dom53.inkita.core.storage.ImageReaderMode
 import net.dom53.inkita.core.storage.ReaderPrefs
 import net.dom53.inkita.core.storage.ReaderThemeMode
 import net.dom53.inkita.domain.model.Format
+import net.dom53.inkita.domain.model.ReaderTocItem
 import net.dom53.inkita.domain.repository.ReaderRepository
 import net.dom53.inkita.ui.reader.model.ReaderFontOption
 import net.dom53.inkita.ui.reader.model.fontFaceCss
@@ -170,6 +180,7 @@ fun ReaderScreen(
     }
 }
 
+@Suppress("CyclomaticComplexMethod")
 @Composable
 internal fun BaseReaderScreen(
     chapterId: Int,
@@ -237,11 +248,24 @@ internal fun BaseReaderScreen(
     val activity = LocalView.current.context as? Activity
     var showOverlay by remember { mutableStateOf(true) }
     var showSettingsPanel by remember { mutableStateOf(false) }
+    var showToc by remember { mutableStateOf(false) }
+    // Last measured overlay bar heights; kept while the bars are hidden so paged layout stays stable.
+    var topBarPx by remember { mutableStateOf(0) }
+    var bottomBarPx by remember { mutableStateOf(0) }
+    var pagedPage by remember { mutableStateOf(0) }
+    var pagedTotal by remember { mutableStateOf(0) }
+    // Direction of an in-progress turn to a neighbouring book page (1 forward, -1 back, 0 none).
+    var enterDirection by remember { mutableStateOf(0) }
     var selectedSettingsTab by remember { mutableStateOf(ReaderSettingsTab.Font) }
     val selectedFont = fontOptions.firstOrNull { it.id == fontFamilyId } ?: readerFontOptions.first()
     val isImageReader = renderer == net.dom53.inkita.ui.reader.renderer.ImageReader
     val isPdfReader = renderer == PdfReader
     val supportsReaderSettings = renderer.supportsTextSettings || isImageReader || isPdfReader
+    val pagedEnabled = readerPrefs.epubPaged && renderer === net.dom53.inkita.ui.reader.renderer.EpubReader
+    LaunchedEffect(uiState.pageIndex, pagedEnabled) {
+        pagedPage = 0
+        pagedTotal = 0
+    }
 
     LaunchedEffect(readerPrefs) {
         fontSize = readerPrefs.fontSize
@@ -272,7 +296,7 @@ internal fun BaseReaderScreen(
         }
     }
 
-    val goPrevPage: () -> Unit = goPrevPage@{
+    val goPrevPageWith: (Boolean) -> Unit = goPrevPage@{ openAtEnd ->
         if (uiState.pageIndex <= 0) {
             scope.launch {
                 val nav = readerViewModel.getPreviousChapter()
@@ -312,10 +336,11 @@ internal fun BaseReaderScreen(
                     Toast.makeText(context, context.getString(R.string.reader_page_not_downloaded), Toast.LENGTH_SHORT).show()
                     return@launch
                 }
-                readerViewModel.loadPage(prev)
+                readerViewModel.loadPage(prev, null, openAtEnd)
             }
         }
     }
+    val goPrevPage: () -> Unit = { goPrevPageWith(false) }
     val goNextPage: () -> Unit = goNextPage@{
         if (uiState.pageCount > 0 && uiState.pageIndex >= uiState.pageCount - 1) {
             scope.launch {
@@ -353,6 +378,71 @@ internal fun BaseReaderScreen(
         }
     }
 
+    // Paged mode: turn a screen inside the current book page, and only load another page at its edges.
+    val pagedTurn: (Boolean) -> Unit = turn@{ forward ->
+        val web = webViewRef.value
+        if (web == null || uiState.isLoading) {
+            web?.evaluateJavascript("(window.__ik && window.__ik.settle());", null)
+            return@turn
+        }
+        val call = if (forward) "next" else "prev"
+        web.evaluateJavascript("(window.__ik ? (window.__ik.$call() ? 1 : 0) : -1);") { result ->
+            when (result) {
+                "1", "-1" -> Unit
+                else -> {
+                    val neighbourPage =
+                        if (forward) {
+                            !(uiState.pageCount > 0 && uiState.pageIndex >= uiState.pageCount - 1)
+                        } else {
+                            uiState.pageIndex > 0
+                        }
+                    if (neighbourPage) {
+                        // Slide this page away, load the neighbour (usually already prefetched), and let it slide in.
+                        val direction = if (forward) 1 else -1
+                        val startPage = uiState.pageIndex
+                        enterDirection = direction
+                        web.evaluateJavascript("(window.__ik && window.__ik.leave($direction));", null)
+                        scope.launch {
+                            delay(PAGED_LEAVE_MS)
+                            if (forward) goNextPage() else goPrevPageWith(true)
+                            delay(PAGED_LOAD_TIMEOUT_MS)
+                            if (uiState.pageIndex == startPage) {
+                                // The page did not change (offline, error): bring the current one back.
+                                enterDirection = 0
+                                web.evaluateJavascript("(window.__ik && window.__ik.recover());", null)
+                            }
+                        }
+                    } else {
+                        web.evaluateJavascript("(window.__ik && window.__ik.settle());", null)
+                        if (forward) goNextPage() else goPrevPageWith(true)
+                    }
+                }
+            }
+        }
+    }
+    val openTocItem: (ReaderTocItem) -> Unit = { item ->
+        showToc = false
+        val token = item.anchor?.let { "id(\"$it\")" }
+        if (item.page == uiState.pageIndex) {
+            val web = webViewRef.value
+            val script =
+                when {
+                    pagedEnabled -> if (token != null) pagedGoToTokenJs(token) else "(window.__ik && window.__ik.go(0));"
+                    token != null -> epubScrollToElementJs(token)
+                    else -> "window.scrollTo(0, 0);"
+                }
+            web?.evaluateJavascript(script, null)
+        } else {
+            scope.launch {
+                if (!NetworkUtils.isOnline(context) && !readerViewModel.isPageDownloaded(item.page)) {
+                    Toast.makeText(context, context.getString(R.string.reader_page_not_downloaded), Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                readerViewModel.loadPage(item.page, token)
+            }
+        }
+    }
+
     Box(
         modifier =
             Modifier
@@ -378,6 +468,13 @@ internal fun BaseReaderScreen(
                     imageReaderMode = readerPrefs.imageReaderMode,
                     imagePrefetchPages = readerPrefs.imagePrefetchPages,
                     pdfRightToLeft = readerPrefs.pdfRightToLeft,
+                    epubPaged = pagedEnabled,
+                    openAtEnd = uiState.openAtEnd,
+                    insetTopPx = topBarPx,
+                    insetBottomPx = bottomBarPx,
+                    enterDirection = enterDirection,
+                    hasPrevPage = uiState.pageIndex > 0,
+                    hasNextPage = !(uiState.pageCount > 0 && uiState.pageIndex >= uiState.pageCount - 1),
                 ),
             callbacks =
                 ReaderRenderCallbacks(
@@ -388,8 +485,8 @@ internal fun BaseReaderScreen(
                             showOverlay = !showOverlay
                         }
                     },
-                    onSwipeNext = { goNextPage() },
-                    onSwipePrev = { goPrevPage() },
+                    onSwipeNext = { if (pagedEnabled) pagedTurn(true) else goNextPage() },
+                    onSwipePrev = { if (pagedEnabled) pagedTurn(false) else goPrevPage() },
                     onImagePageVisible = { visibleChapterId, pageIndex, prefetchPages ->
                         (readerViewModel as? ImageReaderViewModel)?.onWebtoonPageVisible(
                             chapterId = visibleChapterId,
@@ -410,12 +507,35 @@ internal fun BaseReaderScreen(
                     onPdfPageChanged = { idx, count ->
                         (readerViewModel as? PdfReaderViewModel)?.setPdfPageIndex(idx, count)
                     },
+                    onEpubPageChanged = { current, total ->
+                        pagedPage = current
+                        pagedTotal = total
+                        // Fetch the neighbouring book page while the reader is still on the near edge of this one.
+                        if (total > 0) {
+                            val hasNext = !(uiState.pageCount > 0 && uiState.pageIndex >= uiState.pageCount - 1)
+                            if (current >= total - 2 && hasNext) readerViewModel.prefetchPage(uiState.pageIndex + 1)
+                            if (current <= 1 && uiState.pageIndex > 0) readerViewModel.prefetchPage(uiState.pageIndex - 1)
+                        }
+                    },
+                    onConsumeEnter = { enterDirection = 0 },
+                    onConsumeOpenAtEnd = { readerViewModel.consumeOpenAtEnd() },
                 ),
         )
 
         if (showOverlay) {
             val barTitle = uiState.bookInfo?.title ?: stringResource(R.string.reader_title)
-            val barPageText = pageText(uiState.pageIndex, uiState.pageCount, uiState.bookInfo?.pageTitle, context)
+            // Kavita's "pages" of an EPUB are the book's documents (normally one per chapter), so name them
+            // that way; the screen-sized pages of paged mode are the real pages.
+            val isEpub = renderer === net.dom53.inkita.ui.reader.renderer.EpubReader
+            val unitLabel = stringResource(if (isEpub) R.string.reader_chapter_label else R.string.general_page)
+            val basePageText =
+                pageText(uiState.pageIndex, uiState.pageCount, uiState.bookInfo?.pageTitle, unitLabel)
+            val barPageText =
+                if (pagedEnabled && pagedTotal > 0) {
+                    "$basePageText · ${stringResource(R.string.general_page)} ${pagedPage + 1}/$pagedTotal"
+                } else {
+                    basePageText
+                }
             if (topBarContent != null) {
                 topBarContent(barTitle, barPageText, leaveReader)
             } else {
@@ -423,10 +543,12 @@ internal fun BaseReaderScreen(
                     title = barTitle,
                     pageText = barPageText,
                     onBack = leaveReader,
+                    onOpenToc = if (uiState.toc.isNotEmpty()) ({ showToc = true }) else null,
                     modifier =
                         Modifier
                             .align(Alignment.TopStart)
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
+                            .onSizeChanged { if (it.height > 0) topBarPx = it.height },
                 )
             }
 
@@ -438,6 +560,13 @@ internal fun BaseReaderScreen(
                     pageCount = uiState.pageCount,
                     timeLeft = uiState.timeLeftText(context),
                     enableSettings = supportsReaderSettings,
+                    progress =
+                        if (uiState.pageCount > 0) {
+                            val within = if (pagedEnabled && pagedTotal > 0) (pagedPage + 1f) / pagedTotal else 1f
+                            (uiState.pageIndex + within) / uiState.pageCount
+                        } else {
+                            0f
+                        },
                 )
             val bottomBarCallbacks =
                 ReaderBottomBarCallbacks(
@@ -454,7 +583,13 @@ internal fun BaseReaderScreen(
                             }
                         } else {
                             webViewRef.value?.let { web ->
-                                web.post { web.scrollTo(0, 0) }
+                                web.post {
+                                    if (pagedEnabled) {
+                                        web.evaluateJavascript("(window.__ik && window.__ik.go(0));", null)
+                                    } else {
+                                        web.scrollTo(0, 0)
+                                    }
+                                }
                             }
                         }
                     },
@@ -470,14 +605,18 @@ internal fun BaseReaderScreen(
                         } else {
                             webViewRef.value?.let { web ->
                                 web.post {
-                                    val bottom = ((web.contentHeight * web.scale) - web.height).toInt().coerceAtLeast(0)
-                                    web.scrollTo(0, bottom)
+                                    if (pagedEnabled) {
+                                        web.evaluateJavascript("(window.__ik && window.__ik.last());", null)
+                                    } else {
+                                        val bottom = ((web.contentHeight * web.scale) - web.height).toInt().coerceAtLeast(0)
+                                        web.scrollTo(0, bottom)
+                                    }
                                 }
                             }
                         }
                     },
-                    onPrevPage = { goPrevPage() },
-                    onNextPage = { goNextPage() },
+                    onPrevPage = { if (pagedEnabled) pagedTurn(false) else goPrevPage() },
+                    onNextPage = { if (pagedEnabled) pagedTurn(true) else goNextPage() },
                     onOpenSettings = { if (supportsReaderSettings) showSettingsPanel = !showSettingsPanel },
                     onPrevChapter = {
                         scope.launch {
@@ -531,6 +670,7 @@ internal fun BaseReaderScreen(
                     pageIndex = bottomBarState.pageIndex,
                     pageCount = bottomBarState.pageCount,
                     timeLeft = bottomBarState.timeLeft,
+                    progress = bottomBarState.progress,
                     onScrollTop = bottomBarCallbacks.onScrollTop,
                     onScrollBottom = bottomBarCallbacks.onScrollBottom,
                     onPrevPage = bottomBarCallbacks.onPrevPage,
@@ -541,7 +681,8 @@ internal fun BaseReaderScreen(
                     enableSettings = bottomBarState.enableSettings,
                     modifier =
                         Modifier
-                            .align(Alignment.BottomCenter),
+                            .align(Alignment.BottomCenter)
+                            .onSizeChanged { if (it.height > 0) bottomBarPx = it.height },
                 )
             }
 
@@ -577,6 +718,7 @@ internal fun BaseReaderScreen(
                         fontOptions = fontOptions,
                         fontFamilyId = selectedFont.id,
                         imageReaderMode = readerPrefs.imageReaderMode,
+                        epubPaged = readerPrefs.epubPaged,
                     )
                 val settingsCallbacks =
                     ReaderSettingsCallbacks(
@@ -623,6 +765,9 @@ internal fun BaseReaderScreen(
                         onImageReaderModeChange = { mode ->
                             scope.launch { appPreferences.updateReaderPrefs { copy(imageReaderMode = mode) } }
                         },
+                        onEpubPagedChange = { enabled ->
+                            scope.launch { appPreferences.updateReaderPrefs { copy(epubPaged = enabled) } }
+                        },
                     )
                 if (settingsContent != null) {
                     settingsContent(settingsState, settingsCallbacks)
@@ -659,11 +804,22 @@ internal fun BaseReaderScreen(
                         fontOptions = settingsState.fontOptions,
                         fontFamilyId = settingsState.fontFamilyId,
                         onFontFamilyChange = settingsCallbacks.onFontFamilyChange,
+                        epubPaged = settingsState.epubPaged,
+                        onEpubPagedChange = settingsCallbacks.onEpubPagedChange,
                     )
                 }
             }
 
             overlayExtras()
+        }
+
+        if (showToc) {
+            TocDialog(
+                items = uiState.toc,
+                currentPage = uiState.pageIndex,
+                onSelect = openTocItem,
+                onDismiss = { showToc = false },
+            )
         }
 
         if (showNextChapterDialog) {
@@ -724,11 +880,55 @@ private fun ReaderUiState.timeLeftText(context: Context): String? {
 }
 
 @Composable
+private fun TocDialog(
+    items: List<ReaderTocItem>,
+    currentPage: Int,
+    onSelect: (ReaderTocItem) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // Best guess for "where am I": the first entry of the furthest book page that is not past the current one.
+    val currentIndex =
+        remember(items, currentPage) {
+            val page = items.filter { it.page <= currentPage }.maxOfOrNull { it.page }
+            items.indexOfFirst { it.page == page }.takeIf { it >= 0 }
+        }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (currentIndex ?: 0).coerceAtLeast(0))
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.reader_contents)) },
+        text = {
+            LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
+                itemsIndexed(items) { index, item ->
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (index == currentIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(item) }
+                                .padding(start = (item.depth.coerceAtMost(4) * 16).dp, top = 10.dp, bottom = 10.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.general_close))
+            }
+        },
+    )
+}
+
+@Composable
 private fun ReaderTopBar(
     title: String,
     pageText: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenToc: (() -> Unit)? = null,
 ) {
     Row(
         modifier =
@@ -738,13 +938,21 @@ private fun ReaderTopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f),
+        ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.Filled.ArrowBack, contentDescription = stringResource(R.string.general_back))
             }
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(pageText, style = MaterialTheme.typography.labelSmall)
+                Text(pageText, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (onOpenToc != null) {
+            IconButton(onClick = onOpenToc) {
+                Icon(Icons.Filled.Toc, contentDescription = stringResource(R.string.reader_contents))
             }
         }
     }
@@ -758,6 +966,7 @@ private fun ReaderBottomBar(
     pageCount: Int,
     timeLeft: String?,
     enableSettings: Boolean,
+    progress: Float,
     onScrollTop: () -> Unit,
     onScrollBottom: () -> Unit,
     onPrevPage: () -> Unit,
@@ -778,7 +987,7 @@ private fun ReaderBottomBar(
             Text(it, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 4.dp))
         }
         LinearProgressIndicator(
-            progress = if (pageCount > 0) (pageIndex + 1f) / pageCount else 0f,
+            progress = progress.coerceIn(0f, 1f),
             modifier = Modifier.fillMaxWidth(),
         )
         Row(
@@ -838,6 +1047,7 @@ data class ReaderBottomBarState(
     val pageCount: Int,
     val timeLeft: String?,
     val enableSettings: Boolean,
+    val progress: Float = 0f,
 )
 
 data class ReaderBottomBarCallbacks(
@@ -860,6 +1070,7 @@ data class ReaderSettingsState(
     val fontOptions: List<ReaderFontOption>,
     val fontFamilyId: String,
     val imageReaderMode: ImageReaderMode,
+    val epubPaged: Boolean = false,
 )
 
 data class ReaderSettingsCallbacks(
@@ -871,6 +1082,7 @@ data class ReaderSettingsCallbacks(
     val onTextAlignChange: (TextAlign) -> Unit,
     val onFontFamilyChange: (ReaderFontOption) -> Unit,
     val onImageReaderModeChange: (ImageReaderMode) -> Unit,
+    val onEpubPagedChange: (Boolean) -> Unit = {},
 )
 
 @Composable
@@ -890,6 +1102,8 @@ private fun SettingsPanel(
     fontOptions: List<ReaderFontOption>,
     fontFamilyId: String,
     onFontFamilyChange: (ReaderFontOption) -> Unit,
+    epubPaged: Boolean,
+    onEpubPagedChange: (Boolean) -> Unit,
 ) {
     val tabs =
         listOf(
@@ -966,10 +1180,21 @@ private fun SettingsPanel(
                     onThemeChange = onThemeChange,
                 )
             ReaderSettingsTab.Navigation ->
-                Text(
-                    stringResource(R.string.general_nav_option_soon),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.reader_paged_mode), style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            stringResource(R.string.reader_paged_mode_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = epubPaged, onCheckedChange = onEpubPagedChange)
+                }
         }
     }
 }
@@ -1209,9 +1434,9 @@ private fun pageText(
     idx: Int,
     count: Int,
     pageTitle: String?,
-    context: Context,
+    unitLabel: String,
 ): String {
-    val base = if (count > 0) "${context.resources.getString(R.string.general_page)} ${idx + 1} / $count" else ""
+    val base = if (count > 0) "$unitLabel ${idx + 1} / $count" else ""
     return if (!pageTitle.isNullOrBlank()) {
         listOf(base, pageTitle).filter { it.isNotBlank() }.joinToString(" – ")
     } else {
@@ -1219,6 +1444,14 @@ private fun pageText(
     }
 }
 
+private const val PAGED_TAP_ZONE = 0.3f
+private const val PAGED_DRAG_COMMIT = 0.25f
+private const val PAGED_LEAVE_MS = 120L
+private const val PAGED_LOAD_TIMEOUT_MS = 3000L
+private const val PAGED_ENTER_FALLBACK_MS = 3000L
+private const val PAGED_ANCHOR_JS = "(window.__ik ? window.__ik.anchorToken() : null);"
+
+@Suppress("LongParameterList")
 @Composable
 internal fun ReaderWebView(
     html: String,
@@ -1240,12 +1473,22 @@ internal fun ReaderWebView(
     pendingScrollId: String? = null,
     onConsumeScrollId: () -> Unit = {},
     onScrollIdle: (String?) -> Unit = {},
+    paged: Boolean = false,
+    openAtEnd: Boolean = false,
+    onConsumeOpenAtEnd: () -> Unit = {},
+    onPagedChanged: (Int, Int) -> Unit = { _, _ -> },
+    insetTopPx: Int = 0,
+    insetBottomPx: Int = 0,
+    enterDirection: Int = 0,
+    onConsumeEnter: () -> Unit = {},
+    hasPrevPage: Boolean = false,
+    hasNextPage: Boolean = false,
 ) {
     if (html.isBlank()) return
     val context = LocalContext.current
     var loadedContent by remember { mutableStateOf<EpubWebContent?>(null) }
     val content =
-        remember(context, html, config, fromOffline, offlineAssetPaths) {
+        remember(context, html, config, fromOffline, offlineAssetPaths, paged) {
             EpubWebContent(context, html, config, fromOffline, offlineAssetPaths)
         }
     val currentContent by rememberUpdatedState(content)
@@ -1253,6 +1496,16 @@ internal fun ReaderWebView(
     val consumeScroll by rememberUpdatedState(onConsumePendingScroll)
     val currentScrollId by rememberUpdatedState(pendingScrollId)
     val consumeScrollId by rememberUpdatedState(onConsumeScrollId)
+    val currentPaged by rememberUpdatedState(paged)
+    val currentOpenAtEnd by rememberUpdatedState(openAtEnd)
+    val consumeOpenAtEnd by rememberUpdatedState(onConsumeOpenAtEnd)
+    val currentOnPagedChanged by rememberUpdatedState(onPagedChanged)
+    val currentEnter by rememberUpdatedState(enterDirection)
+    val consumeEnter by rememberUpdatedState(onConsumeEnter)
+    val currentHasPrev by rememberUpdatedState(hasPrevPage)
+    val currentHasNext by rememberUpdatedState(hasNextPage)
+    val currentSwipeNext by rememberUpdatedState(onSwipeNext)
+    val currentSwipePrev by rememberUpdatedState(onSwipePrev)
     val paddingTopPx = paddingPx / 2f
     val fontFaceCss = fontOption.fontFaceCss().replace("file:///android_asset/fonts/", READER_FONT_URL)
     val (bgColor, textColor) = themeColorsFor(themeMode)
@@ -1295,7 +1548,10 @@ internal fun ReaderWebView(
         """
         (function() {
             var tag = document.querySelector('head > style#reader-style');
-            if (tag) tag.textContent = ${org.json.JSONObject.quote(cssBlock)};
+            var css = ${org.json.JSONObject.quote(cssBlock)};
+            if (!tag || tag.textContent === css) return;
+            tag.textContent = css;
+            if (window.__ik) window.__ik.relayout();
         })();
         """.trimIndent()
     val currentStyle by rememberUpdatedState(styleJs)
@@ -1337,92 +1593,196 @@ internal fun ReaderWebView(
         """
         }
 
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { context ->
-            val swipeThreshold = 120
-            val swipeVelocityThreshold = 200
-            val gestureDetector =
-                GestureDetector(
-                    context,
-                    object : GestureDetector.SimpleOnGestureListener() {
-                        override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                            onToggleOverlay()
-                            return true
-                        }
-
-                        override fun onFling(
-                            e1: MotionEvent?,
-                            e2: MotionEvent,
-                            velocityX: Float,
-                            velocityY: Float,
-                        ): Boolean {
-                            if (e1 == null) return false
-                            val diffX = e2.x - e1.x
-                            val diffY = e2.y - e1.y
-                            if (abs(diffX) > abs(diffY) &&
-                                abs(diffX) > swipeThreshold &&
-                                abs(velocityX) > swipeVelocityThreshold
-                            ) {
-                                if (diffX < 0) onSwipeNext() else onSwipePrev()
+    val density = LocalDensity.current
+    val pageBackground = runCatching { Color(android.graphics.Color.parseColor(bgColor)) }.getOrDefault(Color.Transparent)
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .then(if (paged) Modifier.background(pageBackground) else Modifier),
+    ) {
+        AndroidView(
+            // Paged mode keeps the page between the top and bottom bars so the bars never hide text.
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (paged) {
+                            Modifier.padding(
+                                top = with(density) { insetTopPx.toDp() },
+                                bottom = with(density) { insetBottomPx.toDp() },
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
+            factory = { context ->
+                val swipeThreshold = 120
+                val swipeVelocityThreshold = 200
+                var tappedView: WebView? = null
+                var dragging = false
+                var flung = false
+                var dragDx = 0f
+                val density = context.resources.displayMetrics.density
+                val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+                val gestureDetector =
+                    GestureDetector(
+                        context,
+                        object : GestureDetector.SimpleOnGestureListener() {
+                            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                                val width = tappedView?.width ?: 0
+                                if (currentPaged && width > 0) {
+                                    when {
+                                        e.x < width * PAGED_TAP_ZONE -> currentSwipePrev()
+                                        e.x > width * (1f - PAGED_TAP_ZONE) -> currentSwipeNext()
+                                        else -> onToggleOverlay()
+                                    }
+                                } else {
+                                    onToggleOverlay()
+                                }
                                 return true
                             }
-                            return false
-                        }
-                    },
-                )
-            WebView(context).apply {
-                configureEpubWebView({ currentContent }) { view ->
-                    view.evaluateJavascript(currentStyle, null)
-                    currentScrollId?.let { id ->
-                        view.evaluateJavascript(epubScrollToElementJs(id), null)
-                        consumeScrollId()
-                    }
-                    currentScrollY?.let { y ->
-                        view.post {
-                            view.scrollTo(0, y)
-                            view.postDelayed({ view.scrollTo(0, y) }, 50)
-                        }
-                        consumeScroll()
-                    }
-                }
-                setOnTouchListener { _, event ->
-                    gestureDetector.onTouchEvent(event)
-                    false
-                }
-                setOnScrollChangeListener { _, _, _, _, _ ->
-                    scrollRunnable?.let { scrollHandler.removeCallbacks(it) }
-                    scrollRunnable =
-                        Runnable {
-                            evaluateJavascript(scrollIdJs) { result ->
-                                val id = result?.let { org.json.JSONTokener(it).nextValue() as? String }
-                                onScrollIdle(id)
+
+                            override fun onFling(
+                                e1: MotionEvent?,
+                                e2: MotionEvent,
+                                velocityX: Float,
+                                velocityY: Float,
+                            ): Boolean {
+                                if (e1 == null) return false
+                                val diffX = e2.x - e1.x
+                                val diffY = e2.y - e1.y
+                                if (abs(diffX) > abs(diffY) &&
+                                    abs(diffX) > swipeThreshold &&
+                                    abs(velocityX) > swipeVelocityThreshold
+                                ) {
+                                    flung = true
+                                    if (diffX < 0) currentSwipeNext() else currentSwipePrev()
+                                    return true
+                                }
+                                return false
                             }
+
+                            override fun onScroll(
+                                e1: MotionEvent?,
+                                e2: MotionEvent,
+                                distanceX: Float,
+                                distanceY: Float,
+                            ): Boolean {
+                                if (!currentPaged || e1 == null) return false
+                                val totalX = e2.x - e1.x
+                                val totalY = e2.y - e1.y
+                                if (!dragging && abs(totalX) > touchSlop * 2 && abs(totalX) > abs(totalY)) dragging = true
+                                if (!dragging) return false
+                                dragDx = totalX
+                                tappedView?.evaluateJavascript("(window.__ik && window.__ik.drag(${totalX / density}, $currentHasPrev, $currentHasNext));", null)
+                                return true
+                            }
+                        },
+                    )
+                WebView(context).apply {
+                    tappedView = this
+                    addJavascriptInterface(
+                        object {
+                            @JavascriptInterface
+                            fun onPage(
+                                current: Int,
+                                total: Int,
+                            ) {
+                                post { currentOnPagedChanged(current, total) }
+                            }
+                        },
+                        PAGED_BRIDGE_NAME,
+                    )
+                    configureEpubWebView({ currentContent }) { view ->
+                        view.evaluateJavascript(currentStyle, null)
+                        if (currentPaged) {
+                            // The view was hidden while loading so the new page can slide in without a flash.
+                            val enter = currentEnter
+                            view.evaluateJavascript(pagedStartJs(currentScrollId, currentOpenAtEnd, enter)) { view.alpha = 1f }
+                            consumeEnter()
+                            consumeScrollId()
+                            consumeOpenAtEnd()
+                            currentScrollY?.let { consumeScroll() }
+                            return@configureEpubWebView
                         }
-                    scrollHandler.postDelayed(scrollRunnable!!, 300)
-                }
-                onWebViewReady(this)
-            }
-        },
-        update = { webView ->
-            webView.setBackgroundColor(Color.Transparent.toArgb())
-            if (loadedContent !== content) {
-                loadedContent = content
-                content.load(webView, cssBlock)
-            } else {
-                webView.evaluateJavascript(styleJs, null)
-            }
-            if (content.isDocumentUrl(webView.url) && webView.progress == 100) {
-                pendingScrollY?.let { y ->
-                    webView.post {
-                        webView.scrollTo(0, y)
+                        view.alpha = 1f
+                        currentScrollId?.let { id ->
+                            view.evaluateJavascript(epubScrollToElementJs(id), null)
+                            consumeScrollId()
+                        }
+                        currentScrollY?.let { y ->
+                            view.post {
+                                view.scrollTo(0, y)
+                                view.postDelayed({ view.scrollTo(0, y) }, 50)
+                            }
+                            consumeScroll()
+                        }
                     }
-                    webView.postDelayed({ webView.scrollTo(0, y) }, 50)
-                    onConsumePendingScroll()
+                    setOnTouchListener { view, event ->
+                        gestureDetector.onTouchEvent(event)
+                        val ended = event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL
+                        if (currentPaged && ended) {
+                            if (dragging && !flung) {
+                                if (event.actionMasked == MotionEvent.ACTION_UP && abs(dragDx) > view.width * PAGED_DRAG_COMMIT) {
+                                    if (dragDx < 0) currentSwipeNext() else currentSwipePrev()
+                                } else {
+                                    evaluateJavascript("(window.__ik && window.__ik.settle());", null)
+                                }
+                            }
+                            dragging = false
+                            flung = false
+                            dragDx = 0f
+                        }
+                        // Paged mode turns pages itself, so the WebView must not scroll under the finger.
+                        currentPaged
+                    }
+                    setOnScrollChangeListener { _, _, _, _, _ ->
+                        scrollRunnable?.let { scrollHandler.removeCallbacks(it) }
+                        scrollRunnable =
+                            Runnable {
+                                val script = if (currentPaged) PAGED_ANCHOR_JS else scrollIdJs
+                                evaluateJavascript(script) { result ->
+                                    val id = result?.let { org.json.JSONTokener(it).nextValue() as? String }
+                                    onScrollIdle(id)
+                                }
+                            }
+                        scrollHandler.postDelayed(scrollRunnable!!, 300)
+                    }
+                    onWebViewReady(this)
                 }
-            }
-        },
-    )
+            },
+            update = { webView ->
+                webView.setBackgroundColor(Color.Transparent.toArgb())
+                // Paged mode moves the page itself; scrollbars would only flash during the slide.
+                webView.isHorizontalScrollBarEnabled = !paged
+                webView.isVerticalScrollBarEnabled = !paged
+                if (loadedContent !== content) {
+                    loadedContent = content
+                    if (paged && enterDirection != 0) {
+                        // Keep the incoming page invisible until it is positioned and ready to slide in.
+                        webView.alpha = 0f
+                        webView.postDelayed({ webView.alpha = 1f }, PAGED_ENTER_FALLBACK_MS)
+                    }
+                    content.load(webView, cssBlock)
+                } else {
+                    webView.evaluateJavascript(styleJs, null)
+                }
+                if (paged) {
+                    // Paged mode keeps its own horizontal position; a vertical scroll offset would reset it.
+                    pendingScrollY?.let { onConsumePendingScroll() }
+                } else if (content.isDocumentUrl(webView.url) && webView.progress == 100) {
+                    pendingScrollY?.let { y ->
+                        webView.post {
+                            webView.scrollTo(0, y)
+                        }
+                        webView.postDelayed({ webView.scrollTo(0, y) }, 50)
+                        onConsumePendingScroll()
+                    }
+                }
+            },
+        )
+    }
 }
 
 private fun epubScrollToElementJs(id: String): String {

@@ -11,6 +11,7 @@ import net.dom53.inkita.domain.model.ReaderBookInfo
 import net.dom53.inkita.domain.model.ReaderChapterNav
 import net.dom53.inkita.domain.model.ReaderProgress
 import net.dom53.inkita.domain.model.ReaderTimeLeft
+import net.dom53.inkita.domain.model.ReaderTocItem
 import net.dom53.inkita.domain.reader.BaseReader
 import net.dom53.inkita.domain.reader.ReaderLoadResult
 
@@ -33,6 +34,9 @@ data class ReaderUiState(
     val bookScrollId: String? = null,
     val isPdf: Boolean = false,
     val pdfPath: String? = null,
+    val toc: List<ReaderTocItem> = emptyList(),
+    /** EPUB paged mode: open the loaded page on its last screen (used when paging backwards). */
+    val openAtEnd: Boolean = false,
 )
 
 data class WebtoonChapterUiState(
@@ -87,16 +91,66 @@ abstract class BaseReaderViewModel(
             }
             loadInitialContent(pageToOpen)
             loadTimeLeft()
+            loadToc()
         }
     }
 
+    private fun loadToc() {
+        if (reader.format != Format.Epub) return
+        viewModelScope.launch {
+            val toc = runCatching { reader.getToc(chapterId) }.getOrDefault(emptyList())
+            _state.update { it.copy(toc = toc) }
+        }
+    }
+
+    private val prefetched = mutableMapOf<Int, ReaderLoadResult>()
+    private val prefetching = mutableSetOf<Int>()
+
+    /** Fetch a neighbouring EPUB page ahead of time so turning to it does not wait for the network. */
+    fun prefetchPage(index: Int) {
+        if (reader.format != Format.Epub || index < 0) return
+        if (prefetched.containsKey(index) || !prefetching.add(index)) return
+        viewModelScope.launch {
+            val result = runCatching { reader.loadPage(chapterId, index) }.getOrNull()
+            prefetching.remove(index)
+            if (result != null) {
+                prefetched.keys.retainAll { kotlin.math.abs(it - index) <= 1 }
+                prefetched[index] = result
+            }
+        }
+    }
+
+    private var targetScrollId: String? = null
+    private var targetOpenAtEnd = false
+
+    /** Loads [index] and, once it is shown, positions the reader at [scrollId] (or at the end of the page). */
+    fun loadPage(
+        index: Int,
+        scrollId: String?,
+        openAtEnd: Boolean = false,
+    ) {
+        targetScrollId = scrollId
+        targetOpenAtEnd = openAtEnd
+        loadPage(index)
+    }
+
+    fun consumeOpenAtEnd() {
+        _state.update { it.copy(openAtEnd = false) }
+    }
+
     open fun loadPage(index: Int) {
+        val scrollId = targetScrollId
+        val openAtEnd = targetOpenAtEnd
+        targetScrollId = null
+        targetOpenAtEnd = false
         viewModelScope.launch {
             val previous = _state.value
             _state.update { it.copy(isLoading = true, error = null) }
-            runCatching { reader.loadPage(chapterId, index) }
+            runCatching { prefetched.remove(index) ?: reader.loadPage(chapterId, index) }
                 .onSuccess { result ->
                     applyLoadResult(result, index)
+                    // A new page must not inherit the previous page's scroll position.
+                    _state.update { it.copy(bookScrollId = scrollId, openAtEnd = openAtEnd) }
                     updateProgress(index)
                     if (_state.value.bookInfo?.pages == null) {
                         val info = runCatching { reader.getBookInfo(chapterId) }.getOrNull()

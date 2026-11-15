@@ -32,3 +32,13 @@ data class ReaderChapterNav(
     val chapterId: Int? = null,
     val pagesRead: Int? = null,
 )
+
+/** One entry of an EPUB table of contents, flattened in reading order. */
+data class ReaderTocItem(
+    val title: String,
+    /** Kavita page (spine file) index the entry lives in. */
+    val page: Int,
+    /** Element id inside that page, or null to open the page from its start. */
+    val anchor: String? = null,
+    val depth: Int = 0,
+)
